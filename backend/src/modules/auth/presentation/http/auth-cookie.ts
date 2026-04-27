@@ -10,7 +10,7 @@ export function buildRefreshCookieOptions(
 ): CookieOptions {
   return {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "none",
     secure: app.environment === "production",
     path: "/",
     maxAge: parseDurationToMilliseconds(auth.refreshTtl),

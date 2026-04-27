@@ -1,20 +1,8 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Instrument_Sans } from "next/font/google";
 
 import { AuthProvider } from "@/components/providers/auth-provider";
 
 import "./globals.css";
-
-const display = Cormorant_Garamond({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["500", "600", "700"],
-});
-
-const body = Instrument_Sans({
-  subsets: ["latin"],
-  variable: "--font-body",
-});
 
 export const metadata: Metadata = {
   title: "SwiftVote",
@@ -34,9 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
-      <body
-        className={`${display.variable} ${body.variable} bg-canvas font-body text-ink antialiased`}
-      >
+      <body className="bg-canvas font-body text-ink antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

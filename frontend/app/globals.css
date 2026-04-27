@@ -5,6 +5,8 @@
 @layer base {
   :root {
     color-scheme: light;
+    --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --font-body: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
   }
 
   * {
