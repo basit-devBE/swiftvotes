@@ -10,7 +10,7 @@ const navLinks = [
   { href: "/#features", label: "Features" },
   { href: "/#how-it-works", label: "How it Works" },
   { href: "/#events", label: "Events" },
-  { href: "/login", label: "Admin" },
+  { href: "/admin/events", label: "Admin" },
 ];
 
 export function Navbar() {
@@ -73,6 +73,9 @@ export function Navbar() {
           <div className="hidden items-center gap-3 md:flex">
             {isAuthenticated ? (
               <>
+                <Link href="/events" className="button-secondary">
+                  My Events
+                </Link>
                 <Link href="/account" className="button-secondary">
                   Account
                 </Link>
@@ -148,6 +151,13 @@ export function Navbar() {
               ))}
               {isAuthenticated ? (
                 <>
+                  <Link
+                    href="/events"
+                    className="button-secondary mt-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    My Events
+                  </Link>
                   <Link
                     href="/account"
                     className="button-secondary mt-2"

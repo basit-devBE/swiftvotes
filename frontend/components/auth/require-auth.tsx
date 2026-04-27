@@ -16,15 +16,15 @@ export function RequireAuth({
 
   useEffect(() => {
     if (status === "anonymous") {
-      router.replace(`/login?next=${encodeURIComponent(pathname || "/account")}`);
+      router.replace(`/login?next=${encodeURIComponent(pathname || "/events")}`);
     }
   }, [pathname, router, status]);
 
   if (status !== "authenticated") {
     return (
-      <div className="rounded-[2rem] border border-white/70 bg-white/84 p-8 shadow-card backdrop-blur">
+      <div className="mx-auto max-w-3xl border-t border-primary/15 pt-10">
         <p className="section-kicker">Session check</p>
-        <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-0.04em] text-ink">
+        <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-0.04em] text-ink sm:text-5xl">
           Verifying your access.
         </h2>
         <p className="mt-4 max-w-xl text-base leading-7 text-ink/64">

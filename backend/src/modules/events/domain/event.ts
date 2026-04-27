@@ -1,0 +1,28 @@
+import { EventCategory } from "./event-category";
+import { EventStatus } from "./event-status";
+
+export type Event = {
+  id: string;
+  creatorUserId: string;
+  name: string;
+  slug: string;
+  description: string;
+  status: EventStatus;
+  primaryFlyerUrl: string;
+  primaryFlyerKey: string;
+  bannerUrl: string | null;
+  bannerKey: string | null;
+  nominationStartAt: Date | null;
+  nominationEndAt: Date | null;
+  votingStartAt: Date;
+  votingEndAt: Date;
+  submittedAt: Date | null;
+  approvedAt: Date | null;
+  approvedByUserId: string | null;
+  rejectedAt: Date | null;
+  rejectedByUserId: string | null;
+  rejectionReason: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  categories: EventCategory[];
+};

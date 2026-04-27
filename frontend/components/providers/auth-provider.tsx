@@ -101,7 +101,7 @@ export function AuthProvider({
         clearSession();
 
         if (pathname !== "/login" && pathname !== "/signup") {
-          router.replace(`/login?next=${encodeURIComponent(pathname || "/account")}`);
+          router.replace(`/login?next=${encodeURIComponent(pathname || "/events")}`);
         }
       },
     });

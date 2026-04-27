@@ -11,7 +11,10 @@ export function buildRefreshCookieOptions(
   return {
     httpOnly: true,
     sameSite: "none",
-    secure: app.environment === "production",
+    // Require Secure for SameSite=None cookies. In development, allow secure
+    // when the configured frontend origin is HTTPS (e.g. ngrok tunnels).
+    secure: app.environment === "production" ||
+      (app.frontendOrigin ?? "").startsWith("https"),
     path: "/",
     maxAge: parseDurationToMilliseconds(auth.refreshTtl),
   };

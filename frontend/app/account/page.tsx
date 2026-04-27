@@ -1,6 +1,5 @@
 import { AccountProfileForm } from "@/components/account/account-profile-form";
 import { RequireAuth } from "@/components/auth/require-auth";
-import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 
 export default function AccountPage() {
@@ -13,7 +12,6 @@ export default function AccountPage() {
           <AccountProfileForm />
         </RequireAuth>
       </main>
-      <Footer />
     </div>
   );
 }

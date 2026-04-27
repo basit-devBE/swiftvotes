@@ -17,6 +17,37 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum EventStatus {
+  DRAFT
+  PENDING_APPROVAL
+  REJECTED
+  APPROVED
+  NOMINATIONS_OPEN
+  NOMINATIONS_CLOSED
+  VOTING_SCHEDULED
+  VOTING_LIVE
+  VOTING_CLOSED
+  ARCHIVED
+}
+
+enum EventRole {
+  EVENT_OWNER
+  EVENT_ADMIN
+  MODERATOR
+  ANALYST
+}
+
+enum MembershipStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum NominationStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  REJECTED
+}
+
 model User {
   id           String      @id @default(cuid())
   email        String      @unique
@@ -26,4 +57,114 @@ model User {
   status       UserStatus  @default(ACTIVE)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+
+  createdEvents           Event[]            @relation("EventCreator")
+  approvedEvents          Event[]            @relation("EventApprover")
+  rejectedEvents          Event[]            @relation("EventRejector")
+  eventMemberships        EventMembership[]  @relation("MembershipUser")
+  assignedMemberships     EventMembership[]  @relation("MembershipAssigner")
+  submittedNominations    Nomination[]       @relation("NominationSubmitter")
+  reviewedNominations     Nomination[]       @relation("NominationReviewer")
+}
+
+model Event {
+  id               String      @id @default(cuid())
+  creatorUserId    String
+  name             String
+  slug             String      @unique
+  description      String
+  status           EventStatus @default(DRAFT)
+  primaryFlyerUrl  String
+  primaryFlyerKey  String
+  bannerUrl        String?
+  bannerKey        String?
+  nominationStartAt DateTime?
+  nominationEndAt   DateTime?
+  votingStartAt     DateTime
+  votingEndAt       DateTime
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  approvedByUserId String?
+  rejectedAt       DateTime?
+  rejectedByUserId String?
+  rejectionReason  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  creator     User              @relation("EventCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
+  approvedBy  User?             @relation("EventApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy  User?             @relation("EventRejector", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  categories  EventCategory[]
+  memberships EventMembership[]
+  nominations Nomination[]
+
+  @@index([creatorUserId, createdAt])
+  @@index([status, submittedAt])
+}
+
+model EventCategory {
+  id             String   @id @default(cuid())
+  eventId        String
+  name           String
+  description    String
+  votePriceMinor Int
+  currency       String
+  imageUrl       String?
+  imageKey       String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  nominations Nomination[]
+
+  @@unique([eventId, name])
+  @@index([eventId, sortOrder])
+}
+
+model EventMembership {
+  id               String           @id @default(cuid())
+  eventId          String
+  userId           String
+  role             EventRole
+  status           MembershipStatus @default(ACTIVE)
+  assignedByUserId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User  @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation("MembershipAssigner", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@index([eventId, role])
+}
+
+model Nomination {
+  id               String           @id @default(cuid())
+  eventId          String
+  categoryId       String
+  submittedByUserId String?
+  submitterName    String
+  submitterEmail   String
+  nomineeName      String
+  nomineeEmail     String?
+  nomineePhone     String?
+  nomineeImageUrl  String?
+  nomineeImageKey  String?
+  status           NominationStatus @default(PENDING_REVIEW)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category    EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  submittedBy User?         @relation("NominationSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  reviewedBy  User?         @relation("NominationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, status, createdAt])
+  @@index([categoryId, status])
 }

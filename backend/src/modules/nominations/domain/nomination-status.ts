@@ -1,0 +1,5 @@
+export enum NominationStatus {
+  PENDING_REVIEW = "PENDING_REVIEW",
+  CONFIRMED = "CONFIRMED",
+  REJECTED = "REJECTED",
+}

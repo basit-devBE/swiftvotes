@@ -19,8 +19,19 @@ async function bootstrap(): Promise<void> {
   app.useLogger(logger);
   app.setGlobalPrefix(appConfig.apiPrefix);
   app.use(cookieParser());
+  const allowedOrigins = [
+    appConfig.frontendOrigin,
+    "https://almanac-patient-spookily.ngrok-free.dev",
+  ];
+
   app.enableCors({
-    origin: appConfig.frontendOrigin,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
