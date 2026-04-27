@@ -1,6 +1,7 @@
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import cookieParser from "cookie-parser";
 
 import { AppModule } from "./app.module";
 import { AppConfig } from "./core/config/app.config";
@@ -17,6 +18,7 @@ async function bootstrap(): Promise<void> {
 
   app.useLogger(logger);
   app.setGlobalPrefix(appConfig.apiPrefix);
+  app.use(cookieParser());
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: "1",
