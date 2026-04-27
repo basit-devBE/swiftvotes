@@ -19,11 +19,11 @@ export function CallToAction() {
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row">
-              <Link href="/" className="button-primary">
+              <Link href="/signup" className="button-primary">
                 Launch SwiftVote
               </Link>
               <Link
-                href="#features"
+                href="/#features"
                 className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/5"
               >
                 Review features

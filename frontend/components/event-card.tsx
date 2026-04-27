@@ -73,7 +73,7 @@ export function EventCard({
             <Link
               href="#get-started"
               onClick={(event) => event.stopPropagation()}
-              className="inline-flex items-center justify-center rounded-full bg-white/92 px-6 py-3 text-sm font-semibold text-[#07111f] transition duration-300 hover:bg-white"
+              className="inline-flex items-center justify-center rounded-full bg-white/90 px-6 py-3 text-sm font-semibold text-[#07111f] transition duration-300 hover:bg-white"
             >
               {ctaLabel}
               <span className="ml-2">-&gt;</span>

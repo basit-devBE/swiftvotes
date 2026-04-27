@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/hooks/use-auth";
 import { SiteLogo } from "@/components/site-logo";
 
 const navLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#how-it-works", label: "How it Works" },
-  { href: "#events", label: "Events" },
-  { href: "#admin", label: "Admin" },
+  { href: "/#features", label: "Features" },
+  { href: "/#how-it-works", label: "How it Works" },
+  { href: "/#events", label: "Events" },
+  { href: "/login", label: "Admin" },
 ];
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const { status, logout } = useAuth();
+  const isAuthenticated = status === "authenticated";
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 12);
@@ -67,10 +70,39 @@ export function Navbar() {
             ))}
           </nav>
 
-          <div className="hidden md:block">
-            <Link href="#get-started" className="button-primary">
-              Get Started
-            </Link>
+          <div className="hidden items-center gap-3 md:flex">
+            {isAuthenticated ? (
+              <>
+                <Link href="/account" className="button-secondary">
+                  Account
+                </Link>
+                <button
+                  type="button"
+                  className="button-primary"
+                  onClick={() => {
+                    void logout();
+                  }}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className={
+                    isScrolled
+                      ? "inline-flex items-center justify-center rounded-full border border-ink/10 bg-white/80 px-6 py-3 text-sm font-semibold text-ink transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:text-primary"
+                      : "inline-flex items-center justify-center rounded-full border border-ink/10 bg-white/84 px-6 py-3 text-sm font-semibold text-ink transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:text-primary"
+                  }
+                >
+                  Login
+                </Link>
+                <Link href="/signup" className="button-primary">
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
 
           <button
@@ -114,13 +146,44 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                href="#get-started"
-                className="button-primary mt-2"
-                onClick={() => setIsOpen(false)}
-              >
-                Get Started
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    href="/account"
+                    className="button-secondary mt-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Account
+                  </Link>
+                  <button
+                    type="button"
+                    className="button-primary mt-2"
+                    onClick={() => {
+                      setIsOpen(false);
+                      void logout();
+                    }}
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="button-secondary mt-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="button-primary mt-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
         ) : null}

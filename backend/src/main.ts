@@ -19,6 +19,12 @@ async function bootstrap(): Promise<void> {
   app.useLogger(logger);
   app.setGlobalPrefix(appConfig.apiPrefix);
   app.use(cookieParser());
+  app.enableCors({
+    origin: appConfig.frontendOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: "1",

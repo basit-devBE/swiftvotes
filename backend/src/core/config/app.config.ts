@@ -11,6 +11,7 @@ export const appConfig = registerAs("app", () => ({
       | undefined) ?? "development",
   port: Number.parseInt(process.env.PORT ?? "3001", 10),
   apiPrefix: process.env.API_PREFIX ?? "api",
+  frontendOrigin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000",
 }));
 
 export type AppConfig = {
@@ -19,4 +20,5 @@ export type AppConfig = {
   environment: "development" | "production" | "test";
   port: number;
   apiPrefix: string;
+  frontendOrigin: string;
 };

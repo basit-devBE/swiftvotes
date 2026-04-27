@@ -8,6 +8,7 @@ export const validationSchema = Joi.object({
   APP_VERSION: Joi.string().default("0.1.0"),
   PORT: Joi.number().port().default(3001),
   API_PREFIX: Joi.string().default("api"),
+  FRONTEND_ORIGIN: Joi.string().uri().default("http://localhost:3000"),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ["postgres", "postgresql"] })
     .default(
