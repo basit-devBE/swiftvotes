@@ -53,7 +53,7 @@ export function Navbar() {
         }`}
       >
         <div className="flex min-h-[5.25rem] items-center justify-between gap-6 px-4 sm:px-6">
-          <SiteLogo priority />
+          <SiteLogo priority imageClassName="h-[4.4rem] sm:h-[5rem]" />
 
           <nav className="hidden items-center gap-8 md:flex">
             {navLinks.map((link) => (

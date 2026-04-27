@@ -4,9 +4,14 @@ import Link from "next/link";
 type SiteLogoProps = {
   priority?: boolean;
   className?: string;
+  imageClassName?: string;
 };
 
-export function SiteLogo({ priority = false, className = "" }: SiteLogoProps) {
+export function SiteLogo({
+  priority = false,
+  className = "",
+  imageClassName = "",
+}: SiteLogoProps) {
   return (
     <Link
       href="/"
@@ -19,7 +24,7 @@ export function SiteLogo({ priority = false, className = "" }: SiteLogoProps) {
         width={190}
         height={76}
         priority={priority}
-        className="h-14 w-auto sm:h-16"
+        className={`h-16 w-auto sm:h-[4.5rem] ${imageClassName}`}
       />
     </Link>
   );
