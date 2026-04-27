@@ -18,6 +18,10 @@ import {
   uploadFileToSignedUrl,
 } from "@/lib/api/uploads";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types & helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 type EditableCategory = {
   name: string;
   description: string;
@@ -31,16 +35,18 @@ type EventEditorProps = {
   initialEvent?: EventResponse;
 };
 
-const inputClassName =
-  "h-12 w-full rounded-xl border border-[#d6deeb] bg-[#f7f9fc] px-4 text-[15px] text-[#07111f] outline-none transition placeholder:text-[#07111f]/28 focus:border-[#0f4cdb] focus:bg-white focus:ring-2 focus:ring-[#0f4cdb]/10 disabled:cursor-not-allowed disabled:opacity-50";
-const textareaClassName =
-  "min-h-[10rem] w-full rounded-xl border border-[#d6deeb] bg-[#f7f9fc] px-4 py-3.5 text-[15px] text-[#07111f] outline-none transition placeholder:text-[#07111f]/28 focus:border-[#0f4cdb] focus:bg-white focus:ring-2 focus:ring-[#0f4cdb]/10 disabled:cursor-not-allowed disabled:opacity-50";
+type StepKey = "basics" | "schedule" | "media" | "categories" | "review";
+
+const STEPS: { key: StepKey; title: string; subtitle: string }[] = [
+  { key: "basics", title: "Basic info", subtitle: "Name & description" },
+  { key: "schedule", title: "Schedule", subtitle: "Voting timeline" },
+  { key: "media", title: "Media", subtitle: "Flyer & banner" },
+  { key: "categories", title: "Categories", subtitle: "Voting tracks" },
+  { key: "review", title: "Review", subtitle: "Confirm & submit" },
+];
 
 function toDateTimeLocalValue(value?: string | null): string {
-  if (!value) {
-    return "";
-  }
-
+  if (!value) return "";
   const date = new Date(value);
   const offset = date.getTimezoneOffset();
   const local = new Date(date.getTime() - offset * 60_000);
@@ -53,11 +59,7 @@ function toIsoOrUndefined(value: string): string | undefined {
 
 function formatPriceLabel(value: string, currency: string): string {
   const numeric = Number.parseInt(value || "0", 10);
-
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return "Free voting";
-  }
-
+  if (!Number.isFinite(numeric) || numeric <= 0) return "Free voting";
   return `${currency || "GHS"} ${numeric.toLocaleString()}`;
 }
 
@@ -65,54 +67,144 @@ function formatStatusLabel(status?: string): string {
   return status?.replaceAll("_", " ") ?? "DRAFT";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Reusable UI atoms
+// ─────────────────────────────────────────────────────────────────────────────
+
+const inputCls =
+  "h-11 w-full rounded-lg border border-[#e1e6ef] bg-white px-3.5 text-[14px] text-[#07111f] outline-none transition placeholder:text-[#9aa4b6] focus:border-[#0f4cdb] focus:ring-4 focus:ring-[#0f4cdb]/8 disabled:cursor-not-allowed disabled:bg-[#f7f9fc] disabled:opacity-60";
+
+const textareaCls =
+  "min-h-[120px] w-full rounded-lg border border-[#e1e6ef] bg-white px-3.5 py-3 text-[14px] leading-6 text-[#07111f] outline-none transition placeholder:text-[#9aa4b6] focus:border-[#0f4cdb] focus:ring-4 focus:ring-[#0f4cdb]/8 disabled:cursor-not-allowed disabled:bg-[#f7f9fc] disabled:opacity-60";
+
+function Field({
+  label,
+  required,
+  optional,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <label className="text-[13px] font-medium text-[#07111f]">
+          {label}
+          {required && <span className="ml-1 text-[#b40f17]">*</span>}
+        </label>
+        {optional && (
+          <span className="text-[11px] font-medium text-[#9aa4b6]">
+            Optional
+          </span>
+        )}
+      </div>
+      {children}
+      {hint && <p className="text-[12px] text-[#9aa4b6]">{hint}</p>}
+    </div>
+  );
+}
+
+// Icons for step rail
+function IconBasics({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </svg>
+  );
+}
+function IconSchedule({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+function IconMedia({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+function IconCategories({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+function IconReview({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12l2 2 4-4" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  );
+}
+function IconCheck({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+const stepIcons: Record<StepKey, (p: { className?: string }) => React.JSX.Element> = {
+  basics: IconBasics,
+  schedule: IconSchedule,
+  media: IconMedia,
+  categories: IconCategories,
+  review: IconReview,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   const router = useRouter();
   const isUpdate = mode === "update" && initialEvent;
   const isEditable =
-    !isUpdate ||
-    ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
+    !isUpdate || ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
 
+  // Form state
   const [name, setName] = useState(initialEvent?.name ?? "");
   const [description, setDescription] = useState(initialEvent?.description ?? "");
-  const [primaryFlyerUrl, setPrimaryFlyerUrl] = useState(
-    initialEvent?.primaryFlyerUrl ?? "",
-  );
-  const [primaryFlyerKey, setPrimaryFlyerKey] = useState(
-    initialEvent?.primaryFlyerKey ?? "",
-  );
+  const [primaryFlyerUrl, setPrimaryFlyerUrl] = useState(initialEvent?.primaryFlyerUrl ?? "");
+  const [primaryFlyerKey, setPrimaryFlyerKey] = useState(initialEvent?.primaryFlyerKey ?? "");
   const [bannerUrl, setBannerUrl] = useState(initialEvent?.bannerUrl ?? "");
   const [bannerKey, setBannerKey] = useState(initialEvent?.bannerKey ?? "");
-  const [nominationStartAt, setNominationStartAt] = useState(
-    toDateTimeLocalValue(initialEvent?.nominationStartAt),
-  );
-  const [nominationEndAt, setNominationEndAt] = useState(
-    toDateTimeLocalValue(initialEvent?.nominationEndAt),
-  );
-  const [votingStartAt, setVotingStartAt] = useState(
-    toDateTimeLocalValue(initialEvent?.votingStartAt),
-  );
-  const [votingEndAt, setVotingEndAt] = useState(
-    toDateTimeLocalValue(initialEvent?.votingEndAt),
-  );
+  const [nominationStartAt, setNominationStartAt] = useState(toDateTimeLocalValue(initialEvent?.nominationStartAt));
+  const [nominationEndAt, setNominationEndAt] = useState(toDateTimeLocalValue(initialEvent?.nominationEndAt));
+  const [votingStartAt, setVotingStartAt] = useState(toDateTimeLocalValue(initialEvent?.votingStartAt));
+  const [votingEndAt, setVotingEndAt] = useState(toDateTimeLocalValue(initialEvent?.votingEndAt));
+
   const [categories, setCategories] = useState<EditableCategory[]>(
     initialEvent?.categories.length
-      ? initialEvent.categories.map((category) => ({
-          name: category.name,
-          description: category.description,
-          votePriceMinor: String(category.votePriceMinor),
-          currency: category.currency,
-          sortOrder: category.sortOrder,
+      ? initialEvent.categories.map((c) => ({
+          name: c.name,
+          description: c.description,
+          votePriceMinor: String(c.votePriceMinor),
+          currency: c.currency,
+          sortOrder: c.sortOrder,
         }))
-      : [
-          {
-            name: "",
-            description: "",
-            votePriceMinor: "0",
-            currency: "GHS",
-            sortOrder: 0,
-          },
-        ],
+      : [{ name: "", description: "", votePriceMinor: "0", currency: "GHS", sortOrder: 0 }],
   );
+
+  // UI state
+  const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -120,11 +212,12 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   const [isUploadingFlyer, setIsUploadingFlyer] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
-  const pageHeading = useMemo(() => {
-    if (!isUpdate) {
-      return "Create Event";
-    }
+  const currentStep = STEPS[stepIndex];
+  const isLastStep = stepIndex === STEPS.length - 1;
+  const isFirstStep = stepIndex === 0;
 
+  const pageHeading = useMemo(() => {
+    if (!isUpdate) return "Create Event";
     return initialEvent?.status === "REJECTED" ? "Revise Event" : "Manage Event";
   }, [initialEvent?.status, isUpdate]);
 
@@ -133,28 +226,18 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
     ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT") &&
     !isSaving;
 
-  async function handleAssetUpload(file: File, kind: "flyer" | "banner") {
-    if (kind === "flyer") {
-      setIsUploadingFlyer(true);
-    } else {
-      setIsUploadingBanner(true);
-    }
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
+  async function handleAssetUpload(file: File, kind: "flyer" | "banner") {
+    if (kind === "flyer") setIsUploadingFlyer(true);
+    else setIsUploadingBanner(true);
     setError(null);
 
     try {
       const intent =
         kind === "flyer"
-          ? await createEventFlyerUploadIntent({
-              fileName: file.name,
-              contentType: file.type,
-              eventId: initialEvent?.id,
-            })
-          : await createEventBannerUploadIntent({
-              fileName: file.name,
-              contentType: file.type,
-              eventId: initialEvent?.id,
-            });
+          ? await createEventFlyerUploadIntent({ fileName: file.name, contentType: file.type, eventId: initialEvent?.id })
+          : await createEventBannerUploadIntent({ fileName: file.name, contentType: file.type, eventId: initialEvent?.id });
 
       await uploadFileToSignedUrl(intent.uploadUrl, file);
 
@@ -166,31 +249,18 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         setBannerKey(intent.key);
       }
     } catch (uploadError) {
-      if (uploadError instanceof ApiClientError) {
-        setError(uploadError.message);
-      } else if (uploadError instanceof Error) {
-        setError(uploadError.message);
-      } else {
-        setError("Unable to upload media right now.");
-      }
+      if (uploadError instanceof ApiClientError) setError(uploadError.message);
+      else if (uploadError instanceof Error) setError(uploadError.message);
+      else setError("Unable to upload media right now.");
     } finally {
-      if (kind === "flyer") {
-        setIsUploadingFlyer(false);
-      } else {
-        setIsUploadingBanner(false);
-      }
+      if (kind === "flyer") setIsUploadingFlyer(false);
+      else setIsUploadingBanner(false);
     }
   }
 
-  function updateCategoryField(
-    index: number,
-    field: keyof EditableCategory,
-    value: string | number,
-  ) {
+  function updateCategoryField(index: number, field: keyof EditableCategory, value: string | number) {
     setCategories((current) =>
-      current.map((category, currentIndex) =>
-        currentIndex === index ? { ...category, [field]: value } : category,
-      ),
+      current.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
     );
   }
 
@@ -210,11 +280,8 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   function removeCategory(index: number) {
     setCategories((current) =>
       current
-        .filter((_, currentIndex) => currentIndex !== index)
-        .map((category, currentIndex) => ({
-          ...category,
-          sortOrder: currentIndex,
-        })),
+        .filter((_, i) => i !== index)
+        .map((c, i) => ({ ...c, sortOrder: i })),
     );
   }
 
@@ -242,12 +309,12 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         nominationEndAt: toIsoOrUndefined(nominationEndAt),
         votingStartAt: new Date(votingStartAt).toISOString(),
         votingEndAt: new Date(votingEndAt).toISOString(),
-        categories: categories.map((category, index) => ({
-          name: category.name,
-          description: category.description,
-          votePriceMinor: Number.parseInt(category.votePriceMinor || "0", 10),
-          currency: category.currency.trim().toUpperCase(),
-          sortOrder: index,
+        categories: categories.map((c, i) => ({
+          name: c.name,
+          description: c.description,
+          votePriceMinor: Number.parseInt(c.votePriceMinor || "0", 10),
+          currency: c.currency.trim().toUpperCase(),
+          sortOrder: i,
         })),
       };
 
@@ -261,21 +328,15 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         router.replace(`/events/${created.id}`);
       }
     } catch (submissionError) {
-      if (submissionError instanceof ApiClientError) {
-        setError(submissionError.message);
-      } else {
-        setError("Unable to save the event right now.");
-      }
+      if (submissionError instanceof ApiClientError) setError(submissionError.message);
+      else setError("Unable to save the event right now.");
     } finally {
       setIsSaving(false);
     }
   }
 
   async function handleSubmitForApproval() {
-    if (!initialEvent) {
-      return;
-    }
-
+    if (!initialEvent) return;
     setIsSubmittingForApproval(true);
     setError(null);
     setSuccess(null);
@@ -294,531 +355,596 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       router.replace(`/events/${result.id}`);
       router.refresh();
     } catch (submissionError) {
-      if (submissionError instanceof ApiClientError) {
-        setError(submissionError.message);
-      } else {
-        setError("Unable to submit the event for approval.");
-      }
+      if (submissionError instanceof ApiClientError) setError(submissionError.message);
+      else setError("Unable to submit the event for approval.");
     } finally {
       setIsSubmittingForApproval(false);
     }
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="mx-auto max-w-[1320px] pb-16">
-      {/* ── Page header ── */}
-      <div className="relative mb-10 overflow-hidden rounded-[2rem] bg-[#07111f] px-8 py-10 sm:px-10 sm:py-12">
-        {/* Decorative radial glow */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-80 w-80 rounded-full bg-[#0f4cdb] opacity-20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 right-10 h-64 w-64 rounded-full bg-[#b40f17] opacity-10 blur-2xl" />
-        {/* Subtle grid pattern */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
-            backgroundSize: "36px 36px",
-          }}
-        />
-
-        <div className="relative flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-[0.67rem] font-semibold uppercase tracking-[0.28em] text-white/70 backdrop-blur">
-              {isUpdate ? "Event workspace" : "Event builder"}
-            </span>
-            <h1 className="mt-5 font-display text-4xl font-semibold leading-[0.95] tracking-[-0.04em] text-white sm:text-5xl">
-              {pageHeading}
-            </h1>
-            <p className="mt-4 max-w-lg text-base leading-7 text-white/55">
-              Build the event details, media, and category pricing in one place.
-            </p>
-          </div>
-
-          {isUpdate ? (
-            <span className="mt-1 shrink-0 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 backdrop-blur">
-              {formatStatusLabel(initialEvent?.status)}
-            </span>
-          ) : null}
+    <div className="mx-auto max-w-[1200px] pb-16">
+      {/* ── Title bar ── */}
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[12px] font-medium text-[#0f4cdb]">
+            {isUpdate ? "Event workspace" : "New event"}
+          </p>
+          <h1 className="mt-1.5 font-display text-[2rem] font-semibold tracking-[-0.02em] text-[#07111f] sm:text-[2.4rem]">
+            {pageHeading}
+          </h1>
         </div>
+        {isUpdate && (
+          <span className="rounded-full border border-[#e1e6ef] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#07111f]/65">
+            {formatStatusLabel(initialEvent?.status)}
+          </span>
+        )}
       </div>
 
-      {initialEvent?.rejectionReason ? (
-        <div className="mb-8 flex items-start gap-4 rounded-[1.4rem] border border-[#f1c6c8] bg-[#fff4f4] px-5 py-4">
-          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#b40f17]/10 text-[#b40f17]">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-          </div>
-          <div className="text-sm text-[#8f2430]">
+      {initialEvent?.rejectionReason && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#f1c6c8] bg-[#fff5f5] px-4 py-3 text-[13px] text-[#8f2430]">
+          <svg className="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div>
             <span className="font-semibold">Rejection reason: </span>
             {initialEvent.rejectionReason}
           </div>
         </div>
-      ) : null}
+      )}
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      {/* ── Layout: rail | form | preview ── */}
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)_280px]">
+        {/* ── Step rail ── */}
+        <nav aria-label="Form steps" className="lg:sticky lg:top-24 lg:self-start">
+          <ol className="space-y-1">
+            {STEPS.map((s, i) => {
+              const Icon = stepIcons[s.key];
+              const isActive = i === stepIndex;
+              const isDone = i < stepIndex;
+              return (
+                <li key={s.key}>
+                  <button
+                    type="button"
+                    onClick={() => setStepIndex(i)}
+                    className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                      isActive
+                        ? "bg-[#0f4cdb]/8"
+                        : "hover:bg-[#07111f]/3"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition ${
+                        isActive
+                          ? "bg-[#0f4cdb] text-white"
+                          : isDone
+                            ? "bg-[#0f4cdb]/12 text-[#0f4cdb]"
+                            : "bg-[#f0f3f8] text-[#9aa4b6]"
+                      }`}
+                    >
+                      {isDone ? <IconCheck /> : <Icon />}
+                    </span>
+                    <div className="min-w-0">
+                      <p
+                        className={`text-[13px] font-semibold leading-tight ${
+                          isActive
+                            ? "text-[#0f4cdb]"
+                            : isDone
+                              ? "text-[#07111f]"
+                              : "text-[#07111f]/60"
+                        }`}
+                      >
+                        {s.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-tight text-[#9aa4b6]">
+                        {s.subtitle}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+
+        {/* ── Form panel ── */}
         <form
           id="event-editor-form"
           onSubmit={handleSubmit}
-          className="space-y-6"
+          noValidate
+          className="rounded-xl border border-[#e1e6ef] bg-white"
         >
-          <section className="relative overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white p-6 shadow-[0_4px_24px_rgba(7,17,31,0.06),0_1px_4px_rgba(7,17,31,0.04)] sm:p-8">
-            {/* Blue left accent bar */}
-            <div className="absolute inset-y-0 left-0 w-1 rounded-l-[1.8rem] bg-gradient-to-b from-[#0f4cdb] to-[#3b6ef5]" />
-            <div className="flex items-center gap-3 pl-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f4cdb] text-xs font-bold text-white shadow-[0_2px_8px_rgba(15,76,219,0.4)]">1</span>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#0f4cdb]/70">
-                Basic info
-              </p>
-            </div>
-            <h2 className="mt-4 pl-2 font-display text-2xl font-semibold tracking-[-0.03em] text-[#07111f]">
-              Tell people what the event is about.
+          <div className="border-b border-[#eef1f6] px-6 py-5 sm:px-8">
+            <h2 className="font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-[#07111f]">
+              {currentStep.title}
             </h2>
-            <div className="mt-6 grid gap-5">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[#07111f]/60">Event name</span>
-                <input
-                  className={inputClassName}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Campus Choice Awards 2026"
-                  required
-                  disabled={!isEditable}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[#07111f]/60">Description</span>
-                <textarea
-                  className={textareaClassName}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Describe the event, audience, and nomination or voting focus."
-                  required
-                  disabled={!isEditable}
-                />
-              </label>
-            </div>
-          </section>
+            <p className="mt-1 text-[13px] text-[#9aa4b6]">
+              Step {stepIndex + 1} of {STEPS.length} — {currentStep.subtitle}
+            </p>
+          </div>
 
-          <section className="relative overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white p-6 shadow-[0_4px_24px_rgba(7,17,31,0.06),0_1px_4px_rgba(7,17,31,0.04)] sm:p-8">
-            <div className="absolute inset-y-0 left-0 w-1 rounded-l-[1.8rem] bg-gradient-to-b from-[#0f4cdb] to-[#3b6ef5]" />
-            <div className="flex items-center gap-3 pl-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f4cdb] text-xs font-bold text-white shadow-[0_2px_8px_rgba(15,76,219,0.4)]">2</span>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#0f4cdb]/70">
-                Timeline
-              </p>
-            </div>
-            <h2 className="mt-4 pl-2 font-display text-2xl font-semibold tracking-[-0.03em] text-[#07111f]">
-              Schedule nominations and voting.
-            </h2>
-            {/* Helper note */}
-            <div className="mt-3 ml-2 flex items-start gap-2 rounded-xl border border-[#d6deeb] bg-[#f7f9fc] px-4 py-3 text-sm text-[#07111f]/50">
-              <svg className="mt-0.5 shrink-0 text-[#0f4cdb]" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-              Nomination dates are optional. Voting start and end are required.
-            </div>
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[#07111f]/60">Nomination start</span>
-                <input
-                  type="datetime-local"
-                  className={inputClassName}
-                  value={nominationStartAt}
-                  onChange={(event) => setNominationStartAt(event.target.value)}
-                  disabled={!isEditable}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[#07111f]/60">Nomination end</span>
-                <input
-                  type="datetime-local"
-                  className={inputClassName}
-                  value={nominationEndAt}
-                  onChange={(event) => setNominationEndAt(event.target.value)}
-                  disabled={!isEditable}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#07111f]/60">
-                  Voting start
-                  <span className="rounded-full bg-[#0f4cdb]/10 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-[#0f4cdb]">required</span>
-                </span>
-                <input
-                  type="datetime-local"
-                  className={inputClassName}
-                  value={votingStartAt}
-                  onChange={(event) => setVotingStartAt(event.target.value)}
+          <div className="px-6 py-7 sm:px-8">
+            {/* ── Step: Basics ── */}
+            {currentStep.key === "basics" && (
+              <div className="space-y-5">
+                <Field label="Event name" required>
+                  <input
+                    className={inputCls}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Campus Choice Awards 2026"
+                    disabled={!isEditable}
+                  />
+                </Field>
+                <Field
+                  label="Description"
                   required
-                  disabled={!isEditable}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#07111f]/60">
-                  Voting end
-                  <span className="rounded-full bg-[#0f4cdb]/10 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-[#0f4cdb]">required</span>
-                </span>
-                <input
-                  type="datetime-local"
-                  className={inputClassName}
-                  value={votingEndAt}
-                  onChange={(event) => setVotingEndAt(event.target.value)}
-                  required
-                  disabled={!isEditable}
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="relative overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white p-6 shadow-[0_4px_24px_rgba(7,17,31,0.06),0_1px_4px_rgba(7,17,31,0.04)] sm:p-8">
-            <div className="absolute inset-y-0 left-0 w-1 rounded-l-[1.8rem] bg-gradient-to-b from-[#0f4cdb] to-[#3b6ef5]" />
-            <div className="flex items-center gap-3 pl-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f4cdb] text-xs font-bold text-white shadow-[0_2px_8px_rgba(15,76,219,0.4)]">3</span>
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#0f4cdb]/70">
-                Media
-              </p>
-            </div>
-            <h2 className="mt-4 pl-2 font-display text-2xl font-semibold tracking-[-0.03em] text-[#07111f]">
-              Upload the flyer and optional banner.
-            </h2>
-            <div className="mt-6 grid gap-6 xl:grid-cols-2">
-              <label className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#07111f]/60">Primary flyer</span>
-                  <span className="rounded-full bg-[#0f4cdb]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-[#0f4cdb]">Required</span>
-                </div>
-                <div className="group overflow-hidden rounded-[1.35rem] border-2 border-dashed border-[#d6deeb] bg-[#f7f9fc] transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]">
-                  {primaryFlyerUrl ? (
-                    <div className="relative h-72 w-full">
-                      <Image
-                        src={primaryFlyerUrl}
-                        alt="Primary flyer preview"
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 1280px) 100vw, 34vw"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-72 flex-col items-center justify-center gap-3 px-6 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0f4cdb]/8 text-[#0f4cdb]/50">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 16.5V19a1 1 0 001 1h14a1 1 0 001-1v-2.5" /><polyline points="16 10 12 6 8 10" /><line x1="12" y1="6" x2="12" y2="16" /></svg>
-                      </div>
-                      <p className="text-sm font-medium text-[#07111f]/40">Your main flyer will appear here</p>
-                      <p className="text-xs text-[#07111f]/28">PNG, JPG, WEBP up to 10MB</p>
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={!isEditable || isUploadingFlyer}
-                  onChange={async (event: ChangeEvent<HTMLInputElement>) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      await handleAssetUpload(file, "flyer");
-                    }
-                  }}
-                  className="block w-full text-sm text-[#07111f]/50 file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#07111f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white file:transition file:hover:bg-[#0f4cdb]"
-                />
-                {isUploadingFlyer ? (
-                  <p className="flex items-center gap-2 text-sm text-[#0f4cdb]"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#0f4cdb] border-t-transparent" />Uploading flyer…</p>
-                ) : null}
-              </label>
-
-              <label className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#07111f]/60">Banner</span>
-                  <span className="rounded-full bg-[#07111f]/6 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-[#07111f]/40">Optional</span>
-                </div>
-                <div className="group overflow-hidden rounded-[1.35rem] border-2 border-dashed border-[#d6deeb] bg-[#f7f9fc] transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]">
-                  {bannerUrl ? (
-                    <div className="relative h-72 w-full">
-                      <Image
-                        src={bannerUrl}
-                        alt="Banner preview"
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 1280px) 100vw, 34vw"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-72 flex-col items-center justify-center gap-3 px-6 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#07111f]/6 text-[#07111f]/30">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-                      </div>
-                      <p className="text-sm font-medium text-[#07111f]/40">Add a banner for wider visual impact</p>
-                      <p className="text-xs text-[#07111f]/28">Recommended 1600 × 600px</p>
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={!isEditable || isUploadingBanner}
-                  onChange={async (event: ChangeEvent<HTMLInputElement>) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      await handleAssetUpload(file, "banner");
-                    }
-                  }}
-                  className="block w-full text-sm text-[#07111f]/50 file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#07111f] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white file:transition file:hover:bg-[#0f4cdb]"
-                />
-                {isUploadingBanner ? (
-                  <p className="flex items-center gap-2 text-sm text-[#0f4cdb]"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#0f4cdb] border-t-transparent" />Uploading banner…</p>
-                ) : null}
-              </label>
-            </div>
-          </section>
-
-          <section className="rounded-[1.8rem] border border-[#d6deeb] bg-white p-6 shadow-[0_24px_64px_rgba(7,17,31,0.05)] sm:p-7">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7b8ca5]">
-                  Categories
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">
-                  Define the voting tracks and prices.
-                </h2>
+                  hint="Describe the purpose, audience, and how voting will work."
+                >
+                  <textarea
+                    className={textareaCls}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Tell people what this event is about…"
+                    disabled={!isEditable}
+                  />
+                </Field>
               </div>
-              {isEditable ? (
-                <button
-                  type="button"
-                  onClick={addCategory}
-                  className="inline-flex items-center rounded-full border border-[#d6deeb] bg-white px-4 py-3 text-sm font-semibold text-[#07111f] transition hover:border-[#0f4cdb]/30 hover:text-[#0f4cdb]"
-                >
-                  Add category
-                </button>
-              ) : null}
-            </div>
+            )}
 
-            <div className="mt-6 space-y-5">
-              {categories.map((category, index) => (
-                <div
-                  key={`${index}-${category.sortOrder}`}
-                  className="overflow-hidden rounded-[1.35rem] border border-[#d6deeb] bg-[#f7f9fc]"
-                >
-                  {/* Category card header strip */}
-                  <div className="flex items-center justify-between gap-4 border-b border-[#d6deeb] bg-white px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0f4cdb]/10 text-xs font-bold text-[#0f4cdb]">{index + 1}</span>
-                      <p className="text-sm font-semibold text-[#07111f]">
-                        Category {index + 1}
-                      </p>
-                    </div>
-                    {categories.length > 1 && isEditable ? (
-                      <button
-                        type="button"
-                        onClick={() => removeCategory(index)}
-                        className="flex h-7 items-center gap-1 rounded-full border border-[#f1c6c8] bg-white px-3 text-xs font-semibold text-[#b40f17] transition hover:bg-[#fff5f5]"
-                      >
-                        <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="p-5">
-
-                  <div className="grid gap-4">
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-[#07111f]/60">Category name</span>
-                      <input
-                        className={inputClassName}
-                        value={category.name}
-                        onChange={(event) =>
-                          updateCategoryField(index, "name", event.target.value)
-                        }
-                        placeholder="Best Female Personality"
-                        required
-                        disabled={!isEditable}
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-[#07111f]/60">Description</span>
-                      <textarea
-                        className="min-h-[7rem] w-full rounded-xl border border-[#d6deeb] bg-[#f7f9fc] px-4 py-3.5 text-[15px] text-[#07111f] outline-none transition placeholder:text-[#07111f]/28 focus:border-[#0f4cdb] focus:bg-white focus:ring-2 focus:ring-[#0f4cdb]/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        value={category.description}
-                        onChange={(event) =>
-                          updateCategoryField(index, "description", event.target.value)
-                        }
-                        placeholder="Short context for what this category represents."
-                        required
-                        disabled={!isEditable}
-                      />
-                    </label>
-                    <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-[#07111f]/60">
-                          Vote price (minor units)
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          className={inputClassName}
-                          value={category.votePriceMinor}
-                          onChange={(event) =>
-                            updateCategoryField(
-                              index,
-                              "votePriceMinor",
-                              event.target.value,
-                            )
-                          }
-                          required
-                          disabled={!isEditable}
-                        />
-                      </label>
-                      <label className="space-y-2">
-                        <span className="text-sm font-medium text-[#07111f]/60">Currency</span>
-                        <input
-                          className={`${inputClassName} uppercase`}
-                          value={category.currency}
-                          onChange={(event) =>
-                            updateCategoryField(index, "currency", event.target.value)
-                          }
-                          placeholder="GHS"
-                          required
-                          disabled={!isEditable}
-                        />
-                      </label>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-[#d6deeb] bg-white px-4 py-2.5">
-                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#0f4cdb" strokeWidth="2"><circle cx="10" cy="10" r="8" /><path d="M10 6v4l3 3" /></svg>
-                      <p className="text-sm font-medium text-[#07111f]/60">
-                        {formatPriceLabel(category.votePriceMinor, category.currency)}
-                      </p>
-                    </div>
-                  </div>
-                  </div>
+            {/* ── Step: Schedule ── */}
+            {currentStep.key === "schedule" && (
+              <div className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Nomination start" optional>
+                    <input
+                      type="datetime-local"
+                      className={inputCls}
+                      value={nominationStartAt}
+                      onChange={(e) => setNominationStartAt(e.target.value)}
+                      disabled={!isEditable}
+                    />
+                  </Field>
+                  <Field label="Nomination end" optional>
+                    <input
+                      type="datetime-local"
+                      className={inputCls}
+                      value={nominationEndAt}
+                      onChange={(e) => setNominationEndAt(e.target.value)}
+                      disabled={!isEditable}
+                    />
+                  </Field>
                 </div>
-              ))}
-            </div>
-          </section>
+                <div className="h-px bg-[#eef1f6]" />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Voting opens" required>
+                    <input
+                      type="datetime-local"
+                      className={inputCls}
+                      value={votingStartAt}
+                      onChange={(e) => setVotingStartAt(e.target.value)}
+                      disabled={!isEditable}
+                    />
+                  </Field>
+                  <Field label="Voting closes" required>
+                    <input
+                      type="datetime-local"
+                      className={inputCls}
+                      value={votingEndAt}
+                      onChange={(e) => setVotingEndAt(e.target.value)}
+                      disabled={!isEditable}
+                    />
+                  </Field>
+                </div>
+              </div>
+            )}
 
-          {error ? (
-            <div className="flex items-start gap-3 rounded-[1.4rem] border border-[#f1c6c8] bg-[#fff4f4] px-5 py-4 text-sm font-medium text-[#8f2430]">
-              <svg className="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-              {error}
-            </div>
-          ) : null}
+            {/* ── Step: Media ── */}
+            {currentStep.key === "media" && (
+              <div className="space-y-6">
+                {/* Primary flyer */}
+                <Field label="Primary flyer" required hint="Shown on the public event page. PNG, JPG, or WEBP, up to 10MB.">
+                  {primaryFlyerUrl ? (
+                    <div className="relative overflow-hidden rounded-lg border border-[#e1e6ef]">
+                      <div className="relative h-56 w-full">
+                        <Image
+                          src={primaryFlyerUrl}
+                          alt="Primary flyer preview"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 1024px) 100vw, 600px"
+                        />
+                      </div>
+                      <label className="absolute right-3 top-3 cursor-pointer rounded-full bg-[#07111f]/85 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-[#07111f]">
+                        Replace
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={!isEditable || isUploadingFlyer}
+                          onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                            const file = e.target.files?.[0];
+                            if (file) await handleAssetUpload(file, "flyer");
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#e1e6ef] bg-[#fafbfd] px-6 py-10 text-center transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0f4cdb]/10 text-[#0f4cdb]">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      </div>
+                      <p className="text-[14px] font-medium text-[#07111f]">
+                        {isUploadingFlyer ? "Uploading…" : "Click to upload flyer"}
+                      </p>
+                      <p className="text-[12px] text-[#9aa4b6]">PNG, JPG, WEBP up to 10MB</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!isEditable || isUploadingFlyer}
+                        onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                          const file = e.target.files?.[0];
+                          if (file) await handleAssetUpload(file, "flyer");
+                        }}
+                      />
+                    </label>
+                  )}
+                </Field>
 
-          {success ? (
-            <div className="flex items-start gap-3 rounded-[1.4rem] border border-[#bfe4d2] bg-[#f2fbf6] px-5 py-4 text-sm font-medium text-[#1b6f4b]">
-              <svg className="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-              {success}
-            </div>
-          ) : null}
+                {/* Banner */}
+                <Field label="Banner" optional hint="Wide banner shown above event details. Recommended 1600 × 600.">
+                  {bannerUrl ? (
+                    <div className="relative overflow-hidden rounded-lg border border-[#e1e6ef]">
+                      <div className="relative h-40 w-full">
+                        <Image
+                          src={bannerUrl}
+                          alt="Banner preview"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 1024px) 100vw, 600px"
+                        />
+                      </div>
+                      <label className="absolute right-3 top-3 cursor-pointer rounded-full bg-[#07111f]/85 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-[#07111f]">
+                        Replace
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={!isEditable || isUploadingBanner}
+                          onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                            const file = e.target.files?.[0];
+                            if (file) await handleAssetUpload(file, "banner");
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#e1e6ef] bg-[#fafbfd] px-6 py-8 text-center transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#07111f]/6 text-[#07111f]/45">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      </div>
+                      <p className="text-[14px] font-medium text-[#07111f]">
+                        {isUploadingBanner ? "Uploading…" : "Add a banner"}
+                      </p>
+                      <p className="text-[12px] text-[#9aa4b6]">Recommended 1600 × 600px</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!isEditable || isUploadingBanner}
+                        onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                          const file = e.target.files?.[0];
+                          if (file) await handleAssetUpload(file, "banner");
+                        }}
+                      />
+                    </label>
+                  )}
+                </Field>
+              </div>
+            )}
+
+            {/* ── Step: Categories ── */}
+            {currentStep.key === "categories" && (
+              <div className="space-y-5">
+                <p className="text-[13px] text-[#9aa4b6]">
+                  Add at least one voting track. Each track has its own price.
+                </p>
+
+                <div className="space-y-3">
+                  {categories.map((category, index) => (
+                    <div
+                      key={`${index}-${category.sortOrder}`}
+                      className="overflow-hidden rounded-lg border border-[#e1e6ef]"
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-[#eef1f6] bg-[#fafbfd] px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#0f4cdb]/10 text-[11px] font-bold text-[#0f4cdb]">
+                            {index + 1}
+                          </span>
+                          <p className="text-[13px] font-semibold text-[#07111f]">
+                            {category.name || `Category ${index + 1}`}
+                          </p>
+                        </div>
+                        {categories.length > 1 && isEditable && (
+                          <button
+                            type="button"
+                            onClick={() => removeCategory(index)}
+                            className="text-[12px] font-semibold text-[#9aa4b6] transition hover:text-[#b40f17]"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 p-4">
+                        <Field label="Name" required>
+                          <input
+                            className={inputCls}
+                            value={category.name}
+                            onChange={(e) => updateCategoryField(index, "name", e.target.value)}
+                            placeholder="Best Female Personality"
+                            disabled={!isEditable}
+                          />
+                        </Field>
+                        <Field label="Description" required>
+                          <textarea
+                            className={textareaCls}
+                            value={category.description}
+                            onChange={(e) => updateCategoryField(index, "description", e.target.value)}
+                            placeholder="Short context for what this category represents."
+                            disabled={!isEditable}
+                          />
+                        </Field>
+                        <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
+                          <Field label="Vote price (minor units)" required hint={formatPriceLabel(category.votePriceMinor, category.currency)}>
+                            <input
+                              type="number"
+                              min="0"
+                              className={inputCls}
+                              value={category.votePriceMinor}
+                              onChange={(e) => updateCategoryField(index, "votePriceMinor", e.target.value)}
+                              disabled={!isEditable}
+                            />
+                          </Field>
+                          <Field label="Currency" required>
+                            <input
+                              className={`${inputCls} uppercase`}
+                              value={category.currency}
+                              onChange={(e) => updateCategoryField(index, "currency", e.target.value)}
+                              placeholder="GHS"
+                              disabled={!isEditable}
+                            />
+                          </Field>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {isEditable && (
+                  <button
+                    type="button"
+                    onClick={addCategory}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#d6deeb] bg-[#fafbfd] px-4 py-3 text-[13px] font-semibold text-[#0f4cdb] transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Add another category
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── Step: Review ── */}
+            {currentStep.key === "review" && (
+              <div className="space-y-4">
+                <ReviewRow label="Event name" value={name || "—"} />
+                <ReviewRow label="Description" value={description || "—"} />
+                <ReviewRow
+                  label="Nominations"
+                  value={
+                    nominationStartAt && nominationEndAt
+                      ? `${new Date(nominationStartAt).toLocaleString()} → ${new Date(nominationEndAt).toLocaleString()}`
+                      : "Not set"
+                  }
+                />
+                <ReviewRow
+                  label="Voting"
+                  value={
+                    votingStartAt && votingEndAt
+                      ? `${new Date(votingStartAt).toLocaleString()} → ${new Date(votingEndAt).toLocaleString()}`
+                      : "—"
+                  }
+                />
+                <ReviewRow label="Primary flyer" value={primaryFlyerUrl ? "Uploaded" : "Missing"} valueTone={primaryFlyerUrl ? "default" : "warn"} />
+                <ReviewRow label="Banner" value={bannerUrl ? "Uploaded" : "Not set"} />
+                <div className="rounded-lg border border-[#eef1f6] bg-[#fafbfd] p-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
+                    Categories ({categories.length})
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {categories.map((c, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
+                        <span className="truncate text-[#07111f]">
+                          {c.name || `Category ${i + 1}`}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-[#0f4cdb]/8 px-2 py-0.5 text-[11px] font-semibold text-[#0f4cdb]">
+                          {formatPriceLabel(c.votePriceMinor, c.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Inline alerts */}
+            {error && (
+              <div className="mt-6 flex items-start gap-2.5 rounded-lg border border-[#f1c6c8] bg-[#fff5f5] px-3.5 py-2.5 text-[13px] font-medium text-[#8f2430]">
+                <svg className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="mt-6 flex items-start gap-2.5 rounded-lg border border-[#bfe4d2] bg-[#f2fbf6] px-3.5 py-2.5 text-[13px] font-medium text-[#1b6f4b]">
+                <IconCheck className="mt-0.5 shrink-0" />
+                {success}
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer / nav ── */}
+          <div className="flex items-center justify-between gap-3 border-t border-[#eef1f6] bg-[#fafbfd] px-6 py-3.5 sm:px-8">
+            <button
+              type="button"
+              onClick={() => setStepIndex((s) => Math.max(s - 1, 0))}
+              disabled={isFirstStep}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e1e6ef] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#07111f] transition hover:border-[#07111f]/30 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Back
+            </button>
+
+            {!isLastStep ? (
+              <button
+                type="button"
+                onClick={() => setStepIndex((s) => Math.min(s + 1, STEPS.length - 1))}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f4cdb] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#0a3aa8]"
+              >
+                Continue
+                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                {canSubmitForApproval && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmitForApproval()}
+                    disabled={isSubmittingForApproval}
+                    className="inline-flex items-center justify-center rounded-lg bg-[#b40f17] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#960d14] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmittingForApproval
+                      ? "Submitting…"
+                      : initialEvent?.status === "REJECTED"
+                        ? "Resubmit"
+                        : "Submit for approval"}
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={!isEditable || isSaving}
+                  className="inline-flex items-center justify-center rounded-lg bg-[#0f4cdb] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#0a3aa8] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSaving ? "Saving…" : isUpdate ? "Save changes" : "Create event"}
+                </button>
+              </div>
+            )}
+          </div>
         </form>
 
-        <aside className="space-y-5 xl:sticky xl:top-28 xl:self-start">
-          <div className="overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white shadow-[0_4px_24px_rgba(7,17,31,0.08),0_1px_4px_rgba(7,17,31,0.05)]">
-            <div className="border-b border-[#d6deeb] bg-[#f7f9fc] px-5 py-4">
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#07111f]/40">
-                Live preview
+        {/* ── Live preview card ── */}
+        <aside className="hidden lg:block lg:sticky lg:top-24 lg:self-start">
+          <div className="overflow-hidden rounded-xl border border-[#e1e6ef] bg-white">
+            <div className="border-b border-[#eef1f6] bg-[#fafbfd] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
+                Card preview
               </p>
             </div>
-            <div className="overflow-hidden">
-              <div className="relative aspect-[4/5] w-full">
-                {primaryFlyerUrl ? (
-                  <Image
-                    src={primaryFlyerUrl}
-                    alt="Event flyer preview"
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 1280px) 100vw, 25vw"
-                  />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#f7f9fc] px-6 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0f4cdb]/8">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f4cdb" strokeWidth="1.5" strokeOpacity="0.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+            <div className="p-4">
+              <div className="overflow-hidden rounded-lg border border-[#eef1f6] bg-[#fafbfd]">
+                <div className="relative aspect-[4/5] w-full">
+                  {primaryFlyerUrl ? (
+                    <Image
+                      src={primaryFlyerUrl}
+                      alt="Event flyer preview"
+                      fill
+                      className="object-cover"
+                      sizes="280px"
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#07111f]/5 text-[#9aa4b6]">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      </div>
+                      <p className="text-[12px] text-[#9aa4b6]">No cover image</p>
                     </div>
-                    <p className="text-sm text-[#07111f]/35">No flyer uploaded yet.</p>
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,23,42,0.84)] via-[rgba(15,23,42,0.12)] to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/72">
-                    Featured event
-                  </p>
-                  <h3 className="mt-3 text-3xl font-semibold leading-[0.96] tracking-[-0.04em]">
-                    {name || "Your event title"}
-                  </h3>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/84">
-                    {description || "A short event summary will appear here once you start filling the form."}
-                  </p>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white shadow-[0_4px_24px_rgba(7,17,31,0.06),0_1px_4px_rgba(7,17,31,0.04)]">
-            <div className="border-b border-[#d6deeb] bg-[#f7f9fc] px-5 py-4">
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#07111f]/40">
-                Summary
+              <h3 className="mt-3.5 truncate font-display text-[1.15rem] font-semibold tracking-[-0.01em] text-[#07111f]">
+                {name || "Your event name"}
+              </h3>
+              <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-[#9aa4b6]">
+                {description || "A short summary will appear here."}
               </p>
-            </div>
-            <dl className="space-y-0 divide-y divide-[#f0f3f8] px-5 py-1 text-sm text-[#07111f]/50">
-              <div className="flex items-center justify-between gap-3 py-3.5">
-                <dt>Status</dt>
-                <dd className="rounded-full bg-[#0f4cdb]/8 px-2.5 py-1 text-xs font-semibold text-[#0f4cdb]">
-                  {formatStatusLabel(initialEvent?.status)}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-3 py-3.5">
-                <dt>Nominations</dt>
-                <dd className="max-w-[11rem] text-right text-xs font-semibold text-[#07111f]">
-                  {nominationStartAt && nominationEndAt
-                    ? `${new Date(nominationStartAt).toLocaleDateString()} → ${new Date(nominationEndAt).toLocaleDateString()}`
-                    : "Opens after approval"}
-                </dd>
-              </div>
-              <div className="flex items-start justify-between gap-3 py-3.5">
-                <dt>Voting</dt>
-                <dd className="max-w-[11rem] text-right text-xs font-semibold text-[#07111f]">
-                  {votingStartAt && votingEndAt
-                    ? `${new Date(votingStartAt).toLocaleDateString()} → ${new Date(votingEndAt).toLocaleDateString()}`
-                    : "Not scheduled yet"}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3 py-3.5">
-                <dt>Categories</dt>
-                <dd className="font-semibold text-[#07111f]">{categories.length}</dd>
-              </div>
-            </dl>
-          </div>
 
-          <div className="overflow-hidden rounded-[1.8rem] border border-[#d6deeb] bg-white shadow-[0_4px_24px_rgba(7,17,31,0.06),0_1px_4px_rgba(7,17,31,0.04)]">
-            <div className="border-b border-[#d6deeb] bg-[#f7f9fc] px-5 py-4">
-              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#07111f]/40">
-                Actions
-              </p>
-            </div>
-            <div className="space-y-3 p-5">
-              <button
-                type="submit"
-                form="event-editor-form"
-                disabled={!isEditable || isSaving}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-[#0f4cdb] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#0930a8] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSaving
-                  ? "Saving..."
-                  : isUpdate
-                    ? "Save changes"
-                    : "Save draft"}
-              </button>
-
-              {canSubmitForApproval ? (
-                <button
-                  type="button"
-                  onClick={() => void handleSubmitForApproval()}
-                  disabled={isSubmittingForApproval}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-[#b40f17] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#960d14] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmittingForApproval
-                    ? "Submitting..."
-                    : initialEvent?.status === "REJECTED"
-                      ? "Resubmit event"
-                      : "Submit for approval"}
-                </button>
-              ) : null}
+              <div className="mt-3.5 space-y-2 border-t border-[#eef1f6] pt-3.5 text-[12px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9aa4b6]">Categories</span>
+                  <span className="font-semibold text-[#07111f]">{categories.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9aa4b6]">Voting</span>
+                  <span className="font-semibold text-[#07111f]">
+                    {votingStartAt
+                      ? new Date(votingStartAt).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tiny review row sub-component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewRow({
+  label,
+  value,
+  valueTone = "default",
+}: {
+  label: string;
+  value: string;
+  valueTone?: "default" | "warn";
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-[#eef1f6] pb-3 last:border-b-0 last:pb-0">
+      <span className="text-[13px] font-medium text-[#9aa4b6]">{label}</span>
+      <span
+        className={`max-w-[60%] text-right text-[13px] ${
+          valueTone === "warn" ? "font-semibold text-[#b40f17]" : "text-[#07111f]"
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
