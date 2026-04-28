@@ -173,7 +173,7 @@ export function AccountProfileForm() {
             <button type="submit" className="button-primary" disabled={isSaving}>
               {isSaving ? "Saving..." : "Save changes"}
             </button>
-            <Link href="/events" className="button-secondary">
+            <Link href="/my-events" className="button-secondary">
               My events
             </Link>
             <button

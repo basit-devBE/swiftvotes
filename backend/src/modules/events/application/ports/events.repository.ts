@@ -46,6 +46,8 @@ export interface EventsRepository {
   findById(eventId: string): Promise<Event | null>;
   findBySlug(slug: string): Promise<Event | null>;
   findMine(creatorUserId: string): Promise<Event[]>;
+  findAll(): Promise<Event[]>;
+  findApproved(): Promise<Event[]>;
   findPendingApproval(): Promise<Event[]>;
   findLifecycleCandidates(): Promise<Event[]>;
   updateDraft(eventId: string, input: UpdateDraftEventRecord): Promise<Event>;

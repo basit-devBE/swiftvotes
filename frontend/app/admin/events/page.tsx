@@ -1,17 +1,82 @@
-import { RequireAuth } from "@/components/auth/require-auth";
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { AllEventsTable } from "@/components/admin/all-events-table";
 import { PendingEventsReview } from "@/components/admin/pending-events-review";
-import { Navbar } from "@/components/navbar";
+import { listAllAdminEvents } from "@/lib/api/events";
+import { EventResponse } from "@/lib/api/types";
+
+type Tab = "pending" | "all";
 
 export default function AdminEventsPage() {
+  const [tab, setTab] = useState<Tab>("pending");
+  const [allEvents, setAllEvents] = useState<EventResponse[]>([]);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
+  const [loadedAll, setLoadedAll] = useState(false);
+
+  useEffect(() => {
+    if (tab === "all" && !loadedAll) {
+      setIsLoadingAll(true);
+
+      listAllAdminEvents()
+        .then((events) => {
+          setAllEvents(events);
+          setLoadedAll(true);
+        })
+        .finally(() => setIsLoadingAll(false));
+    }
+  }, [tab, loadedAll]);
+
   return (
-    <div className="relative min-h-screen overflow-x-clip">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[36rem] bg-[radial-gradient(circle_at_top_left,_rgba(15,76,219,0.14),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(15,76,219,0.1),_transparent_30%),linear-gradient(180deg,_rgba(255,255,255,0.98),_#f6f9fd)]" />
-      <Navbar />
-      <main className="page-shell pb-16 pt-10 sm:pb-20 sm:pt-14">
-        <RequireAuth>
+    <div className="px-8 py-10">
+      {/* Header */}
+      <div className="mb-8 border-b border-line pb-8">
+        <p className="section-kicker">Events</p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.04em] text-ink">
+          Event management
+        </h1>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-2xl border border-line bg-white p-1 w-fit">
+        {(
+          [
+            { key: "pending", label: "Pending Review" },
+            { key: "all", label: "All Events" },
+          ] as { key: Tab; label: string }[]
+        ).map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={[
+              "rounded-xl px-5 py-2 text-sm font-semibold transition",
+              tab === key
+                ? "bg-ink text-white shadow-sm"
+                : "text-ink/50 hover:text-ink",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "pending" && (
+        <div className="mt-6">
           <PendingEventsReview />
-        </RequireAuth>
-      </main>
+        </div>
+      )}
+
+      {tab === "all" && (
+        <div className="mt-2">
+          {isLoadingAll ? (
+            <p className="mt-6 text-sm text-ink/40">Loading events…</p>
+          ) : (
+            <AllEventsTable events={allEvents} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

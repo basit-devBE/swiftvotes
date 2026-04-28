@@ -23,7 +23,7 @@ export function LoginForm() {
   }>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const nextPath = searchParams.get("next") || "/events";
+  const nextPath = searchParams.get("next") || "/my-events";
 
   useEffect(() => {
     if (status === "authenticated") {

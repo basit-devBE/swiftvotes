@@ -22,7 +22,7 @@ export function AuthShell({
   footerLinkHref,
 }: AuthShellProps) {
   return (
-    <section className="page-shell flex h-full items-center justify-center py-4 sm:py-6">
+    <section className="page-shell flex min-h-full items-start justify-center py-6 sm:items-center sm:py-8">
       <div className="w-full max-w-xl rounded-[2.2rem] border border-white/70 bg-white/84 p-7 shadow-card backdrop-blur sm:p-9">
         <div className="mb-8 flex justify-center">
           <SiteLogo

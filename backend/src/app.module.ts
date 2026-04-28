@@ -6,6 +6,7 @@ import { CoreModule } from "./core/core.module";
 import { appConfig } from "./core/config/app.config";
 import { authConfig } from "./core/config/auth.config";
 import { databaseConfig } from "./core/config/database.config";
+import { emailConfig } from "./core/config/email.config";
 import { validationSchema } from "./core/config/env.validation";
 import { storageConfig } from "./core/config/storage.config";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -24,7 +25,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [appConfig, authConfig, databaseConfig, storageConfig],
+      load: [appConfig, authConfig, databaseConfig, emailConfig, storageConfig],
       validationSchema,
       envFilePath: [
         `.env.${process.env.NODE_ENV}.local`,

@@ -7,6 +7,8 @@ import { CreateCategoryUseCase } from "./application/use-cases/create-category.u
 import { CreateEventUseCase } from "./application/use-cases/create-event.use-case";
 import { DeleteCategoryUseCase } from "./application/use-cases/delete-category.use-case";
 import { GetEventDetailsUseCase } from "./application/use-cases/get-event-details.use-case";
+import { ListAllEventsUseCase } from "./application/use-cases/list-all-events.use-case";
+import { ListApprovedEventsUseCase } from "./application/use-cases/list-approved-events.use-case";
 import { ListMyEventsUseCase } from "./application/use-cases/list-my-events.use-case";
 import { ListPendingEventsUseCase } from "./application/use-cases/list-pending-events.use-case";
 import { RejectEventUseCase } from "./application/use-cases/reject-event.use-case";
@@ -24,6 +26,8 @@ import { EventsController } from "./presentation/http/events.controller";
   controllers: [EventsController],
   providers: [
     CreateEventUseCase,
+    ListAllEventsUseCase,
+    ListApprovedEventsUseCase,
     ListMyEventsUseCase,
     GetEventDetailsUseCase,
     UpdateEventUseCase,

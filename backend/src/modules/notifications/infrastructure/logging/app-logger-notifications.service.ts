@@ -36,4 +36,13 @@ export class AppLoggerNotificationsService implements NotificationsService {
       "Notifications",
     );
   }
+
+  async sendAdminNewEventPendingEmail(
+    payload: EventNotificationPayload,
+  ): Promise<void> {
+    this.logger.log(
+      `Admin notification queued for new pending event ${payload.eventId} submitted by ${payload.recipientEmail}`,
+      "Notifications",
+    );
+  }
 }

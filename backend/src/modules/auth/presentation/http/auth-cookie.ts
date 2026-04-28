@@ -8,13 +8,17 @@ export function buildRefreshCookieOptions(
   app: AppConfig,
   auth: ConfigType<typeof authConfig>,
 ): CookieOptions {
+  // SameSite=None requires Secure=true or browsers will silently drop the cookie.
+  // For local HTTP development (same-site localhost) use Lax, which allows the
+  // cookie to be sent on same-site cross-port fetch requests.
+  const isSecure =
+    app.environment === "production" ||
+    (app.frontendOrigin ?? "").startsWith("https");
+
   return {
     httpOnly: true,
-    sameSite: "none",
-    // Require Secure for SameSite=None cookies. In development, allow secure
-    // when the configured frontend origin is HTTPS (e.g. ngrok tunnels).
-    secure: app.environment === "production" ||
-      (app.frontendOrigin ?? "").startsWith("https"),
+    sameSite: isSecure ? "none" : "lax",
+    secure: isSecure,
     path: "/",
     maxAge: parseDurationToMilliseconds(auth.refreshTtl),
   };

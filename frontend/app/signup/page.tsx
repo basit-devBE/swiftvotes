@@ -4,11 +4,11 @@ import { Navbar } from "@/components/navbar";
 
 export default function SignupPage() {
   return (
-    <div className="relative flex h-screen overflow-hidden">
+    <div className="relative flex min-h-screen overflow-x-clip">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(15,76,219,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(15,76,219,0.12),_transparent_28%),linear-gradient(180deg,_rgba(255,255,255,0.98),_#f6f9fd)]" />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-screen flex-1 flex-col">
         <Navbar />
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main className="flex-1">
         <AuthShell
           eyebrow="Create account"
           title="Create your SwiftVote account."

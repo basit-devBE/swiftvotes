@@ -30,4 +30,10 @@ export const validationSchema = Joi.object({
   SUPER_ADMIN_EMAIL: Joi.string().email().optional(),
   SUPER_ADMIN_PASSWORD: Joi.string().min(8).optional(),
   SUPER_ADMIN_FULL_NAME: Joi.string().optional(),
+  SMTP_HOST: Joi.string().allow("").default(""),
+  SMTP_PORT: Joi.number().port().default(587),
+  SMTP_SECURE: Joi.string().valid("true", "false").default("false"),
+  SMTP_USER: Joi.string().allow("").default(""),
+  SMTP_PASS: Joi.string().allow("").default(""),
+  EMAIL_FROM: Joi.string().allow("").default("SwiftVote <no-reply@swiftvote.app>"),
 });

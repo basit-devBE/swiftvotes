@@ -17,9 +17,12 @@ import { SystemRole } from "../../../users/domain/system-role";
 import { ApproveEventUseCase } from "../../application/use-cases/approve-event.use-case";
 import { CreateCategoryUseCase } from "../../application/use-cases/create-category.use-case";
 import { CreateEventUseCase } from "../../application/use-cases/create-event.use-case";
+import { ListAllEventsUseCase } from "../../application/use-cases/list-all-events.use-case";
+import { ListApprovedEventsUseCase } from "../../application/use-cases/list-approved-events.use-case";
 import { DeleteCategoryUseCase } from "../../application/use-cases/delete-category.use-case";
 import { GetEventDetailsUseCase } from "../../application/use-cases/get-event-details.use-case";
 import { ListMyEventsUseCase } from "../../application/use-cases/list-my-events.use-case";
+import { Public } from "../../../auth/presentation/http/decorators/public.decorator";
 import { ListPendingEventsUseCase } from "../../application/use-cases/list-pending-events.use-case";
 import { RejectEventUseCase } from "../../application/use-cases/reject-event.use-case";
 import { ResubmitEventUseCase } from "../../application/use-cases/resubmit-event.use-case";
@@ -41,6 +44,8 @@ import { EventResponseDto } from "./responses/event.response.dto";
 export class EventsController {
   constructor(
     private readonly createEventUseCase: CreateEventUseCase,
+    private readonly listAllEventsUseCase: ListAllEventsUseCase,
+    private readonly listApprovedEventsUseCase: ListApprovedEventsUseCase,
     private readonly listMyEventsUseCase: ListMyEventsUseCase,
     private readonly getEventDetailsUseCase: GetEventDetailsUseCase,
     private readonly updateEventUseCase: UpdateEventUseCase,
@@ -53,6 +58,13 @@ export class EventsController {
     private readonly updateCategoryUseCase: UpdateCategoryUseCase,
     private readonly deleteCategoryUseCase: DeleteCategoryUseCase,
   ) {}
+
+  @Public()
+  @Get()
+  async listApproved(): Promise<EventResponseDto[]> {
+    const events = await this.listApprovedEventsUseCase.execute();
+    return events.map((event) => EventResponseDto.fromDomain(event));
+  }
 
   @Post()
   async createEvent(
@@ -96,6 +108,13 @@ export class EventsController {
   @SystemRoles(SystemRole.SUPER_ADMIN)
   async listPendingEvents(): Promise<EventResponseDto[]> {
     const events = await this.listPendingEventsUseCase.execute();
+    return events.map((event) => EventResponseDto.fromDomain(event));
+  }
+
+  @Get("admin/all")
+  @SystemRoles(SystemRole.SUPER_ADMIN)
+  async listAllEvents(): Promise<EventResponseDto[]> {
+    const events = await this.listAllEventsUseCase.execute();
     return events.map((event) => EventResponseDto.fromDomain(event));
   }
 

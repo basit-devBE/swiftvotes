@@ -106,6 +106,36 @@ export class PrismaEventsRepository implements EventsRepository {
     return events.map((event) => this.toDomainEvent(event));
   }
 
+  async findAll(): Promise<Event[]> {
+    const events = await this.prisma.event.findMany({
+      include: EVENT_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return events.map((event) => this.toDomainEvent(event));
+  }
+
+  async findApproved(): Promise<Event[]> {
+    const events = await this.prisma.event.findMany({
+      where: {
+        status: {
+          in: [
+            PrismaEventStatus.APPROVED,
+            PrismaEventStatus.NOMINATIONS_OPEN,
+            PrismaEventStatus.NOMINATIONS_CLOSED,
+            PrismaEventStatus.VOTING_SCHEDULED,
+            PrismaEventStatus.VOTING_LIVE,
+            PrismaEventStatus.VOTING_CLOSED,
+          ],
+        },
+      },
+      include: EVENT_INCLUDE,
+      orderBy: { approvedAt: "desc" },
+    });
+
+    return events.map((event) => this.toDomainEvent(event));
+  }
+
   async findPendingApproval(): Promise<Event[]> {
     const events = await this.prisma.event.findMany({
       where: { status: PrismaEventStatus.PENDING_APPROVAL },

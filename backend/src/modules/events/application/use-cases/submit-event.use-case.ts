@@ -62,6 +62,13 @@ export class SubmitEventUseCase {
         recipientEmail: creator.email,
         recipientName: creator.fullName,
       });
+
+      await this.notificationsService.sendAdminNewEventPendingEmail({
+        eventId: updated.id,
+        eventName: updated.name,
+        recipientEmail: creator.email,
+        recipientName: creator.fullName,
+      });
     }
 
     return updated;

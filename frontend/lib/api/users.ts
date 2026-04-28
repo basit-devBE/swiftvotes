@@ -25,3 +25,17 @@ export function updateCurrentUser(
     body: input,
   });
 }
+
+export function listUsers(): Promise<UserResponse[]> {
+  return apiRequest<UserResponse[]>("/users");
+}
+
+export function changeUserStatus(
+  userId: string,
+  status: "ACTIVE" | "SUSPENDED",
+): Promise<UserResponse> {
+  return apiRequest<UserResponse>(`/users/${userId}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+}

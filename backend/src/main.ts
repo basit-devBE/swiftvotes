@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     appConfig.frontendOrigin,
     "https://almanac-patient-spookily.ngrok-free.dev",
-    "http://localhost:3000/"
+    "http://localhost:3000",
   ];
 
   app.enableCors({

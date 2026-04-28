@@ -16,7 +16,7 @@ export function RequireAuth({
 
   useEffect(() => {
     if (status === "anonymous") {
-      router.replace(`/login?next=${encodeURIComponent(pathname || "/events")}`);
+      router.replace(`/login?next=${encodeURIComponent(pathname || "/my-events")}`);
     }
   }, [pathname, router, status]);
 

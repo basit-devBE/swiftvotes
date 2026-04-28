@@ -32,7 +32,7 @@ export function SignupForm() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/events");
+      router.replace("/my-events");
     }
   }, [router, status]);
 
@@ -67,7 +67,7 @@ export function SignupForm() {
         password,
       });
       await login({ email, password });
-      router.replace("/events");
+      router.replace("/my-events");
     } catch (submissionError) {
       if (submissionError instanceof ApiClientError) {
         setError(submissionError.message || "Unable to create account.");

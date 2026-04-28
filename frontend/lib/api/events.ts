@@ -18,6 +18,10 @@ export function listMyEvents(): Promise<EventResponse[]> {
   return apiRequest<EventResponse[]>("/events/mine");
 }
 
+export function listApprovedEvents(): Promise<EventResponse[]> {
+  return apiRequest<EventResponse[]>("/events");
+}
+
 export function getEvent(eventId: string): Promise<EventResponse> {
   return apiRequest<EventResponse>(`/events/${eventId}`);
 }
@@ -56,6 +60,10 @@ export function createCategory(
 
 export function listPendingEvents(): Promise<EventResponse[]> {
   return apiRequest<EventResponse[]>("/events/admin/pending");
+}
+
+export function listAllAdminEvents(): Promise<EventResponse[]> {
+  return apiRequest<EventResponse[]>("/events/admin/all");
 }
 
 export function approveEvent(eventId: string): Promise<EventResponse> {

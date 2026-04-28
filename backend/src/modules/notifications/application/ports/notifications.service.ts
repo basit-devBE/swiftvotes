@@ -12,4 +12,7 @@ export interface NotificationsService {
   ): Promise<void>;
   sendEventApprovedEmail(payload: EventNotificationPayload): Promise<void>;
   sendEventRejectedEmail(payload: EventNotificationPayload): Promise<void>;
+  sendAdminNewEventPendingEmail(
+    payload: EventNotificationPayload,
+  ): Promise<void>;
 }

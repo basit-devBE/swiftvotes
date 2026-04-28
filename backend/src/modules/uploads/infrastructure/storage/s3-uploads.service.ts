@@ -16,6 +16,12 @@ export class S3UploadsService implements UploadsService {
   ) {
     this.client = new S3Client({
       region: config.region,
+      // Prevent the SDK from adding CRC32 checksum params to presigned URLs by
+      // default (SDK v3 ≥ 3.6xx does this automatically). Without this flag the
+      // browser PUT fails with 403 because the plain fetch() doesn't send the
+      // required x-amz-checksum-crc32 header.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
       credentials:
         config.accessKeyId && config.secretAccessKey
           ? {
