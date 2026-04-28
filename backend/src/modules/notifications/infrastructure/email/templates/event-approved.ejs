@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <%- include('_styles') %>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+      </div>
+      <div class="card-body">
+        <p>Hi <%= recipientName %>,</p>
+        <p>Your event has been approved and is now active on the platform.</p>
+        <div class="event-name"><%= eventName %></div>
+        <p>Nominations and voting will open based on the schedule you configured. You can review your event details and manage categories from your event workspace.</p>
+        <div class="divider"></div>
+        <a href="<%= eventUrl %>" class="btn btn-primary">Go to event workspace</a>
+      </div>
+      <div class="card-footer">
+        <p>This email was sent by SwiftVote. If you did not expect this, you can ignore it.</p>
+        <p style="margin-top:6px"><a href="<%= frontendUrl %>">swiftvote.app</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

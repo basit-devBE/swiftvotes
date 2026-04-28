@@ -1,0 +1,6 @@
+export enum EventRole {
+  EVENT_OWNER = "EVENT_OWNER",
+  EVENT_ADMIN = "EVENT_ADMIN",
+  MODERATOR = "MODERATOR",
+  ANALYST = "ANALYST",
+}

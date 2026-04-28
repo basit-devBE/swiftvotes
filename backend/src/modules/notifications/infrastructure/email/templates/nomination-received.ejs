@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <%- include('_styles') %>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+      </div>
+      <div class="card-body">
+        <p>Hi <%= recipientName %>,</p>
+        <p>A new nomination has been submitted for your event and is waiting for your review.</p>
+        <div class="event-name"><%= eventName %></div>
+        <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+          <tr>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Nominee</td>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-weight:600;color:#07111f;"><%= nomineeName %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Category</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;color:#07111f;"><%= categoryName %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-radius:0 0 6px 6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Submitted by</td>
+            <td style="padding:10px 14px;border-radius:0 0 6px 6px;color:#07111f;"><%= submitterName %></td>
+          </tr>
+        </table>
+        <p>Head to your event workspace to confirm or reject this nomination before it goes live.</p>
+        <div class="divider"></div>
+        <a href="<%= manageUrl %>" class="btn btn-primary">Review nominations</a>
+      </div>
+      <div class="card-footer">
+        <p>This email was sent by SwiftVote. If you did not expect this, you can ignore it.</p>
+        <p style="margin-top:6px"><a href="<%= frontendUrl %>">swiftvote.app</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

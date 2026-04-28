@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <%- include('_styles') %>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+      </div>
+      <div class="card-body">
+        <p>Hi <%= recipientName %>,</p>
+        <p>Your event has been submitted and is now waiting for review.</p>
+        <div class="event-name"><%= eventName %></div>
+        <p>You will receive another email once a decision has been made. This usually takes 1&#8211;2 business days.</p>
+        <div class="divider"></div>
+        <a href="<%= eventUrl %>" class="btn btn-primary">View your event</a>
+      </div>
+      <div class="card-footer">
+        <p>This email was sent by SwiftVote. If you did not expect this, you can ignore it.</p>
+        <p style="margin-top:6px"><a href="<%= frontendUrl %>">swiftvote.app</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

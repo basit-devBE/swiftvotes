@@ -6,49 +6,34 @@ import { EventCard } from "@/components/event-card";
 
 const featuredEvents = [
   {
-    title: "Campus Choice",
+    title: "Ghana SHS Awards",
     summary:
-      "Vote across live student categories with fast checkouts, clean discovery, and public momentum.",
+      "Completed school honors campaign with category pricing and a polished public rollout.",
     category: "Awards",
-    status: "Open now",
+    status: "Closed",
+    imageSrc: "/ghana SHS Awards.png",
     visualTone: "indigo" as const,
-    ctaLabel: "Vote now",
+    ctaLabel: "View recap",
   },
   {
-    title: "Radiance Finals",
+    title: "Dinner Night",
     summary:
-      "Review nominee momentum, launch final rounds, and bring a polished pageantry flow to the front page.",
-    category: "Pageantry",
-    status: "Nominations",
+      "Finished social campaign presented as a premium event page even after entries close.",
+    category: "Lifestyle",
+    status: "Closed",
+    imageSrc: "/DINNER NIGHT A4 LOGO copy.jpg.jpeg",
     visualTone: "blue" as const,
-    ctaLabel: "See nominees",
+    ctaLabel: "See recap",
   },
   {
-    title: "Creator Impact",
+    title: "Grand Finale Contestants",
     summary:
-      "Feature audience-driven campaigns with shareable voting and a stronger public spotlight.",
-    category: "Community",
-    status: "Live vote",
+      "Finale lineup showcase grounded in an actual pageantry campaign.",
+    category: "Pageantry",
+    status: "Closed",
+    imageSrc: "/grand finale contestants.jpg.jpeg",
     visualTone: "slate" as const,
-    ctaLabel: "Explore vote",
-  },
-  {
-    title: "Next Star",
-    summary:
-      "Push a talent showcase forward with urgent visibility, cleaner promotion, and clear result tracking.",
-    category: "Talent",
-    status: "Closing soon",
-    visualTone: "amber" as const,
-    ctaLabel: "Track results",
-  },
-  {
-    title: "Future Voices",
-    summary:
-      "Run a flagship campaign with high visibility, nominee engagement, and structured live voting windows.",
-    category: "Featured",
-    status: "Coming next",
-    visualTone: "crimson" as const,
-    ctaLabel: "View event",
+    ctaLabel: "View lineup",
   },
 ];
 
@@ -104,11 +89,12 @@ export function EventsPreview() {
         <div className="mx-auto max-w-4xl text-center">
           <p className="section-kicker">Featured events</p>
           <h2 className="mt-4 font-body text-5xl font-semibold tracking-[-0.05em] text-ink sm:text-6xl">
-            What SwiftVote can power
+            Real event campaigns, not placeholders
           </h2>
           <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-ink/68 sm:text-xl">
-            Seamless featured campaigns, pageantry rounds, and public voting
-            experiences presented like the events themselves matter.
+            These flyers are from completed campaigns. They give the landing
+            page real event texture while showing how SwiftVote can present
+            awards, pageantry, and public-facing event moments cleanly.
           </p>
         </div>
 
@@ -118,6 +104,7 @@ export function EventsPreview() {
             summary={featuredEvents[activeIndex].summary}
             category={featuredEvents[activeIndex].category}
             status={featuredEvents[activeIndex].status}
+            imageSrc={featuredEvents[activeIndex].imageSrc}
             visualTone={featuredEvents[activeIndex].visualTone}
             ctaLabel={featuredEvents[activeIndex].ctaLabel}
             indexLabel={`0${activeIndex + 1}`}
@@ -148,6 +135,7 @@ export function EventsPreview() {
                   summary={event.summary}
                   category={event.category}
                   status={event.status}
+                  imageSrc={event.imageSrc}
                   visualTone={event.visualTone}
                   ctaLabel={event.ctaLabel}
                   indexLabel={isActive ? `0${activeIndex + 1}` : undefined}

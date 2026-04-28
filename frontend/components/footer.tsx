@@ -3,10 +3,10 @@ import Link from "next/link";
 import { SiteLogo } from "@/components/site-logo";
 
 const footerLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#how-it-works", label: "How it Works" },
-  { href: "#events", label: "Events" },
-  { href: "#get-started", label: "Get Started" },
+  { href: "/#features", label: "Features" },
+  { href: "/#how-it-works", label: "How it Works" },
+  { href: "/#events", label: "Events" },
+  { href: "/signup", label: "Get Started" },
 ];
 
 export function Footer() {

@@ -35,10 +35,10 @@ export function Hero() {
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <Link href="#get-started" className="button-primary">
+            <Link href="/signup" className="button-primary">
               Get Started
             </Link>
-            <Link href="#events" className="button-secondary">
+            <Link href="/#events" className="button-secondary">
               Explore Events
             </Link>
           </div>

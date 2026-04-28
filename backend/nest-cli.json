@@ -2,6 +2,18 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "modules/notifications/infrastructure/email/templates/**/*",
+        "outDir": "dist",
+        "watchAssets": true
+      },
+      {
+        "include": "modules/notifications/infrastructure/email/assets/**/*",
+        "outDir": "dist",
+        "watchAssets": true
+      }
+    ]
   }
 }

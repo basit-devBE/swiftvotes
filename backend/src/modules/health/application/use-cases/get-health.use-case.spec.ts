@@ -11,6 +11,7 @@ describe("GetHealthUseCase", () => {
       environment: "test",
       port: 3001,
       apiPrefix: "api",
+      frontendOrigin: "http://localhost:3000",
     } satisfies ConfigType<typeof appConfig>;
 
     const useCase = new GetHealthUseCase(config);
