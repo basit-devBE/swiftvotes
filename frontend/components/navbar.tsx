@@ -21,9 +21,10 @@ const appLinks = [
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const { status, logout } = useAuth();
+  const { status, user, logout } = useAuth();
   const pathname = usePathname();
   const isAuthenticated = status === "authenticated";
+  const isAdmin = isAuthenticated && user?.systemRole === "SUPER_ADMIN";
   const isHomePage = pathname === "/";
   const isMyEventsPage = pathname === "/my-events";
   const navLinks = isHomePage ? marketingLinks : appLinks;
@@ -86,6 +87,15 @@ export function Navbar() {
           <div className="hidden items-center gap-3 md:flex">
             {isAuthenticated ? (
               <>
+                {isAdmin ? (
+                  <Link
+                    href="/admin"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-ink/85"
+                  >
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    Admin
+                  </Link>
+                ) : null}
                 {isMyEventsPage ? (
                   <Link href="/events/create" className="button-primary">
                     Create Event
@@ -177,6 +187,16 @@ export function Navbar() {
               ))}
               {isAuthenticated ? (
                 <>
+                  {isAdmin ? (
+                    <Link
+                      href="/admin"
+                      className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Admin panel
+                    </Link>
+                  ) : null}
                   <Link
                     href={isMyEventsPage ? "/events/create" : "/my-events"}
                     className="button-secondary mt-2"

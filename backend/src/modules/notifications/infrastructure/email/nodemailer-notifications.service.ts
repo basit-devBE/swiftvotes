@@ -14,6 +14,14 @@ import {
 } from "../../application/ports/notifications.service";
 
 const TEMPLATES_DIR = path.join(__dirname, "templates");
+const LOGO_CID = "swiftvote-logo@mail";
+const LOGO_PATH = path.join(__dirname, "assets", "swiftvote-logo.png");
+
+const LOGO_ATTACHMENT = {
+  filename: "swiftvote-logo.png",
+  path: LOGO_PATH,
+  cid: LOGO_CID,
+};
 
 @Injectable()
 export class NodemailerNotificationsService implements NotificationsService {
@@ -39,10 +47,6 @@ export class NodemailerNotificationsService implements NotificationsService {
 
   // ── Private helpers ─────────────────────────────────────────────────────
 
-  private logoUrl(): string {
-    return `${this.app.frontendOrigin}/swiftvote-logo.png`;
-  }
-
   private eventUrl(eventId: string): string {
     return `${this.app.frontendOrigin}/events/${eventId}`;
   }
@@ -54,7 +58,7 @@ export class NodemailerNotificationsService implements NotificationsService {
     const file = path.join(TEMPLATES_DIR, `${template}.ejs`);
     return ejs.renderFile(file, {
       ...data,
-      logoUrl: this.logoUrl(),
+      logoUrl: `cid:${LOGO_CID}`,
       frontendUrl: this.app.frontendOrigin,
     });
   }
@@ -74,6 +78,7 @@ export class NodemailerNotificationsService implements NotificationsService {
         to,
         subject,
         html,
+        attachments: [LOGO_ATTACHMENT],
       });
       this.logger.log(
         `Email sent to ${to}: "${subject}"`,
