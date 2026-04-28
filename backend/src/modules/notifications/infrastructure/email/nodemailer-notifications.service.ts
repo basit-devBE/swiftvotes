@@ -10,6 +10,7 @@ import { emailConfig } from "../../../../core/config/email.config";
 import { AppLogger } from "../../../../core/logging/app-logger.service";
 import {
   EventNotificationPayload,
+  NominationReceivedPayload,
   NotificationsService,
 } from "../../application/ports/notifications.service";
 
@@ -156,5 +157,21 @@ export class NodemailerNotificationsService implements NotificationsService {
       reviewUrl: this.eventUrl(payload.eventId),
     });
     await this.send(adminEmail, subject, html);
+  }
+
+  async sendNominationReceivedEmail(
+    payload: NominationReceivedPayload,
+  ): Promise<void> {
+    const subject = `New nomination received — ${payload.eventName}`;
+    const html = await this.render("nomination-received", {
+      subject,
+      recipientName: payload.recipientName,
+      eventName: payload.eventName,
+      nomineeName: payload.nomineeName,
+      categoryName: payload.categoryName,
+      submitterName: payload.submitterName,
+      manageUrl: `${this.app.frontendOrigin}/events/${payload.eventId}/manage`,
+    });
+    await this.send(payload.recipientEmail, subject, html);
   }
 }

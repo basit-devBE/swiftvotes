@@ -168,7 +168,7 @@ export function MyEventsView() {
         {events.map((event) => (
           <Link
             key={event.id}
-            href={`/events/${event.id}`}
+            href={`/events/${event.id}/manage`}
             className="group overflow-hidden rounded-[1.9rem] border border-primary/12 bg-white/82 shadow-[0_22px_55px_-42px_rgba(7,17,31,0.26)] transition hover:-translate-y-1 hover:border-primary/24"
           >
             <div className="grid min-h-[18rem] lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -190,7 +190,7 @@ export function MyEventsView() {
                     {formatStatusLabel(event.status)}
                   </span>
                   <span className="text-sm font-semibold text-ink/48 transition group-hover:text-primary">
-                    Open
+                    Manage →
                   </span>
                 </div>
                 <h2 className="mt-4 font-display text-[2rem] font-semibold leading-[0.95] tracking-[-0.04em] text-ink">

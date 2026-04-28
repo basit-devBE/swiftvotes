@@ -4,6 +4,9 @@ import {
   CreateEventInput,
   EventCategoryResponse,
   EventResponse,
+  NominationResponse,
+  RejectNominationInput,
+  SubmitNominationInput,
   UpdateEventInput,
 } from "./types";
 
@@ -80,4 +83,39 @@ export function rejectEvent(
     method: "POST",
     body: { reason },
   });
+}
+
+export function submitNomination(
+  eventId: string,
+  input: SubmitNominationInput,
+): Promise<NominationResponse> {
+  return apiRequest<NominationResponse>(`/events/${eventId}/nominations`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function listNominations(eventId: string): Promise<NominationResponse[]> {
+  return apiRequest<NominationResponse[]>(`/events/${eventId}/nominations`);
+}
+
+export function confirmNomination(
+  eventId: string,
+  nominationId: string,
+): Promise<NominationResponse> {
+  return apiRequest<NominationResponse>(
+    `/events/${eventId}/nominations/${nominationId}/confirm`,
+    { method: "POST" },
+  );
+}
+
+export function rejectNomination(
+  eventId: string,
+  nominationId: string,
+  input: RejectNominationInput,
+): Promise<NominationResponse> {
+  return apiRequest<NominationResponse>(
+    `/events/${eventId}/nominations/${nominationId}/reject`,
+    { method: "POST", body: input },
+  );
 }

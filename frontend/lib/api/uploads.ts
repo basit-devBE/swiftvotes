@@ -19,6 +19,15 @@ export function createEventBannerUploadIntent(
   });
 }
 
+export function createNominationImageUploadIntent(
+  input: CreateUploadIntentInput,
+): Promise<UploadIntentResponse> {
+  return apiRequest<UploadIntentResponse>("/uploads/nominations/image-url", {
+    method: "POST",
+    body: input,
+  });
+}
+
 export async function uploadFileToSignedUrl(
   uploadUrl: string,
   file: File,

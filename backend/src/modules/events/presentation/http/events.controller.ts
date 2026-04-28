@@ -148,13 +148,8 @@ export class EventsController {
     return EventResponseDto.fromDomain(event);
   }
 
+  @Public()
   @Get(":eventId")
-  @EventRoles(
-    EventRole.EVENT_OWNER,
-    EventRole.EVENT_ADMIN,
-    EventRole.MODERATOR,
-    EventRole.ANALYST,
-  )
   async getEvent(@Param("eventId") eventId: string): Promise<EventResponseDto> {
     const event = await this.getEventDetailsUseCase.execute(eventId);
     return EventResponseDto.fromDomain(event);

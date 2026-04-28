@@ -115,6 +115,43 @@ export type CreateEventInput = {
 
 export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">>;
 
+export type NominationStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
+
+export type NominationResponse = {
+  id: string;
+  eventId: string;
+  categoryId: string;
+  submittedByUserId: string | null;
+  submitterName: string;
+  submitterEmail: string;
+  nomineeName: string;
+  nomineeEmail: string | null;
+  nomineePhone: string | null;
+  nomineeImageUrl: string | null;
+  nomineeImageKey: string | null;
+  status: NominationStatus;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RejectNominationInput = {
+  reason: string;
+};
+
+export type SubmitNominationInput = {
+  categoryId: string;
+  submitterName: string;
+  submitterEmail: string;
+  nomineeName: string;
+  nomineeEmail?: string;
+  nomineePhone?: string;
+  nomineeImageUrl?: string;
+  nomineeImageKey?: string;
+};
+
 export type CreateUploadIntentInput = {
   fileName: string;
   contentType: string;

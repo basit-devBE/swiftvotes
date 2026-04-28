@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 
 import { EventsModule } from "../events/events.module";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { UsersModule } from "../users/users.module";
 import { NOMINATIONS_REPOSITORY } from "./application/nominations.tokens";
 import { ConfirmNominationUseCase } from "./application/use-cases/confirm-nomination.use-case";
 import { ListNominationsUseCase } from "./application/use-cases/list-nominations.use-case";
@@ -10,7 +12,7 @@ import { PrismaNominationsRepository } from "./infrastructure/persistence/prisma
 import { NominationsController } from "./presentation/http/nominations.controller";
 
 @Module({
-  imports: [EventsModule],
+  imports: [EventsModule, NotificationsModule, UsersModule],
   controllers: [NominationsController],
   providers: [
     SubmitNominationUseCase,

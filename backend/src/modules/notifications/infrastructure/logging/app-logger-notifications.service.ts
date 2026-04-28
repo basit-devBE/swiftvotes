@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import { AppLogger } from "../../../../core/logging/app-logger.service";
 import {
   EventNotificationPayload,
+  NominationReceivedPayload,
   NotificationsService,
 } from "../../application/ports/notifications.service";
 
@@ -42,6 +43,15 @@ export class AppLoggerNotificationsService implements NotificationsService {
   ): Promise<void> {
     this.logger.log(
       `Admin notification queued for new pending event ${payload.eventId} submitted by ${payload.recipientEmail}`,
+      "Notifications",
+    );
+  }
+
+  async sendNominationReceivedEmail(
+    payload: NominationReceivedPayload,
+  ): Promise<void> {
+    this.logger.log(
+      `Nomination received email queued for ${payload.recipientEmail} — nominee: ${payload.nomineeName}, category: ${payload.categoryName}, event: ${payload.eventId}`,
       "Notifications",
     );
   }
