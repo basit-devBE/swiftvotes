@@ -27,6 +27,7 @@ export function Navbar() {
   const isAdmin = isAuthenticated && user?.systemRole === "SUPER_ADMIN";
   const isHomePage = pathname === "/";
   const isMyEventsPage = pathname === "/my-events";
+  const isMyProfilePage = pathname === "/my-profile";
   const navLinks = isHomePage ? marketingLinks : appLinks;
 
   useEffect(() => {
@@ -110,6 +111,14 @@ export function Navbar() {
                     Create Event
                   </Link>
                 ) : null}
+                {!isAdmin && (
+                  <Link
+                    href="/my-profile"
+                    className={`button-secondary ${isMyProfilePage ? "text-primary" : ""}`}
+                  >
+                    My Profile
+                  </Link>
+                )}
                 <Link href="/account" className="button-secondary">
                   Account
                 </Link>
@@ -213,6 +222,15 @@ export function Navbar() {
                       Create Event
                     </Link>
                   ) : null}
+                  {!isAdmin && (
+                    <Link
+                      href="/my-profile"
+                      className="button-secondary mt-2"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      My Profile
+                    </Link>
+                  )}
                   <Link
                     href="/account"
                     className="button-secondary mt-2"

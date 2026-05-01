@@ -1,4 +1,24 @@
+import { EventStatus } from "../../../events/domain/event-status";
 import { Contestant } from "../../domain/contestant";
+
+export type ContestantWithContext = Contestant & {
+  event: {
+    id: string;
+    name: string;
+    slug: string;
+    status: EventStatus;
+    contestantsCanViewOwnVotes: boolean;
+    contestantsCanViewLeaderboard: boolean;
+    votingStartAt: Date;
+    votingEndAt: Date;
+    primaryFlyerUrl: string;
+    bannerUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+  };
+};
 
 export interface ContestantsRepository {
   createFromNomination(input: {
@@ -16,4 +36,5 @@ export interface ContestantsRepository {
   findByEventAndCategory(eventId: string, categoryId: string): Promise<Contestant[]>;
   findById(contestantId: string): Promise<Contestant | null>;
   updateUserId(contestantId: string, userId: string): Promise<Contestant>;
+  findWithContextByUserId(userId: string): Promise<ContestantWithContext[]>;
 }
