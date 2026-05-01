@@ -188,7 +188,7 @@ function ProfileCard({ profile }: { profile: MyContestantProfileResponse }) {
         <p className="mb-1 text-sm text-ink/50">{profile.category.name}</p>
 
         <Link
-          href={`/events/${event.slug}`}
+          href={`/events/${event.id}`}
           className="text-sm font-semibold text-primary transition hover:underline"
         >
           {event.name}
