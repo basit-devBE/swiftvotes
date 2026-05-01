@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { CoreModule } from "./core/core.module";
 import { appConfig } from "./core/config/app.config";
@@ -37,6 +38,9 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
         ".env",
       ],
     }),
+    ThrottlerModule.forRoot([
+      { name: "default", ttl: 60_000, limit: 30 },
+    ]),
     CoreModule,
     UsersModule,
     AuthModule,
@@ -51,6 +55,10 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     HealthModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

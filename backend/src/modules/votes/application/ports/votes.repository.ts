@@ -36,4 +36,9 @@ export interface VotesRepository {
     categoryId: string,
   ): Promise<ContestantVoteCount[]>;
   listByEvent(eventId: string): Promise<Vote[]>;
+  findRecentFreeVoteByIp(input: {
+    contestantId: string;
+    ipAddress: string;
+    since: Date;
+  }): Promise<Vote | null>;
 }

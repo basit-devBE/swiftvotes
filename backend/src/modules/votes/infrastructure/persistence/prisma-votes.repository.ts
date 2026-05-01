@@ -108,6 +108,23 @@ export class PrismaVotesRepository implements VotesRepository {
     return votes.map((v) => this.toDomain(v));
   }
 
+  async findRecentFreeVoteByIp(input: {
+    contestantId: string;
+    ipAddress: string;
+    since: Date;
+  }): Promise<Vote | null> {
+    const vote = await this.prisma.vote.findFirst({
+      where: {
+        contestantId: input.contestantId,
+        ipAddress: input.ipAddress,
+        status: VoteStatus.FREE,
+        createdAt: { gte: input.since },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return vote ? this.toDomain(vote) : null;
+  }
+
   private toDomain(vote: PrismaVote): Vote {
     return {
       id: vote.id,

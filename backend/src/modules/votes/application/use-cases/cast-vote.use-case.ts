@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -16,6 +18,8 @@ import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
 import { VOTES_REPOSITORY } from "../votes.tokens";
 import { VotesRepository } from "../ports/votes.repository";
+
+const FREE_VOTE_COOLDOWN_MS = 60 * 60 * 1000;
 
 export type CastVoteInput = {
   eventId: string;
@@ -73,6 +77,21 @@ export class CastVoteUseCase {
     const voterEmail = input.voterEmail.trim().toLowerCase();
 
     if (category.votePriceMinor === 0) {
+      if (input.ipAddress) {
+        const since = new Date(Date.now() - FREE_VOTE_COOLDOWN_MS);
+        const recent = await this.votesRepository.findRecentFreeVoteByIp({
+          contestantId: contestant.id,
+          ipAddress: input.ipAddress,
+          since,
+        });
+        if (recent) {
+          throw new HttpException(
+            "You've already voted for this contestant recently. Please try again later.",
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+
       const vote = await this.votesRepository.create({
         eventId: event.id,
         categoryId: category.id,
