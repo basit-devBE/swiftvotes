@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
 import { getEvent, listContestants } from "@/lib/api/events";
 import { ContestantResponse, EventResponse } from "@/lib/api/types";
+import { PublicLeaderboard } from "@/components/votes/public-leaderboard";
+import { VoteModal } from "@/components/votes/vote-modal";
 import { NominationForm, StatusBanner } from "./nomination-form";
 
 function formatDate(date: string | null): string {
@@ -29,6 +31,9 @@ export function PublicEventView({ eventId }: { eventId: string }) {
   const [contestants, setContestants] = useState<ContestantResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [votingContestant, setVotingContestant] =
+    useState<ContestantResponse | null>(null);
+  const [leaderboardVersion, setLeaderboardVersion] = useState<number>(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -84,6 +89,17 @@ export function PublicEventView({ eventId }: { eventId: string }) {
 
   const isOwner = user?.id === event.creatorUserId;
   const nominationsOpen = event.status === "NOMINATIONS_OPEN";
+  const votingLive = event.status === "VOTING_LIVE";
+
+  const showLeaderboard =
+    event.contestantsCanViewLeaderboard &&
+    (event.status === "VOTING_LIVE" ||
+      event.status === "VOTING_CLOSED" ||
+      event.status === "ARCHIVED");
+
+  const votingCategory = votingContestant
+    ? event.categories.find((c) => c.id === votingContestant.categoryId) ?? null
+    : null;
 
   return (
     <article className="mx-auto max-w-6xl pb-20">
@@ -311,11 +327,30 @@ export function PublicEventView({ eventId }: { eventId: string }) {
                       <span className="shrink-0 rounded-full bg-[#07111f] px-2.5 py-1 font-mono text-[0.65rem] font-semibold tracking-wider text-white">
                         {contestant.code}
                       </span>
+
+                      {/* Vote button (only when voting is live) */}
+                      {votingLive && (
+                        <button
+                          type="button"
+                          onClick={() => setVotingContestant(contestant)}
+                          className="shrink-0 rounded-full bg-primary px-3 py-1 text-[0.7rem] font-semibold text-white transition hover:bg-primary/88"
+                        >
+                          Vote
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
+
+          {/* Leaderboard (when organiser has enabled visibility) */}
+          {showLeaderboard && (
+            <PublicLeaderboard
+              eventId={event.id}
+              refreshKey={leaderboardVersion}
+            />
           )}
         </div>
 
@@ -341,6 +376,17 @@ export function PublicEventView({ eventId }: { eventId: string }) {
           </div>
         </aside>
       </div>
+
+      {/* Vote modal */}
+      {votingContestant && votingCategory && (
+        <VoteModal
+          event={event}
+          contestant={votingContestant}
+          category={votingCategory}
+          onClose={() => setVotingContestant(null)}
+          onVoteSuccess={() => setLeaderboardVersion((v) => v + 1)}
+        />
+      )}
     </article>
   );
 }

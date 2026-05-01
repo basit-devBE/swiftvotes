@@ -196,6 +196,40 @@ export type UploadIntentResponse = {
   expiresInSeconds: number;
 };
 
+export type CastVoteInput = {
+  contestantId: string;
+  quantity: number;
+  voterName: string;
+  voterEmail: string;
+};
+
+export type VoteStatus = "FREE" | "PENDING_PAYMENT" | "CONFIRMED" | "FAILED";
+
+export type CastVoteResponse = {
+  type: "free" | "payment";
+  voteId: string;
+  status: VoteStatus;
+  quantity: number;
+  amountMinor: number;
+  currency: string;
+  paymentUrl: string | null;
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  id: string;
+  code: string;
+  name: string;
+  imageUrl: string | null;
+  voteCount: number;
+};
+
+export type LeaderboardCategory = {
+  categoryId: string;
+  categoryName: string;
+  contestants: LeaderboardEntry[];
+};
+
 export type MyContestantProfileResponse = {
   id: string;
   code: string;
