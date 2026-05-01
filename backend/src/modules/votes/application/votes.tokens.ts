@@ -1,0 +1,1 @@
+export const VOTES_REPOSITORY = Symbol("VOTES_REPOSITORY");
