@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { Contestant as PrismaContestant } from "@prisma/client";
+import { Contestant as PrismaContestant, Event as PrismaEvent, EventCategory as PrismaEventCategory } from "@prisma/client";
 
 import { PrismaService } from "../../../../core/prisma/prisma.service";
+import { EventStatus } from "../../../events/domain/event-status";
 import { buildContestantCode } from "../../domain/build-contestant-code";
 import { Contestant } from "../../domain/contestant";
-import { ContestantsRepository } from "../../application/ports/contestants.repository";
+import { ContestantsRepository, ContestantWithContext } from "../../application/ports/contestants.repository";
 
 @Injectable()
 export class PrismaContestantsRepository implements ContestantsRepository {
@@ -81,6 +82,34 @@ export class PrismaContestantsRepository implements ContestantsRepository {
       data: { userId },
     });
     return this.toDomain(contestant);
+  }
+
+  async findWithContextByUserId(userId: string): Promise<ContestantWithContext[]> {
+    const rows = await this.prisma.contestant.findMany({
+      where: { userId },
+      include: { event: true, category: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return rows.map((row) => ({
+      ...this.toDomain(row),
+      event: {
+        id: row.event.id,
+        name: row.event.name,
+        slug: row.event.slug,
+        status: row.event.status as EventStatus,
+        contestantsCanViewOwnVotes: row.event.contestantsCanViewOwnVotes,
+        contestantsCanViewLeaderboard: row.event.contestantsCanViewLeaderboard,
+        votingStartAt: row.event.votingStartAt,
+        votingEndAt: row.event.votingEndAt,
+        primaryFlyerUrl: row.event.primaryFlyerUrl,
+        bannerUrl: row.event.bannerUrl,
+      },
+      category: {
+        id: row.category.id,
+        name: row.category.name,
+      },
+    }));
   }
 
   private toDomain(contestant: PrismaContestant): Contestant {

@@ -195,3 +195,29 @@ export type UploadIntentResponse = {
   publicUrl: string;
   expiresInSeconds: number;
 };
+
+export type MyContestantProfileResponse = {
+  id: string;
+  code: string;
+  name: string;
+  imageUrl: string | null;
+  email: string | null;
+  voteCount: number;
+  createdAt: string;
+  event: {
+    id: string;
+    name: string;
+    slug: string;
+    status: EventStatus;
+    contestantsCanViewOwnVotes: boolean;
+    contestantsCanViewLeaderboard: boolean;
+    votingStartAt: string;
+    votingEndAt: string;
+    primaryFlyerUrl: string;
+    bannerUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+  };
+};
