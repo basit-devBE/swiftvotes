@@ -79,6 +79,23 @@ export class PrismaUsersRepository implements UsersRepository {
     return this.toDomain(user);
   }
 
+  async upsertByEmail(email: string, onCreate: CreateUserRecord): Promise<{ user: User; created: boolean }> {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return { user: this.toDomain(existing), created: false };
+    }
+    const created = await this.prisma.user.create({
+      data: {
+        email: onCreate.email,
+        fullName: onCreate.fullName,
+        passwordHash: onCreate.passwordHash,
+        status: (onCreate.status ?? UserStatus.ACTIVE) as PrismaUserStatus,
+        systemRole: (onCreate.systemRole ?? SystemRole.NONE) as PrismaSystemRole,
+      },
+    });
+    return { user: this.toDomain(created), created: true };
+  }
+
   private toDomain(user: PrismaUser): User {
     return {
       id: user.id,

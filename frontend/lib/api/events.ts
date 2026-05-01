@@ -1,5 +1,7 @@
 import { apiRequest } from "./client";
 import {
+  ContestantCredentialsResponse,
+  ContestantResponse,
   CreateEventCategoryInput,
   CreateEventInput,
   EventCategoryResponse,
@@ -34,6 +36,16 @@ export function updateEvent(
   input: UpdateEventInput,
 ): Promise<EventResponse> {
   return apiRequest<EventResponse>(`/events/${eventId}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function updateEventVisibility(
+  eventId: string,
+  input: { contestantsCanViewOwnVotes?: boolean; contestantsCanViewLeaderboard?: boolean },
+): Promise<EventResponse> {
+  return apiRequest<EventResponse>(`/events/${eventId}/visibility`, {
     method: "PATCH",
     body: input,
   });
@@ -117,5 +129,32 @@ export function rejectNomination(
   return apiRequest<NominationResponse>(
     `/events/${eventId}/nominations/${nominationId}/reject`,
     { method: "POST", body: input },
+  );
+}
+
+export function listContestants(
+  eventId: string,
+  categoryId?: string,
+): Promise<ContestantResponse[]> {
+  const query = categoryId ? `?categoryId=${categoryId}` : "";
+  return apiRequest<ContestantResponse[]>(`/events/${eventId}/contestants${query}`);
+}
+
+export function getContestantCredentials(
+  eventId: string,
+  contestantId: string,
+): Promise<ContestantCredentialsResponse> {
+  return apiRequest<ContestantCredentialsResponse>(
+    `/events/${eventId}/contestants/${contestantId}/credentials`,
+  );
+}
+
+export function regenerateMagicLink(
+  eventId: string,
+  contestantId: string,
+): Promise<{ magicLinkUrl: string }> {
+  return apiRequest<{ magicLinkUrl: string }>(
+    `/events/${eventId}/contestants/${contestantId}/magic-link`,
+    { method: "POST" },
   );
 }

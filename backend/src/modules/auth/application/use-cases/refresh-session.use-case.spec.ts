@@ -24,6 +24,7 @@ describe("RefreshSessionUseCase", () => {
       }),
       update: jest.fn(),
       updateStatus: jest.fn(),
+      upsertByEmail: jest.fn(),
     };
     const tokenService: jest.Mocked<AuthTokenService> = {
       issueAccessToken: jest.fn().mockResolvedValue({
@@ -61,6 +62,7 @@ describe("RefreshSessionUseCase", () => {
       findById: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
       updateStatus: jest.fn(),
+      upsertByEmail: jest.fn(),
     };
     const tokenService: jest.Mocked<AuthTokenService> = {
       issueAccessToken: jest.fn(),

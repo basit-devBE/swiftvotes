@@ -7,11 +7,17 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiClientError } from "@/lib/api/client";
 import {
   confirmNomination,
+  getContestantCredentials,
   getEvent,
+  listContestants,
   listNominations,
+  regenerateMagicLink,
   rejectNomination,
+  updateEventVisibility,
 } from "@/lib/api/events";
 import {
+  ContestantCredentialsResponse,
+  ContestantResponse,
   EventCategoryResponse,
   EventResponse,
   NominationResponse,
@@ -22,7 +28,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "overview" | "nominations" | "votes";
+type Tab = "overview" | "nominations" | "contestants" | "votes";
 type NomFilter = "all" | NominationStatus;
 
 // ---------------------------------------------------------------------------
@@ -133,6 +139,7 @@ function getStepState(
 function NominationCard({
   nomination,
   categoryName,
+  contestant,
   onConfirm,
   onReject,
   isConfirming,
@@ -140,6 +147,7 @@ function NominationCard({
 }: {
   nomination: NominationResponse;
   categoryName: string;
+  contestant?: ContestantResponse;
   onConfirm: (id: string) => void;
   onReject: (id: string, reason: string) => void;
   isConfirming: boolean;
@@ -211,6 +219,11 @@ function NominationCard({
                 {nomination.nomineePhone}
               </span>
             )}
+            {contestant && (
+              <span className="rounded-full border border-[#1b6f4b]/20 bg-[#07111f] px-2.5 py-0.5 font-mono text-[0.7rem] font-semibold tracking-wider text-white">
+                {contestant.code}
+              </span>
+            )}
           </div>
 
           <p className="mt-2.5 text-xs text-ink/44">
@@ -231,20 +244,45 @@ function NominationCard({
 
       {/* Action bar — pending only */}
       {nomination.status === "PENDING_REVIEW" && !rejectMode && (
-        <div className="flex gap-2 border-t border-primary/8 bg-[#f9fafb] px-5 py-3">
-          <button
-            onClick={() => onConfirm(nomination.id)}
-            disabled={isConfirming}
-            className="rounded-full border border-[#cfe7da] bg-[#eef9f2] px-4 py-1.5 text-xs font-semibold text-[#1b6f4b] transition hover:bg-[#dcf5e8] disabled:opacity-50"
-          >
-            {isConfirming ? "Confirming…" : "Confirm"}
-          </button>
-          <button
-            onClick={() => setRejectMode(true)}
-            className="rounded-full border border-[#f0cfd3] bg-[#fff2f4] px-4 py-1.5 text-xs font-semibold text-accent transition hover:bg-[#fde8eb]"
-          >
-            Reject
-          </button>
+        <div className="border-t border-primary/8 bg-[#f9fafb]">
+          {/* No-email warning */}
+          {!nomination.nomineeEmail && (
+            <div className="flex items-start gap-2 border-b border-[#fde68a]/60 bg-[#fffbeb] px-5 py-3">
+              <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b45309]" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 5Zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+              </svg>
+              <p className="text-[11px] leading-4 text-[#92400e]">
+                <span className="font-semibold">No email on record.</span> Add an email to this nomination before confirming — login credentials will be sent to it.
+              </p>
+            </div>
+          )}
+          {/* Email present — soft reminder */}
+          {nomination.nomineeEmail && (
+            <div className="flex items-start gap-2 border-b border-[#fde68a]/60 bg-[#fffbeb] px-5 py-3">
+              <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b45309]" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 5Zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+              </svg>
+              <p className="text-[11px] leading-4 text-[#92400e]">
+                Make sure <span className="font-semibold">{nomination.nomineeEmail}</span> is correct — login credentials will be sent there.
+              </p>
+            </div>
+          )}
+          <div className="flex gap-2 px-5 py-3">
+            <button
+              onClick={() => onConfirm(nomination.id)}
+              disabled={isConfirming || !nomination.nomineeEmail}
+              title={!nomination.nomineeEmail ? "Add an email before confirming" : undefined}
+              className="rounded-full border border-[#cfe7da] bg-[#eef9f2] px-4 py-1.5 text-xs font-semibold text-[#1b6f4b] transition hover:bg-[#dcf5e8] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isConfirming ? "Confirming…" : "Confirm"}
+            </button>
+            <button
+              onClick={() => setRejectMode(true)}
+              className="rounded-full border border-[#f0cfd3] bg-[#fff2f4] px-4 py-1.5 text-xs font-semibold text-accent transition hover:bg-[#fde8eb]"
+            >
+              Reject
+            </button>
+          </div>
         </div>
       )}
 
@@ -289,7 +327,53 @@ function NominationCard({
 // Overview tab
 // ---------------------------------------------------------------------------
 
-function OverviewTab({ event }: { event: EventResponse }) {
+function VisibilityToggle({
+  label,
+  description,
+  checked,
+  loading,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  loading: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-ink">{label}</p>
+        <p className="mt-0.5 text-xs leading-5 text-ink/48">{description}</p>
+      </div>
+      <button
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        disabled={loading}
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60 ${checked ? "bg-primary" : "bg-[#dce4f1]"}`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${checked ? "translate-x-5" : "translate-x-0"}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function OverviewTab({
+  event,
+  onToggleOwnVotes,
+  onToggleLeaderboard,
+  togglingOwnVotes,
+  togglingLeaderboard,
+}: {
+  event: EventResponse;
+  onToggleOwnVotes: () => void;
+  onToggleLeaderboard: () => void;
+  togglingOwnVotes: boolean;
+  togglingLeaderboard: boolean;
+}) {
   // Build the step list — insert REJECTED after PENDING_APPROVAL if relevant
   const displaySteps =
     event.status === "REJECTED"
@@ -410,6 +494,30 @@ function OverviewTab({ event }: { event: EventResponse }) {
             ))}
           </div>
         </div>
+
+        {/* Contestant visibility */}
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Contestant Visibility
+          </p>
+          <div className="mt-5 space-y-5">
+            <VisibilityToggle
+              label="Contestants can see their own votes"
+              description="Each contestant can view only their personal vote count."
+              checked={event.contestantsCanViewOwnVotes}
+              loading={togglingOwnVotes}
+              onToggle={onToggleOwnVotes}
+            />
+            <div className="border-t border-primary/8" />
+            <VisibilityToggle
+              label="Contestants can see the leaderboard"
+              description="All contestants can view total votes for every other contestant."
+              checked={event.contestantsCanViewLeaderboard}
+              loading={togglingLeaderboard}
+              onToggle={onToggleLeaderboard}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Right: categories */}
@@ -463,6 +571,7 @@ function NominationsTab({
   eventStatus: EventResponse["status"];
 }) {
   const [nominations, setNominations] = useState<NominationResponse[]>([]);
+  const [contestantsByNomination, setContestantsByNomination] = useState<Record<string, ContestantResponse>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<NomFilter>("all");
@@ -474,12 +583,27 @@ function NominationsTab({
     [categories],
   );
 
+  async function refreshContestants() {
+    const list = await listContestants(eventId);
+    setContestantsByNomination(
+      Object.fromEntries(list.map((c) => [c.nominationId, c])),
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const result = await listNominations(eventId);
-        if (!cancelled) setNominations(result);
+        const [noms, contestants] = await Promise.all([
+          listNominations(eventId),
+          listContestants(eventId),
+        ]);
+        if (!cancelled) {
+          setNominations(noms);
+          setContestantsByNomination(
+            Object.fromEntries(contestants.map((c) => [c.nominationId, c])),
+          );
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -505,6 +629,7 @@ function NominationsTab({
       setNominations((prev) =>
         prev.map((n) => (n.id === updated.id ? updated : n)),
       );
+      await refreshContestants();
     } finally {
       setConfirmingId(null);
     }
@@ -636,6 +761,7 @@ function NominationsTab({
               categoryName={
                 categoryMap[nomination.categoryId] ?? "Unknown category"
               }
+              contestant={contestantsByNomination[nomination.id]}
               onConfirm={handleConfirm}
               onReject={handleReject}
               isConfirming={confirmingId === nomination.id}
@@ -643,6 +769,358 @@ function NominationsTab({
             />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Contestant drawer
+// ---------------------------------------------------------------------------
+
+function ContestantDrawer({
+  contestant,
+  eventId,
+  categoryName,
+  onClose,
+}: {
+  contestant: ContestantResponse;
+  eventId: string;
+  categoryName: string;
+  onClose: () => void;
+}) {
+  const [creds, setCreds] = useState<ContestantCredentialsResponse | null>(null);
+  const [loadingCreds, setLoadingCreds] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const initials = contestant.name
+    .split(" ")
+    .map((w) => w[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingCreds(true);
+    getContestantCredentials(eventId, contestant.id)
+      .then((c) => { if (!cancelled) setCreds(c); })
+      .catch(() => { if (!cancelled) setCreds(null); })
+      .finally(() => { if (!cancelled) setLoadingCreds(false); });
+    return () => { cancelled = true; };
+  }, [eventId, contestant.id]);
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    try {
+      const result = await regenerateMagicLink(eventId, contestant.id);
+      setCreds((prev) => prev ? { ...prev, magicLinkUrl: result.magicLinkUrl } : prev);
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleCopy(text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-[#07111f]/30 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-[0_0_60px_-20px_rgba(7,17,31,0.36)]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-primary/10 px-6 py-4">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Contestant Details
+          </p>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-ink/40 transition hover:bg-primary/8 hover:text-ink"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Photo + identity */}
+          <div className="flex items-center gap-4 px-6 py-5">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[#eff3f8]">
+              {contestant.imageUrl ? (
+                <Image src={contestant.imageUrl} alt={contestant.name} fill className="object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <span className="font-display text-xl font-semibold text-primary/40">{initials}</span>
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="font-display text-lg font-semibold leading-tight tracking-[-0.03em] text-ink">
+                {contestant.name}
+              </p>
+              {contestant.email && (
+                <p className="mt-0.5 truncate text-sm text-ink/48">{contestant.email}</p>
+              )}
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="rounded-lg bg-[#07111f] px-2 py-0.5 font-mono text-[0.68rem] font-bold tracking-widest text-white">
+                  {contestant.code}
+                </span>
+                <span className="rounded-full border border-primary/16 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
+                  {categoryName}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-primary/8 px-6 py-5 space-y-5">
+            {loadingCreds ? (
+              <p className="text-sm text-ink/44">Loading login info…</p>
+            ) : !creds?.hasAccount ? (
+              <div className="rounded-xl border border-[#dce4f1] bg-[#f7f9fc] p-4 text-center">
+                <p className="text-sm font-semibold text-ink/60">No account</p>
+                <p className="mt-1 text-xs text-ink/38">
+                  {contestant.email
+                    ? "An account will be created next time credentials are provisioned."
+                    : "This contestant has no email address on record."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Password */}
+                <div>
+                  <p className="mb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-ink/40">
+                    Password
+                  </p>
+                  <div className="flex items-center gap-3 rounded-xl border border-primary/12 bg-[#f7f9fc] px-4 py-3">
+                    <span className="font-mono text-sm tracking-[0.3em] text-ink/40">••••••••••</span>
+                    <span className="ml-auto text-[11px] text-ink/36">Sent to contestant&apos;s email</span>
+                  </div>
+                </div>
+
+                {/* Magic link */}
+                <div>
+                  <p className="mb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-ink/40">
+                    Login Link
+                  </p>
+                  {creds.magicLinkUrl ? (
+                    <div className="rounded-xl border border-primary/12 bg-[#f7f9fc] p-3">
+                      <p className="break-all font-mono text-[0.68rem] leading-5 text-ink/54">
+                        {creds.magicLinkUrl}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handleCopy(creds.magicLinkUrl!)}
+                          className="flex items-center gap-1.5 rounded-full border border-primary/18 bg-white px-3 py-1.5 text-[0.7rem] font-semibold text-ink/70 transition hover:border-primary/36 hover:text-ink"
+                        >
+                          {copied ? (
+                            <>
+                              <svg className="h-3 w-3 text-[#1b6f4b]" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z" /><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z" />
+                              </svg>
+                              Copy link
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleRegenerate}
+                          disabled={regenerating}
+                          className="flex items-center gap-1.5 rounded-full border border-primary/18 bg-white px-3 py-1.5 text-[0.7rem] font-semibold text-ink/70 transition hover:border-primary/36 hover:text-ink disabled:opacity-50"
+                        >
+                          <svg className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5ZM1.705 8.005a.75.75 0 0 1 .834.656 5.501 5.501 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834Z" />
+                          </svg>
+                          {regenerating ? "Regenerating…" : "Regenerate"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-[#dce4f1] bg-[#f7f9fc] p-4">
+                      <p className="text-xs text-ink/44">No active link. Click Regenerate to create one.</p>
+                      <button
+                        onClick={handleRegenerate}
+                        disabled={regenerating}
+                        className="mt-3 flex items-center gap-1.5 rounded-full border border-primary/18 bg-white px-3 py-1.5 text-[0.7rem] font-semibold text-ink/70 transition hover:border-primary/36 hover:text-ink disabled:opacity-50"
+                      >
+                        {regenerating ? "Generating…" : "Generate login link"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Contestants tab
+// ---------------------------------------------------------------------------
+
+function ContestantsTab({
+  eventId,
+  categories,
+}: {
+  eventId: string;
+  categories: EventCategoryResponse[];
+}) {
+  const [contestants, setContestants] = useState<ContestantResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedContestant, setSelectedContestant] = useState<ContestantResponse | null>(null);
+
+  const categoryMap = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
+    [categories],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    listContestants(eventId)
+      .then((list) => { if (!cancelled) setContestants(list); })
+      .catch((err) => {
+        if (!cancelled)
+          setError(err instanceof ApiClientError ? err.message : "Unable to load contestants.");
+      })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [eventId]);
+
+  if (isLoading) return <p className="text-base text-ink/56">Loading contestants…</p>;
+
+  if (error) {
+    return (
+      <div className="rounded-[1.25rem] border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+        {error}
+      </div>
+    );
+  }
+
+  if (contestants.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-[1.8rem] border border-primary/10 bg-white/60 py-20 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eef4ff]">
+          <svg className="h-7 w-7 text-primary/60" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+        </div>
+        <h3 className="mt-4 font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+          No contestants yet
+        </h3>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-ink/50">
+          Contestants appear here once nominations are confirmed. Go to the Nominations tab to review and confirm pending nominations.
+        </p>
+      </div>
+    );
+  }
+
+  const byCategory = categories
+    .map((cat) => ({
+      category: cat,
+      contestants: contestants.filter((c) => c.categoryId === cat.id),
+    }))
+    .filter((group) => group.contestants.length > 0);
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-ink/50">
+          <span className="font-semibold text-ink">{contestants.length}</span> contestant{contestants.length !== 1 ? "s" : ""} confirmed
+        </p>
+      </div>
+
+      {byCategory.map(({ category, contestants: group }) => (
+        <div key={category.id}>
+          <div className="mb-4 flex items-center gap-3">
+            <h3 className="font-display text-lg font-semibold tracking-[-0.03em] text-ink">
+              {category.name}
+            </h3>
+            <span className="rounded-full border border-primary/16 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
+              {group.length}
+            </span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {group.map((contestant) => {
+              const initials = contestant.name
+                .split(" ")
+                .map((w) => w[0] ?? "")
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+
+              return (
+                <div
+                  key={contestant.id}
+                  onClick={() => setSelectedContestant(contestant)}
+                  className="cursor-pointer overflow-hidden rounded-[1.4rem] border border-primary/10 bg-white/90 shadow-[0_8px_24px_-12px_rgba(7,17,31,0.10)] transition hover:border-primary/24 hover:shadow-[0_12px_32px_-14px_rgba(7,17,31,0.18)]"
+                >
+                  {/* Photo / avatar */}
+                  <div className="relative h-40 bg-[#eff3f8]">
+                    {contestant.imageUrl ? (
+                      <Image
+                        src={contestant.imageUrl}
+                        alt={contestant.name}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <span className="font-display text-4xl font-semibold text-primary/30">
+                          {initials}
+                        </span>
+                      </div>
+                    )}
+                    {/* Code badge pinned to top-right */}
+                    <span className="absolute right-3 top-3 rounded-lg bg-white px-2.5 py-1 font-mono text-[0.7rem] font-bold tracking-widest text-[#07111f] shadow-[0_2px_10px_rgba(7,17,31,0.22)]">
+                      {contestant.code}
+                    </span>
+                  </div>
+
+                  <div className="p-4">
+                    <p className="font-display text-base font-semibold leading-tight tracking-[-0.02em] text-ink">
+                      {contestant.name}
+                    </p>
+                    {contestant.email && (
+                      <p className="mt-0.5 truncate text-xs text-ink/44">
+                        {contestant.email}
+                      </p>
+                    )}
+                    <span className="mt-2.5 inline-flex rounded-full border border-primary/16 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
+                      {categoryMap[contestant.categoryId] ?? "Unknown"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {selectedContestant && (
+        <ContestantDrawer
+          contestant={selectedContestant}
+          eventId={eventId}
+          categoryName={categoryMap[selectedContestant.categoryId] ?? "Unknown"}
+          onClose={() => setSelectedContestant(null)}
+        />
       )}
     </div>
   );
@@ -690,6 +1168,34 @@ export function EventManageView({ eventId }: { eventId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [togglingOwnVotes, setTogglingOwnVotes] = useState(false);
+  const [togglingLeaderboard, setTogglingLeaderboard] = useState(false);
+
+  async function handleToggleOwnVotes() {
+    if (!event || togglingOwnVotes) return;
+    setTogglingOwnVotes(true);
+    try {
+      const updated = await updateEventVisibility(eventId, {
+        contestantsCanViewOwnVotes: !event.contestantsCanViewOwnVotes,
+      });
+      setEvent(updated);
+    } finally {
+      setTogglingOwnVotes(false);
+    }
+  }
+
+  async function handleToggleLeaderboard() {
+    if (!event || togglingLeaderboard) return;
+    setTogglingLeaderboard(true);
+    try {
+      const updated = await updateEventVisibility(eventId, {
+        contestantsCanViewLeaderboard: !event.contestantsCanViewLeaderboard,
+      });
+      setEvent(updated);
+    } finally {
+      setTogglingLeaderboard(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -738,6 +1244,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "nominations", label: "Nominations" },
+    { key: "contestants", label: "Contestants" },
     { key: "votes", label: "Votes" },
   ];
 
@@ -870,12 +1377,26 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
       {/* ── Tab panels ───────────────────────────────────────────────────── */}
       <div className="mt-7">
-        {activeTab === "overview" && <OverviewTab event={event} />}
+        {activeTab === "overview" && (
+          <OverviewTab
+            event={event}
+            onToggleOwnVotes={handleToggleOwnVotes}
+            onToggleLeaderboard={handleToggleLeaderboard}
+            togglingOwnVotes={togglingOwnVotes}
+            togglingLeaderboard={togglingLeaderboard}
+          />
+        )}
         {activeTab === "nominations" && (
           <NominationsTab
             eventId={event.id}
             categories={event.categories}
             eventStatus={event.status}
+          />
+        )}
+        {activeTab === "contestants" && (
+          <ContestantsTab
+            eventId={event.id}
+            categories={event.categories}
           />
         )}
         {activeTab === "votes" && <VotesTab />}

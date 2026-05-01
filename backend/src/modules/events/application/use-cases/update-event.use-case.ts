@@ -23,6 +23,8 @@ export type UpdateEventInput = {
   nominationEndAt?: Date | null;
   votingStartAt?: Date;
   votingEndAt?: Date;
+  contestantsCanViewOwnVotes?: boolean;
+  contestantsCanViewLeaderboard?: boolean;
 };
 
 @Injectable()

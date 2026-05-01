@@ -21,4 +21,5 @@ export interface UsersRepository {
   findById(id: string): Promise<User | null>;
   update(id: string, input: UpdateUserRecord): Promise<User>;
   updateStatus(id: string, status: UserStatus): Promise<User>;
+  upsertByEmail(email: string, onCreate: CreateUserRecord): Promise<{ user: User; created: boolean }>;
 }

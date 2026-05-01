@@ -239,6 +239,12 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   const [nominationEndAt, setNominationEndAt] = useState(toDateTimeLocalValue(initialEvent?.nominationEndAt));
   const [votingStartAt, setVotingStartAt] = useState(toDateTimeLocalValue(initialEvent?.votingStartAt));
   const [votingEndAt, setVotingEndAt] = useState(toDateTimeLocalValue(initialEvent?.votingEndAt));
+  const [contestantsCanViewOwnVotes, setContestantsCanViewOwnVotes] = useState(
+    initialEvent?.contestantsCanViewOwnVotes ?? false,
+  );
+  const [contestantsCanViewLeaderboard, setContestantsCanViewLeaderboard] = useState(
+    initialEvent?.contestantsCanViewLeaderboard ?? false,
+  );
 
   const [categories, setCategories] = useState<EditableCategory[]>(
     initialEvent?.categories.length
@@ -426,6 +432,8 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         nominationEndAt: toIsoOrUndefined(nominationEndAt),
         votingStartAt: votingStartDate.toISOString(),
         votingEndAt: votingEndDate.toISOString(),
+        contestantsCanViewOwnVotes,
+        contestantsCanViewLeaderboard,
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
@@ -780,6 +788,53 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                       disabled={!isEditable}
                     />
                   </Field>
+                </div>
+
+                {/* Visibility settings */}
+                <div className="mt-6 rounded-2xl border border-[#e8edf6] bg-[#f7f9fc] p-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#07111f]/50">
+                    Contestant visibility
+                  </p>
+                  <p className="mt-1 text-[13px] leading-5 text-[#07111f]/50">
+                    Control what contestants can see while voting is live.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${contestantsCanViewOwnVotes ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0f4cdb]"
+                        checked={contestantsCanViewOwnVotes}
+                        onChange={(e) => setContestantsCanViewOwnVotes(e.target.checked)}
+                        disabled={!isEditable}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#07111f]">
+                          Contestants can see their own votes
+                        </p>
+                        <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
+                          Each contestant can view only their personal vote count.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${contestantsCanViewLeaderboard ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0f4cdb]"
+                        checked={contestantsCanViewLeaderboard}
+                        onChange={(e) => setContestantsCanViewLeaderboard(e.target.checked)}
+                        disabled={!isEditable}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#07111f]">
+                          Contestants can see the leaderboard
+                        </p>
+                        <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
+                          All contestants can view total vote counts for every other contestant.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
               </div>
             )}

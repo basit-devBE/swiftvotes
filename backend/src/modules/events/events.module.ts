@@ -17,6 +17,7 @@ import { SubmitEventUseCase } from "./application/use-cases/submit-event.use-cas
 import { SynchronizeEventLifecycleUseCase } from "./application/use-cases/synchronize-event-lifecycle.use-case";
 import { UpdateCategoryUseCase } from "./application/use-cases/update-category.use-case";
 import { UpdateEventUseCase } from "./application/use-cases/update-event.use-case";
+import { UpdateEventVisibilityUseCase } from "./application/use-cases/update-event-visibility.use-case";
 import { EVENTS_REPOSITORY } from "./application/events.tokens";
 import { PrismaEventsRepository } from "./infrastructure/persistence/prisma-events.repository";
 import { EventsController } from "./presentation/http/events.controller";
@@ -31,6 +32,7 @@ import { EventsController } from "./presentation/http/events.controller";
     ListMyEventsUseCase,
     GetEventDetailsUseCase,
     UpdateEventUseCase,
+    UpdateEventVisibilityUseCase,
     SubmitEventUseCase,
     ResubmitEventUseCase,
     ListPendingEventsUseCase,

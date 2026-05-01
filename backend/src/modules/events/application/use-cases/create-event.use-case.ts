@@ -18,6 +18,8 @@ export type CreateEventInput = {
   nominationEndAt?: Date | null;
   votingStartAt: Date;
   votingEndAt: Date;
+  contestantsCanViewOwnVotes?: boolean;
+  contestantsCanViewLeaderboard?: boolean;
   categories: Array<{
     name: string;
     description: string;

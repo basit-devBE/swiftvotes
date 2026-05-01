@@ -11,6 +11,7 @@ import { validationSchema } from "./core/config/env.validation";
 import { storageConfig } from "./core/config/storage.config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AccessControlModule } from "./modules/access-control/access-control.module";
+import { ContestantsModule } from "./modules/contestants/contestants.module";
 import { EventsModule } from "./modules/events/events.module";
 import { HealthModule } from "./modules/health/health.module";
 import { NominationsModule } from "./modules/nominations/nominations.module";
@@ -38,6 +39,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     UsersModule,
     AuthModule,
     AccessControlModule,
+    ContestantsModule,
     NotificationsModule,
     EventsModule,
     NominationsModule,

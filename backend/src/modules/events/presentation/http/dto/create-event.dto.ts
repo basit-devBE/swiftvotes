@@ -2,6 +2,7 @@ import { Type } from "class-transformer";
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsOptional,
   IsString,
@@ -48,6 +49,14 @@ export class CreateEventDto {
 
   @IsDateString()
   votingEndAt!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  contestantsCanViewOwnVotes?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  contestantsCanViewLeaderboard?: boolean;
 
   @IsArray()
   @ArrayMinSize(1)

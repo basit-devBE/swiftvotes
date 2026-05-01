@@ -48,6 +48,8 @@ export class PrismaEventsRepository implements EventsRepository {
           nominationEndAt: input.nominationEndAt ?? null,
           votingStartAt: input.votingStartAt,
           votingEndAt: input.votingEndAt,
+          contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes ?? false,
+          contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard ?? false,
           categories: {
             create: input.categories.map((category) => ({
               name: category.name,
@@ -179,10 +181,24 @@ export class PrismaEventsRepository implements EventsRepository {
         nominationEndAt: input.nominationEndAt,
         votingStartAt: input.votingStartAt,
         votingEndAt: input.votingEndAt,
+        contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
+        contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
       },
       include: EVENT_INCLUDE,
     });
 
+    return this.toDomainEvent(event);
+  }
+
+  async updateVisibility(eventId: string, input: { contestantsCanViewOwnVotes?: boolean; contestantsCanViewLeaderboard?: boolean }): Promise<Event> {
+    const event = await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
+        contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
+      },
+      include: EVENT_INCLUDE,
+    });
     return this.toDomainEvent(event);
   }
 
@@ -283,6 +299,8 @@ export class PrismaEventsRepository implements EventsRepository {
       nominationEndAt: event.nominationEndAt,
       votingStartAt: event.votingStartAt,
       votingEndAt: event.votingEndAt,
+      contestantsCanViewOwnVotes: event.contestantsCanViewOwnVotes,
+      contestantsCanViewLeaderboard: event.contestantsCanViewLeaderboard,
       submittedAt: event.submittedAt,
       approvedAt: event.approvedAt,
       approvedByUserId: event.approvedByUserId,
