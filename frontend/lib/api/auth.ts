@@ -22,3 +22,11 @@ export function logout(): Promise<{ success: true }> {
     skipAuthRetry: true,
   });
 }
+
+export function magicLinkLogin(token: string): Promise<AuthSessionResponse> {
+  return apiRequest<AuthSessionResponse>("/auth/magic-link", {
+    method: "POST",
+    body: { token },
+    skipAuthRetry: true,
+  });
+}

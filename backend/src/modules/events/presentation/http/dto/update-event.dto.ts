@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
+import { IsBoolean, IsDateString, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
 
 export class UpdateEventDto {
   @IsOptional()
@@ -42,4 +42,12 @@ export class UpdateEventDto {
   @IsOptional()
   @IsDateString()
   votingEndAt?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  contestantsCanViewOwnVotes?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  contestantsCanViewLeaderboard?: boolean;
 }

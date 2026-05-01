@@ -25,6 +25,7 @@ type AuthContextValue = {
   user: UserResponse | null;
   accessToken: string | null;
   login: (input: LoginInput) => Promise<void>;
+  loginWithSession: (session: AuthSessionResponse) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<boolean>;
   setUser: (user: UserResponse) => void;
@@ -72,6 +73,13 @@ export function AuthProvider({
   const login = useCallback(
     async (input: LoginInput) => {
       const session = await loginRequest(input);
+      applySession(session);
+    },
+    [applySession],
+  );
+
+  const loginWithSession = useCallback(
+    (session: AuthSessionResponse) => {
       applySession(session);
     },
     [applySession],
@@ -139,11 +147,12 @@ export function AuthProvider({
       user,
       accessToken,
       login,
+      loginWithSession,
       logout,
       refresh,
       setUser,
     }),
-    [accessToken, login, logout, refresh, setUser, status, user],
+    [accessToken, login, loginWithSession, logout, refresh, setUser, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
-import { getEvent } from "@/lib/api/events";
-import { EventResponse } from "@/lib/api/types";
+import { getEvent, listContestants } from "@/lib/api/events";
+import { ContestantResponse, EventResponse } from "@/lib/api/types";
 import { NominationForm, StatusBanner } from "./nomination-form";
 
 function formatDate(date: string | null): string {
@@ -26,6 +26,7 @@ function formatCurrency(minor: number, currency: string): string {
 
 export function PublicEventView({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<EventResponse | null>(null);
+  const [contestants, setContestants] = useState<ContestantResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
@@ -34,8 +35,14 @@ export function PublicEventView({ eventId }: { eventId: string }) {
     let cancelled = false;
     async function load() {
       try {
-        const result = await getEvent(eventId);
-        if (!cancelled) setEvent(result);
+        const [result, contestantList] = await Promise.all([
+          getEvent(eventId),
+          listContestants(eventId),
+        ]);
+        if (!cancelled) {
+          setEvent(result);
+          setContestants(contestantList);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -242,6 +249,74 @@ export function PublicEventView({ eventId }: { eventId: string }) {
               ))}
             </div>
           </div>
+
+          {/* Contestants */}
+          {contestants.length > 0 && (
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
+              <div className="flex items-baseline gap-3">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                  Contestants
+                </p>
+                <span className="font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
+                  {contestants.length}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {contestants.map((contestant) => {
+                  const catName =
+                    event.categories.find((c) => c.id === contestant.categoryId)
+                      ?.name ?? "";
+                  const initials = contestant.name
+                    .split(" ")
+                    .map((w) => w[0] ?? "")
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+
+                  return (
+                    <div
+                      key={contestant.id}
+                      className="flex items-center gap-3 overflow-hidden rounded-xl border border-[#edf0f6] bg-[#f7f9fc] px-3 py-3"
+                    >
+                      {/* Avatar */}
+                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#e4ecf8]">
+                        {contestant.imageUrl ? (
+                          <Image
+                            src={contestant.imageUrl}
+                            alt={contestant.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs font-semibold text-primary/50">
+                            {initials}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-ink">
+                          {contestant.name}
+                        </p>
+                        {catName && (
+                          <p className="truncate text-[0.68rem] text-ink/44">
+                            {catName}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Code */}
+                      <span className="shrink-0 rounded-full bg-[#07111f] px-2.5 py-1 font-mono text-[0.65rem] font-semibold tracking-wider text-white">
+                        {contestant.code}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right column – nomination form */}

@@ -25,6 +25,7 @@ describe("LoginUseCase", () => {
       findById: jest.fn(),
       update: jest.fn(),
       updateStatus: jest.fn(),
+      upsertByEmail: jest.fn(),
     };
     const passwordHasher: jest.Mocked<PasswordHasher> = {
       hash: jest.fn(),
@@ -72,6 +73,7 @@ describe("LoginUseCase", () => {
       findById: jest.fn(),
       update: jest.fn(),
       updateStatus: jest.fn(),
+      upsertByEmail: jest.fn(),
     };
     const passwordHasher: jest.Mocked<PasswordHasher> = {
       hash: jest.fn(),

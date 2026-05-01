@@ -5,16 +5,27 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 
-import { NOMINATIONS_REPOSITORY } from "../nominations.tokens";
-import { NominationsRepository } from "../ports/nominations.repository";
+import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
+import { EventsRepository } from "../../../events/application/ports/events.repository";
+import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
+import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
+import { ProvisionContestantAccountUseCase } from "../../../contestants/application/use-cases/provision-contestant-account.use-case";
+import { extractEventInitials } from "../../../contestants/domain/build-contestant-code";
 import { Nomination } from "../../domain/nomination";
 import { NominationStatus } from "../../domain/nomination-status";
+import { NOMINATIONS_REPOSITORY } from "../nominations.tokens";
+import { NominationsRepository } from "../ports/nominations.repository";
 
 @Injectable()
 export class ConfirmNominationUseCase {
   constructor(
     @Inject(NOMINATIONS_REPOSITORY)
     private readonly nominationsRepository: NominationsRepository,
+    @Inject(EVENTS_REPOSITORY)
+    private readonly eventsRepository: EventsRepository,
+    @Inject(CONTESTANTS_REPOSITORY)
+    private readonly contestantsRepository: ContestantsRepository,
+    private readonly provisionContestantAccountUseCase: ProvisionContestantAccountUseCase,
   ) {}
 
   async execute(input: {
@@ -35,11 +46,41 @@ export class ConfirmNominationUseCase {
       );
     }
 
-    return this.nominationsRepository.updateReview({
+    const event = await this.eventsRepository.findById(nomination.eventId);
+
+    if (!event) {
+      throw new NotFoundException("Event was not found.");
+    }
+
+    const confirmed = await this.nominationsRepository.updateReview({
       nominationId: input.nominationId,
       status: "CONFIRMED",
       reviewedByUserId: input.reviewerUserId,
       rejectionReason: null,
     });
+
+    const contestant = await this.contestantsRepository.createFromNomination({
+      eventId: nomination.eventId,
+      categoryId: nomination.categoryId,
+      nominationId: nomination.id,
+      codePrefix: extractEventInitials(event.name),
+      name: nomination.nomineeName,
+      email: nomination.nomineeEmail,
+      phone: nomination.nomineePhone,
+      imageUrl: nomination.nomineeImageUrl,
+      imageKey: nomination.nomineeImageKey,
+    });
+
+    if (nomination.nomineeEmail) {
+      await this.provisionContestantAccountUseCase.execute({
+        contestantId: contestant.id,
+        contestantCode: contestant.code,
+        name: nomination.nomineeName,
+        email: nomination.nomineeEmail,
+        eventName: event.name,
+      });
+    }
+
+    return confirmed;
   }
 }

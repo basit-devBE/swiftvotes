@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <%- include('_styles') %>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+      </div>
+      <div class="card-body">
+        <p>Hi <%= recipientName %>,</p>
+        <p>Congratulations! Your nomination for <strong><%= eventName %></strong> has been confirmed. You're now a contestant and your login details are below.</p>
+        <div class="event-name"><%= eventName %></div>
+        <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+          <tr>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Contestant Code</td>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-weight:700;color:#07111f;font-family:monospace;letter-spacing:0.1em;"><%= contestantCode %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Password</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-weight:600;color:#07111f;font-family:monospace;"><%= defaultPassword %></td>
+          </tr>
+        </table>
+        <p style="font-size:13px;color:#6b7a99;">You can log in with your email and password, or use the one-click login link below — no password needed.</p>
+        <div class="divider"></div>
+        <a href="<%= magicLinkUrl %>" class="btn btn-primary">Log in instantly</a>
+        <p style="margin-top:20px;font-size:12px;color:#9aa5b8;">This magic link expires in 7 days. If it has expired, contact the event organiser to send a new one.</p>
+      </div>
+      <div class="card-footer">
+        <p>This email was sent by SwiftVote on behalf of the event organiser. If you did not expect this, you can ignore it.</p>
+        <p style="margin-top:6px"><a href="<%= frontendUrl %>">swiftvote.app</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

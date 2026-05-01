@@ -9,6 +9,7 @@ import { appConfig } from "../../../../core/config/app.config";
 import { emailConfig } from "../../../../core/config/email.config";
 import { AppLogger } from "../../../../core/logging/app-logger.service";
 import {
+  ContestantWelcomePayload,
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
@@ -39,6 +40,7 @@ export class NodemailerNotificationsService implements NotificationsService {
       host: email.host,
       port: email.port,
       secure: email.secure,
+      requireTLS: !email.secure && email.port === 587,
       auth:
         email.user && email.pass
           ? { user: email.user, pass: email.pass }
@@ -171,6 +173,19 @@ export class NodemailerNotificationsService implements NotificationsService {
       categoryName: payload.categoryName,
       submitterName: payload.submitterName,
       manageUrl: `${this.app.frontendOrigin}/events/${payload.eventId}/manage`,
+    });
+    await this.send(payload.recipientEmail, subject, html);
+  }
+
+  async sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void> {
+    const subject = `Your contestant login for ${payload.eventName}`;
+    const html = await this.render("contestant-welcome", {
+      subject,
+      recipientName: payload.recipientName,
+      eventName: payload.eventName,
+      contestantCode: payload.contestantCode,
+      defaultPassword: payload.defaultPassword,
+      magicLinkUrl: payload.magicLinkUrl,
     });
     await this.send(payload.recipientEmail, subject, html);
   }

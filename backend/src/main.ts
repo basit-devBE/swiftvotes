@@ -22,7 +22,8 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     appConfig.frontendOrigin,
     "https://almanac-patient-spookily.ngrok-free.dev",
-    "http://localhost:3000",
+    "http://localhost:3002",
+    "https://swiftvotes-cpz3.vercel.app",
   ];
 
   app.enableCors({

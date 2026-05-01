@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { AppLogger } from "../../../../core/logging/app-logger.service";
 import {
+  ContestantWelcomePayload,
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
@@ -52,6 +53,13 @@ export class AppLoggerNotificationsService implements NotificationsService {
   ): Promise<void> {
     this.logger.log(
       `Nomination received email queued for ${payload.recipientEmail} — nominee: ${payload.nomineeName}, category: ${payload.categoryName}, event: ${payload.eventId}`,
+      "Notifications",
+    );
+  }
+
+  async sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void> {
+    this.logger.log(
+      `Contestant welcome email queued for ${payload.recipientEmail} — code: ${payload.contestantCode}, event: ${payload.eventName}`,
       "Notifications",
     );
   }

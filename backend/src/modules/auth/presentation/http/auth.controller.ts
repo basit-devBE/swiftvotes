@@ -6,13 +6,21 @@ import {
   Res,
   UnauthorizedException,
 } from "@nestjs/common";
+import { IsString, IsNotEmpty } from "class-validator";
 import { ConfigService } from "@nestjs/config";
 import { Request, Response } from "express";
 
 import { AppConfig } from "../../../../core/config/app.config";
 import { AuthConfig } from "../../../../core/config/auth.config";
 import { LoginUseCase } from "../../application/use-cases/login.use-case";
+import { MagicLinkLoginUseCase } from "../../application/use-cases/magic-link-login.use-case";
 import { RefreshSessionUseCase } from "../../application/use-cases/refresh-session.use-case";
+
+class MagicLinkLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
 import { buildRefreshCookieOptions } from "./auth-cookie";
 import { LoginDto } from "./dto/login.dto";
 import { Public } from "./decorators/public.decorator";
@@ -26,6 +34,7 @@ export class AuthController {
   constructor(
     private readonly configService: ConfigService,
     private readonly loginUseCase: LoginUseCase,
+    private readonly magicLinkLoginUseCase: MagicLinkLoginUseCase,
     private readonly refreshSessionUseCase: RefreshSessionUseCase,
   ) {}
 
@@ -36,6 +45,22 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthSessionResponseDto> {
     const session = await this.loginUseCase.execute(body);
+    this.setRefreshCookie(response, session.refreshToken.token);
+
+    return AuthSessionResponseDto.fromResult({
+      accessToken: session.accessToken.token,
+      accessTokenExpiresIn: session.accessToken.expiresIn,
+      user: session.user,
+    });
+  }
+
+  @Public()
+  @Post("magic-link")
+  async magicLinkLogin(
+    @Body() body: MagicLinkLoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthSessionResponseDto> {
+    const session = await this.magicLinkLoginUseCase.execute(body.token);
     this.setRefreshCookie(response, session.refreshToken.token);
 
     return AuthSessionResponseDto.fromResult({

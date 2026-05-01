@@ -23,6 +23,3 @@ pnpm-debug.log*
 Thumbs.db
 
 # Local agent/tooling folders
-.agents/
-.claude/
-skills-lock.json

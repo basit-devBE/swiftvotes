@@ -78,6 +78,8 @@ export type EventResponse = {
   nominationEndAt: string | null;
   votingStartAt: string;
   votingEndAt: string;
+  contestantsCanViewOwnVotes: boolean;
+  contestantsCanViewLeaderboard: boolean;
   submittedAt: string | null;
   approvedAt: string | null;
   approvedByUserId: string | null;
@@ -110,10 +112,15 @@ export type CreateEventInput = {
   nominationEndAt?: string;
   votingStartAt: string;
   votingEndAt: string;
+  contestantsCanViewOwnVotes?: boolean;
+  contestantsCanViewLeaderboard?: boolean;
   categories: CreateEventCategoryInput[];
 };
 
-export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">>;
+export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">> & {
+  contestantsCanViewOwnVotes?: boolean;
+  contestantsCanViewLeaderboard?: boolean;
+};
 
 export type NominationStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
 
@@ -150,6 +157,28 @@ export type SubmitNominationInput = {
   nomineePhone?: string;
   nomineeImageUrl?: string;
   nomineeImageKey?: string;
+};
+
+export type ContestantResponse = {
+  id: string;
+  eventId: string;
+  categoryId: string;
+  nominationId: string;
+  userId: string | null;
+  code: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  imageUrl: string | null;
+  imageKey: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ContestantCredentialsResponse = {
+  email: string | null;
+  hasAccount: boolean;
+  magicLinkUrl: string | null;
 };
 
 export type CreateUploadIntentInput = {

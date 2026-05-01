@@ -16,6 +16,15 @@ export type NominationReceivedPayload = {
   submitterName: string;
 };
 
+export type ContestantWelcomePayload = {
+  recipientEmail: string;
+  recipientName: string;
+  eventName: string;
+  contestantCode: string;
+  defaultPassword: string;
+  magicLinkUrl: string;
+};
+
 export interface NotificationsService {
   sendEventPendingApprovalEmail(
     payload: EventNotificationPayload,
@@ -28,4 +37,5 @@ export interface NotificationsService {
   sendNominationReceivedEmail(
     payload: NominationReceivedPayload,
   ): Promise<void>;
+  sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void>;
 }

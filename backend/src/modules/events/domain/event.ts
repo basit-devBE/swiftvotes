@@ -16,6 +16,8 @@ export type Event = {
   nominationEndAt: Date | null;
   votingStartAt: Date;
   votingEndAt: Date;
+  contestantsCanViewOwnVotes: boolean;
+  contestantsCanViewLeaderboard: boolean;
   submittedAt: Date | null;
   approvedAt: Date | null;
   approvedByUserId: string | null;

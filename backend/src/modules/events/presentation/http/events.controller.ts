@@ -29,11 +29,13 @@ import { ResubmitEventUseCase } from "../../application/use-cases/resubmit-event
 import { SubmitEventUseCase } from "../../application/use-cases/submit-event.use-case";
 import { UpdateCategoryUseCase } from "../../application/use-cases/update-category.use-case";
 import { UpdateEventUseCase } from "../../application/use-cases/update-event.use-case";
+import { UpdateEventVisibilityUseCase } from "../../application/use-cases/update-event-visibility.use-case";
 import { CreateEventCategoryDto } from "./dto/create-event-category.dto";
 import { CreateEventDto } from "./dto/create-event.dto";
 import { RejectEventDto } from "./dto/reject-event.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { UpdateEventDto } from "./dto/update-event.dto";
+import { UpdateEventVisibilityDto } from "./dto/update-event-visibility.dto";
 import { EventCategoryResponseDto } from "./responses/event-category.response.dto";
 import { EventResponseDto } from "./responses/event.response.dto";
 
@@ -57,6 +59,7 @@ export class EventsController {
     private readonly createCategoryUseCase: CreateCategoryUseCase,
     private readonly updateCategoryUseCase: UpdateCategoryUseCase,
     private readonly deleteCategoryUseCase: DeleteCategoryUseCase,
+    private readonly updateEventVisibilityUseCase: UpdateEventVisibilityUseCase,
   ) {}
 
   @Public()
@@ -87,6 +90,8 @@ export class EventsController {
         : null,
       votingStartAt: new Date(body.votingStartAt),
       votingEndAt: new Date(body.votingEndAt),
+      contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes ?? false,
+      contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard ?? false,
       categories: body.categories.map((category) => ({
         ...category,
         currency: category.currency.trim().toUpperCase(),
@@ -183,8 +188,24 @@ export class EventsController {
         ? new Date(body.votingStartAt)
         : undefined,
       votingEndAt: body.votingEndAt ? new Date(body.votingEndAt) : undefined,
+      contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes,
+      contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
     });
 
+    return EventResponseDto.fromDomain(event);
+  }
+
+  @Patch(":eventId/visibility")
+  @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
+  async updateEventVisibility(
+    @Param("eventId") eventId: string,
+    @Body() body: UpdateEventVisibilityDto,
+  ): Promise<EventResponseDto> {
+    const event = await this.updateEventVisibilityUseCase.execute({
+      eventId,
+      contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes,
+      contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
+    });
     return EventResponseDto.fromDomain(event);
   }
 

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum SystemRole {
@@ -65,6 +66,8 @@ model User {
   assignedMemberships     EventMembership[]  @relation("MembershipAssigner")
   submittedNominations    Nomination[]       @relation("NominationSubmitter")
   reviewedNominations     Nomination[]       @relation("NominationReviewer")
+  contestantProfile       Contestant?
+  magicLinkTokens         MagicLinkToken[]
 }
 
 model Event {
@@ -78,10 +81,12 @@ model Event {
   primaryFlyerKey  String
   bannerUrl        String?
   bannerKey        String?
-  nominationStartAt DateTime?
-  nominationEndAt   DateTime?
-  votingStartAt     DateTime
-  votingEndAt       DateTime
+  nominationStartAt              DateTime?
+  nominationEndAt                DateTime?
+  votingStartAt                  DateTime
+  votingEndAt                    DateTime
+  contestantsCanViewOwnVotes     Boolean   @default(false)
+  contestantsCanViewLeaderboard  Boolean   @default(false)
   submittedAt      DateTime?
   approvedAt       DateTime?
   approvedByUserId String?
@@ -94,9 +99,10 @@ model Event {
   creator     User              @relation("EventCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
   approvedBy  User?             @relation("EventApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   rejectedBy  User?             @relation("EventRejector", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
-  categories  EventCategory[]
-  memberships EventMembership[]
-  nominations Nomination[]
+  categories   EventCategory[]
+  memberships  EventMembership[]
+  nominations  Nomination[]
+  contestants  Contestant[]
 
   @@index([creatorUserId, createdAt])
   @@index([status, submittedAt])
@@ -115,8 +121,9 @@ model EventCategory {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  nominations Nomination[]
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  nominations  Nomination[]
+  contestants  Contestant[]
 
   @@unique([eventId, name])
   @@index([eventId, sortOrder])
@@ -164,7 +171,45 @@ model Nomination {
   category    EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   submittedBy User?         @relation("NominationSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   reviewedBy  User?         @relation("NominationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  contestant  Contestant?
 
   @@index([eventId, status, createdAt])
   @@index([categoryId, status])
+}
+
+model Contestant {
+  id           String   @id @default(cuid())
+  eventId      String
+  categoryId   String
+  nominationId String   @unique
+  userId       String?  @unique
+  code         String
+  name         String
+  email        String?
+  phone        String?
+  imageUrl     String?
+  imageKey     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  nomination Nomination    @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, code])
+  @@index([eventId, categoryId])
+}
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
