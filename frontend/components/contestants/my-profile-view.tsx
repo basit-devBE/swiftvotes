@@ -55,8 +55,8 @@ function ContestantAvatar({ imageUrl, name, size }: { imageUrl: string | null; n
   }
   return (
     <div
-      className="flex items-center justify-center rounded-full bg-[#eef4ff] font-semibold text-primary"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
+      className="flex items-center justify-center rounded-full bg-[#dce8ff] font-bold text-primary"
+      style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
       {name.charAt(0).toUpperCase()}
     </div>
@@ -152,32 +152,36 @@ function ProfileCard({ profile }: { profile: MyContestantProfileResponse }) {
 
   return (
     <article className="overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-[0_12px_40px_-20px_rgba(7,17,31,0.14)]">
-      {/* Event banner / header */}
-      <div className="relative h-32 w-full overflow-hidden bg-[#eef4ff] sm:h-40">
+      {/* Hero: event banner with contestant photo centered */}
+      <div className="relative h-52 w-full overflow-hidden bg-[#c5d4f5] sm:h-60">
         {event.bannerUrl ? (
           <Image src={event.bannerUrl} alt={event.name} fill className="object-cover" />
         ) : event.primaryFlyerUrl ? (
-          <Image src={event.primaryFlyerUrl} alt={event.name} fill className="object-cover opacity-30" />
+          <Image src={event.primaryFlyerUrl} alt={event.name} fill className="object-cover" />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,76,219,0.18),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,76,219,0.28),transparent_60%),radial-gradient(circle_at_bottom_right,rgba(15,76,219,0.18),transparent_50%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/80" />
+        {/* Dark scrim so photo stands out */}
+        <div className="absolute inset-0 bg-black/40" />
+
+        {/* Status badge — top right */}
+        <span className={`absolute right-4 top-4 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm ${statusClass(event.status)}`}>
+          {statusLabel(event.status)}
+        </span>
+
+        {/* Contestant photo — large, centered, bottom-aligned to overlap */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
+          <div className="rounded-full ring-4 ring-white shadow-xl">
+            <ContestantAvatar imageUrl={profile.imageUrl} name={profile.name} size={112} />
+          </div>
+        </div>
       </div>
 
-      <div className="px-6 pb-6 pt-0 sm:px-8">
-        {/* Contestant photo overlapping the banner */}
-        <div className="-mt-10 mb-4 flex items-end justify-between">
-          <div className="rounded-full ring-4 ring-white">
-            <ContestantAvatar imageUrl={profile.imageUrl} name={profile.name} size={72} />
-          </div>
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(event.status)}`}>
-            {statusLabel(event.status)}
-          </span>
-        </div>
-
+      {/* Content — padded top to clear the overlapping photo */}
+      <div className="px-6 pb-6 pt-16 text-center sm:px-8 sm:pt-16">
         {/* Identity */}
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <h2 className="font-display text-xl font-bold tracking-tight text-ink">
+        <div className="mb-1 flex flex-wrap items-center justify-center gap-2">
+          <h2 className="font-display text-2xl font-bold tracking-tight text-ink">
             {profile.name}
           </h2>
           <span className="rounded-full bg-[#f0f4ff] px-2.5 py-0.5 font-mono text-xs font-semibold text-primary">
@@ -194,13 +198,12 @@ function ProfileCard({ profile }: { profile: MyContestantProfileResponse }) {
           {event.name}
         </Link>
 
-        {/* Voting window */}
-        <p className="mt-2 text-xs text-ink/40">
+        <p className="mt-1 text-xs text-ink/40">
           Voting: {formatDate(event.votingStartAt)} → {formatDate(event.votingEndAt)}
         </p>
 
         {/* Votes & leaderboard */}
-        <div className="mt-6 flex flex-col gap-4">
+        <div className="mt-6 flex flex-col gap-4 text-left">
           <VotesSection profile={profile} />
           <LeaderboardSection profile={profile} />
         </div>
