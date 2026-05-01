@@ -95,7 +95,7 @@ export function VoteModal({
     try {
       const result = await castVote(event.id, {
         contestantId: contestant.id,
-        quantity,
+        quantity: isFree ? 1 : quantity,
         voterName: voterName.trim(),
         voterEmail: voterEmail.trim(),
       });
@@ -204,10 +204,10 @@ export function VoteModal({
               </div>
               <div>
                 <p className="font-display text-xl font-semibold tracking-tight text-ink">
-                  Vote{quantity > 1 ? "s" : ""} cast!
+                  Vote{!isFree && quantity > 1 ? "s" : ""} cast!
                 </p>
                 <p className="mt-1 text-sm text-ink/55">
-                  {quantity} vote{quantity > 1 ? "s" : ""} for {contestant.name}.
+                  {isFree ? 1 : quantity} vote{!isFree && quantity > 1 ? "s" : ""} for {contestant.name}.
                 </p>
                 {!isFree && (
                   <p className="mt-1 text-sm text-ink/55">
@@ -225,52 +225,52 @@ export function VoteModal({
             </div>
           ) : (
             <form onSubmit={onSubmit} className="flex flex-col gap-5">
-              {/* Quantity */}
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
-                  Number of votes
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {QUANTITY_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setQuantity(preset)}
-                      className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                        quantity === preset
-                          ? "bg-primary text-white shadow-[0_4px_14px_-4px_rgba(15,76,219,0.5)]"
-                          : "border border-[#d6deeb] bg-white text-ink/70 hover:border-primary/40 hover:text-primary"
-                      }`}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    min={1}
-                    value={QUANTITY_PRESETS.includes(quantity) ? "" : quantity}
-                    onChange={(e) => {
-                      const n = Number.parseInt(e.target.value, 10);
-                      if (Number.isFinite(n) && n >= 1) setQuantity(n);
-                    }}
-                    placeholder="Custom"
-                    className="w-24 rounded-full border border-[#d6deeb] bg-white px-3 py-1.5 text-center text-sm text-ink outline-none placeholder:text-ink/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
-                  />
+              {/* Quantity (paid only — free votes are capped at 1) */}
+              {isFree ? (
+                <div className="rounded-xl bg-[#eef9f2] px-4 py-3 text-sm text-[#1b6f4b]">
+                  This category is free to vote in. You can cast 1 vote per
+                  contestant per hour.
                 </div>
-                {!isFree && (
+              ) : (
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
+                    Number of votes
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {QUANTITY_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setQuantity(preset)}
+                        className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                          quantity === preset
+                            ? "bg-primary text-white shadow-[0_4px_14px_-4px_rgba(15,76,219,0.5)]"
+                            : "border border-[#d6deeb] bg-white text-ink/70 hover:border-primary/40 hover:text-primary"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      min={1}
+                      value={QUANTITY_PRESETS.includes(quantity) ? "" : quantity}
+                      onChange={(e) => {
+                        const n = Number.parseInt(e.target.value, 10);
+                        if (Number.isFinite(n) && n >= 1) setQuantity(n);
+                      }}
+                      placeholder="Custom"
+                      className="w-24 rounded-full border border-[#d6deeb] bg-white px-3 py-1.5 text-center text-sm text-ink outline-none placeholder:text-ink/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                    />
+                  </div>
                   <p className="mt-3 rounded-xl bg-[#f7f9fc] px-4 py-3 text-sm text-ink/70">
                     {quantity} × {formatPrice(category.votePriceMinor, category.currency)} ={" "}
                     <span className="font-semibold text-ink">
                       {formatPrice(totalMinor, category.currency)}
                     </span>
                   </p>
-                )}
-                {isFree && (
-                  <p className="mt-3 rounded-xl bg-[#eef9f2] px-4 py-3 text-sm text-[#1b6f4b]">
-                    This category is free to vote in.
-                  </p>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Voter details */}
               <div>
@@ -326,7 +326,7 @@ export function VoteModal({
                     Casting…
                   </span>
                 ) : isFree ? (
-                  `Cast ${quantity} vote${quantity > 1 ? "s" : ""}`
+                  "Cast vote"
                 ) : (
                   `Pay ${formatPrice(totalMinor, category.currency)}`
                 )}

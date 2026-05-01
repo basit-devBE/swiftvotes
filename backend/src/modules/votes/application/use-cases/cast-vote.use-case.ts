@@ -77,6 +77,12 @@ export class CastVoteUseCase {
     const voterEmail = input.voterEmail.trim().toLowerCase();
 
     if (category.votePriceMinor === 0) {
+      if (input.quantity !== 1) {
+        throw new BadRequestException(
+          "Free votes are limited to 1 per cast.",
+        );
+      }
+
       if (input.ipAddress) {
         const since = new Date(Date.now() - FREE_VOTE_COOLDOWN_MS);
         const recent = await this.votesRepository.findRecentFreeVoteByIp({
