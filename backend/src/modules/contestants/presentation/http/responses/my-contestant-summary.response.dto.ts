@@ -1,12 +1,10 @@
-import { ContestantProfileWithVotes } from "../../../application/use-cases/get-my-contestant-profile.use-case";
+import { ContestantWithContext } from "../../../application/ports/contestants.repository";
 
 class EventSummaryDto {
   id!: string;
   name!: string;
   slug!: string;
   status!: string;
-  contestantsCanViewOwnVotes!: boolean;
-  contestantsCanViewLeaderboard!: boolean;
   votingStartAt!: string;
   votingEndAt!: string;
   primaryFlyerUrl!: string;
@@ -18,33 +16,27 @@ class CategorySummaryDto {
   name!: string;
 }
 
-export class MyContestantProfileResponseDto {
+export class MyContestantSummaryResponseDto {
   id!: string;
   code!: string;
   name!: string;
   imageUrl!: string | null;
-  email!: string | null;
-  voteCount!: number | null;
   createdAt!: string;
   event!: EventSummaryDto;
   category!: CategorySummaryDto;
 
-  static fromDomain(profile: ContestantProfileWithVotes): MyContestantProfileResponseDto {
+  static fromDomain(profile: ContestantWithContext): MyContestantSummaryResponseDto {
     return {
       id: profile.id,
       code: profile.code,
       name: profile.name,
       imageUrl: profile.imageUrl,
-      email: profile.email,
-      voteCount: profile.voteCount,
       createdAt: profile.createdAt.toISOString(),
       event: {
         id: profile.event.id,
         name: profile.event.name,
         slug: profile.event.slug,
         status: profile.event.status,
-        contestantsCanViewOwnVotes: profile.event.contestantsCanViewOwnVotes,
-        contestantsCanViewLeaderboard: profile.event.contestantsCanViewLeaderboard,
         votingStartAt: profile.event.votingStartAt.toISOString(),
         votingEndAt: profile.event.votingEndAt.toISOString(),
         primaryFlyerUrl: profile.event.primaryFlyerUrl,

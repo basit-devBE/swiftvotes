@@ -36,4 +36,7 @@ export const validationSchema = Joi.object({
   SMTP_USER: Joi.string().allow("").default(""),
   SMTP_PASS: Joi.string().allow("").default(""),
   EMAIL_FROM: Joi.string().allow("").default("SwiftVote <no-reply@swiftvote.app>"),
+  PAYSTACK_SECRET_KEY: Joi.string().allow("").default(""),
+  PAYSTACK_PUBLIC_KEY: Joi.string().allow("").default(""),
+  PAYSTACK_BASE_URL: Joi.string().uri().default("https://api.paystack.co"),
 });

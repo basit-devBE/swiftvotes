@@ -1,0 +1,6 @@
+export enum VoteStatus {
+  FREE = "FREE",
+  PENDING_PAYMENT = "PENDING_PAYMENT",
+  CONFIRMED = "CONFIRMED",
+  FAILED = "FAILED",
+}

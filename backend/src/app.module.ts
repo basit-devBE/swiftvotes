@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { CoreModule } from "./core/core.module";
 import { appConfig } from "./core/config/app.config";
@@ -8,6 +9,7 @@ import { authConfig } from "./core/config/auth.config";
 import { databaseConfig } from "./core/config/database.config";
 import { emailConfig } from "./core/config/email.config";
 import { validationSchema } from "./core/config/env.validation";
+import { paystackConfig } from "./core/config/paystack.config";
 import { storageConfig } from "./core/config/storage.config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AccessControlModule } from "./modules/access-control/access-control.module";
@@ -19,6 +21,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { SchedulingModule } from "./modules/scheduling/scheduling.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UsersModule } from "./modules/users/users.module";
+import { VotesModule } from "./modules/votes/votes.module";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
 
 @Module({
@@ -26,7 +29,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [appConfig, authConfig, databaseConfig, emailConfig, storageConfig],
+      load: [appConfig, authConfig, databaseConfig, emailConfig, paystackConfig, storageConfig],
       validationSchema,
       envFilePath: [
         `.env.${process.env.NODE_ENV}.local`,
@@ -35,6 +38,9 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
         ".env",
       ],
     }),
+    ThrottlerModule.forRoot([
+      { name: "default", ttl: 60_000, limit: 30 },
+    ]),
     CoreModule,
     UsersModule,
     AuthModule,
@@ -44,10 +50,15 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     EventsModule,
     NominationsModule,
     UploadsModule,
+    VotesModule,
     SchedulingModule,
     HealthModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

@@ -49,6 +49,13 @@ enum NominationStatus {
   REJECTED
 }
 
+enum VoteStatus {
+  FREE
+  PENDING_PAYMENT
+  CONFIRMED
+  FAILED
+}
+
 model User {
   id           String      @id @default(cuid())
   email        String      @unique
@@ -103,6 +110,7 @@ model Event {
   memberships  EventMembership[]
   nominations  Nomination[]
   contestants  Contestant[]
+  votes        Vote[]
 
   @@index([creatorUserId, createdAt])
   @@index([status, submittedAt])
@@ -124,6 +132,7 @@ model EventCategory {
   event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   nominations  Nomination[]
   contestants  Contestant[]
+  votes        Vote[]
 
   @@unique([eventId, name])
   @@index([eventId, sortOrder])
@@ -196,6 +205,7 @@ model Contestant {
   category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   nomination Nomination    @relation(fields: [nominationId], references: [id], onDelete: Cascade)
   user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  votes      Vote[]
 
   @@unique([eventId, code])
   @@index([eventId, categoryId])
@@ -212,4 +222,30 @@ model MagicLinkToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Vote {
+  id             String     @id @default(cuid())
+  eventId        String
+  categoryId     String
+  contestantId   String
+  voterName      String
+  voterEmail     String
+  quantity       Int
+  amountMinor    Int
+  currency       String
+  status         VoteStatus @default(FREE)
+  transactionRef String?    @unique
+  ipAddress      String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  contestant Contestant    @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, categoryId])
+  @@index([contestantId])
+  @@index([voterEmail])
+  @@index([eventId, status, createdAt])
 }
