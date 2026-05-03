@@ -266,51 +266,43 @@ export function PublicEventView({ eventId }: { eventId: string }) {
   }));
 
   // ── Hero (shared across all states) ───────────────────────────────────────
-  const Hero = (
-    <div className="relative overflow-hidden rounded-[2rem] bg-ink shadow-[0_40px_90px_-50px_rgba(7,17,31,0.5)]">
-      {event.bannerUrl ? (
-        <div className="relative aspect-[21/9] w-full">
-          <Image
-            src={event.bannerUrl}
-            alt={event.name}
-            fill
-            priority
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(7,17,31,0.82)_0%,rgba(7,17,31,0.22)_50%,transparent_100%)]" />
-        </div>
-      ) : (
-        <div className="relative aspect-[21/9] w-full">
-          <Image
-            src={event.primaryFlyerUrl}
-            alt={event.name}
-            fill
-            priority
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(7,17,31,0.86)_0%,rgba(7,17,31,0.28)_52%,transparent_100%)]" />
-        </div>
-      )}
+  // For VOTING_LIVE we use a slim banner so contestants are visible above the fold.
+  // For other states we keep a more substantial hero.
+  const heroHeight = votingLive
+    ? "h-32 sm:h-40 lg:h-44"
+    : "h-44 sm:h-56 lg:h-64";
 
-      <div className="absolute inset-x-0 bottom-0 px-8 pb-8 sm:px-10 sm:pb-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+  const Hero = (
+    <div className="relative overflow-hidden rounded-[1.75rem] bg-ink shadow-[0_24px_60px_-40px_rgba(7,17,31,0.4)]">
+      <div className={`relative w-full ${heroHeight}`}>
+        <Image
+          src={event.bannerUrl ?? event.primaryFlyerUrl}
+          alt={event.name}
+          fill
+          priority
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(7,17,31,0.84)_0%,rgba(7,17,31,0.30)_55%,transparent_100%)]" />
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 px-5 pb-4 sm:px-7 sm:pb-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/52">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-white/55">
               {event.status.replaceAll("_", " ")}
+              {votingLive && (
+                <span className="ml-2 text-white/85">
+                  · {daysUntil(event.votingEndAt)}
+                </span>
+              )}
             </p>
-            <h1 className="mt-2 font-display text-3xl font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-5xl">
+            <h1 className="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-2xl lg:text-3xl">
               {event.name}
             </h1>
-            {votingLive && (
-              <p className="mt-2 text-sm font-medium text-white/72">
-                Voting closes {formatDate(event.votingEndAt)} ·{" "}
-                <span className="text-white">{daysUntil(event.votingEndAt)}</span>
-              </p>
-            )}
           </div>
 
           {event.bannerUrl && (
-            <div className="relative hidden h-20 w-14 shrink-0 overflow-hidden rounded-xl border-2 border-white/20 shadow-xl sm:block">
+            <div className="relative hidden h-12 w-9 shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-lg sm:block">
               <Image
                 src={event.primaryFlyerUrl}
                 alt="Flyer"

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
 import { ContestantsModule } from "../contestants/contestants.module";
 import { EventsModule } from "../events/events.module";
@@ -9,7 +9,7 @@ import { PrismaVotesRepository } from "./infrastructure/persistence/prisma-votes
 import { VotesController } from "./presentation/http/votes.controller";
 
 @Module({
-  imports: [EventsModule, ContestantsModule],
+  imports: [EventsModule, forwardRef(() => ContestantsModule)],
   controllers: [VotesController],
   providers: [
     CastVoteUseCase,

@@ -230,13 +230,35 @@ export type LeaderboardCategory = {
   contestants: LeaderboardEntry[];
 };
 
+export type MyContestantSummaryResponse = {
+  id: string;
+  code: string;
+  name: string;
+  imageUrl: string | null;
+  createdAt: string;
+  event: {
+    id: string;
+    name: string;
+    slug: string;
+    status: EventStatus;
+    votingStartAt: string;
+    votingEndAt: string;
+    primaryFlyerUrl: string;
+    bannerUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+  };
+};
+
 export type MyContestantProfileResponse = {
   id: string;
   code: string;
   name: string;
   imageUrl: string | null;
   email: string | null;
-  voteCount: number;
+  voteCount: number | null;
   createdAt: string;
   event: {
     id: string;
