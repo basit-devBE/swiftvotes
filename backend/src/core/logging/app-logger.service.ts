@@ -1,74 +1,39 @@
-import { ConsoleLogger, Injectable, LogLevel } from "@nestjs/common";
+import { Injectable, LoggerService } from "@nestjs/common";
+import { PinoLogger } from "nestjs-pino";
 
 @Injectable()
-export class AppLogger extends ConsoleLogger {
-  private readonly isProduction = process.env.NODE_ENV === "production";
-
-  constructor() {
-    super({
-      timestamp: true,
-    });
+export class AppLogger implements LoggerService {
+  constructor(private readonly pino: PinoLogger) {
+    this.pino.setContext("App");
   }
 
-  override log(message: unknown, context?: string): void {
-    this.write("log", message, context);
+  log(message: unknown, context?: string): void {
+    this.pino.info({ context }, this.toString(message));
   }
 
-  override error(message: unknown, stack?: string, context?: string): void {
-    this.write("error", message, context, stack);
+  error(message: unknown, stack?: string, context?: string): void {
+    this.pino.error({ context, stack }, this.toString(message));
   }
 
-  override warn(message: unknown, context?: string): void {
-    this.write("warn", message, context);
+  warn(message: unknown, context?: string): void {
+    this.pino.warn({ context }, this.toString(message));
   }
 
-  override debug(message: unknown, context?: string): void {
-    this.write("debug", message, context);
+  debug(message: unknown, context?: string): void {
+    this.pino.debug({ context }, this.toString(message));
   }
 
-  override verbose(message: unknown, context?: string): void {
-    this.write("verbose", message, context);
+  verbose(message: unknown, context?: string): void {
+    this.pino.trace({ context }, this.toString(message));
   }
 
-  private write(
-    level: LogLevel,
-    message: unknown,
-    context?: string,
-    stack?: string,
-  ): void {
-    if (!this.isProduction) {
-      switch (level) {
-        case "error":
-          super.error(message, stack, context);
-          return;
-        case "warn":
-          super.warn(message, context);
-          return;
-        case "debug":
-          super.debug(message, context);
-          return;
-        case "verbose":
-          super.verbose(message, context);
-          return;
-        default:
-          super.log(message, context);
-      }
-      return;
+  private toString(message: unknown): string {
+    if (typeof message === "string") return message;
+    if (message instanceof Error) return message.message;
+    try {
+      return JSON.stringify(message);
+    } catch {
+      return String(message);
     }
-
-    const payload = JSON.stringify({
-      level,
-      context,
-      message,
-      stack,
-      timestamp: new Date().toISOString(),
-    });
-
-    if (level === "error") {
-      process.stderr.write(`${payload}\n`);
-      return;
-    }
-
-    process.stdout.write(`${payload}\n`);
   }
 }

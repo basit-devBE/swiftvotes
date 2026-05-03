@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
-import { AppLogger } from "./logging/app-logger.service";
+import { LoggerModule } from "./logging/logger.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import {
   BcryptPasswordHasherService,
@@ -9,14 +9,13 @@ import {
 
 @Global()
 @Module({
-  imports: [PrismaModule],
+  imports: [LoggerModule, PrismaModule],
   providers: [
-    AppLogger,
     {
       provide: PASSWORD_HASHER,
       useClass: BcryptPasswordHasherService,
     },
   ],
-  exports: [AppLogger, PrismaModule, PASSWORD_HASHER],
+  exports: [LoggerModule, PrismaModule, PASSWORD_HASHER],
 })
 export class CoreModule {}
