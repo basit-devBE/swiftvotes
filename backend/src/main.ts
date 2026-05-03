@@ -1,18 +1,18 @@
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import { Logger } from "nestjs-pino";
 import cookieParser from "cookie-parser";
 
 import { AppModule } from "./app.module";
 import { AppConfig } from "./core/config/app.config";
-import { AppLogger } from "./core/logging/app-logger.service";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
 
-  const logger = app.get(AppLogger);
+  const logger = app.get(Logger);
   const configService = app.get(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>("app");
 
