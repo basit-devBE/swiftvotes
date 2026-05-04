@@ -98,6 +98,7 @@ export function VoteModal({
         quantity: isFree ? 1 : quantity,
         voterName: voterName.trim(),
         voterEmail: voterEmail.trim(),
+        callbackOrigin: window.location.origin,
       });
 
       if (result.type === "payment" && result.paymentUrl) {

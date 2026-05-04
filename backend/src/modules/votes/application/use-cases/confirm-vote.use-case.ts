@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PinoLogger } from "nestjs-pino";
 
+import { PrismaService } from "../../../../core/prisma/prisma.service";
 import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
 import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
@@ -10,7 +12,8 @@ import { NotificationsService } from "../../../notifications/application/ports/n
 import { PaystackService } from "../../infrastructure/payments/paystack.service";
 import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
-import { VOTES_REPOSITORY } from "../votes.tokens";
+import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "../votes.tokens";
+import { PaymentsRepository } from "../ports/payments.repository";
 import { VotesRepository } from "../ports/votes.repository";
 
 export type ConfirmVoteResult = {
@@ -23,6 +26,8 @@ export class ConfirmVoteUseCase {
   constructor(
     @Inject(VOTES_REPOSITORY)
     private readonly votesRepository: VotesRepository,
+    @Inject(PAYMENTS_REPOSITORY)
+    private readonly paymentsRepository: PaymentsRepository,
     @Inject(EVENTS_REPOSITORY)
     private readonly eventsRepository: EventsRepository,
     @Inject(CONTESTANTS_REPOSITORY)
@@ -30,6 +35,7 @@ export class ConfirmVoteUseCase {
     @Inject(NOTIFICATIONS_SERVICE)
     private readonly notifications: NotificationsService,
     private readonly paystack: PaystackService,
+    private readonly prisma: PrismaService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext("ConfirmVoteUseCase");
@@ -58,12 +64,33 @@ export class ConfirmVoteUseCase {
     }
 
     const verification = await this.paystack.verifyTransaction(reference);
+    const rawVerifyResponse = verification.raw as Prisma.InputJsonValue;
 
     if (verification.status === "success") {
-      const updated = await this.votesRepository.updateStatus(
-        vote.id,
-        VoteStatus.CONFIRMED,
-      );
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await this.paymentsRepository.markSucceeded(
+          {
+            reference,
+            providerRef: verification.providerRef,
+            amountPaidMinor: verification.amount,
+            feeMinor: verification.fees,
+            paidAt: verification.paidAt
+              ? new Date(verification.paidAt)
+              : new Date(),
+            channel: verification.channel,
+            cardLast4: verification.cardLast4,
+            mobileNumber: verification.mobileNumber,
+            rawVerifyResponse,
+          },
+          tx,
+        );
+        return this.votesRepository.updateStatus(
+          vote.id,
+          VoteStatus.CONFIRMED,
+          undefined,
+          tx,
+        );
+      });
       this.logger.info(
         { scope: "votes", op: "confirm", reference, voteId: updated.id, decision: "confirmed" },
         "vote confirmed via Paystack",
@@ -73,10 +100,25 @@ export class ConfirmVoteUseCase {
     }
 
     if (verification.status === "failed" || verification.status === "abandoned") {
-      const updated = await this.votesRepository.updateStatus(
-        vote.id,
-        VoteStatus.FAILED,
-      );
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await this.paymentsRepository.markFailed(
+          {
+            reference,
+            providerRef: verification.providerRef,
+            failureReason:
+              verification.gatewayResponse ?? `paystack:${verification.status}`,
+            failedAt: new Date(),
+            rawVerifyResponse,
+          },
+          tx,
+        );
+        return this.votesRepository.updateStatus(
+          vote.id,
+          VoteStatus.FAILED,
+          undefined,
+          tx,
+        );
+      });
       this.logger.warn(
         {
           scope: "votes",
@@ -91,7 +133,7 @@ export class ConfirmVoteUseCase {
       return { vote: updated, alreadyResolved: false };
     }
 
-    // Pending — leave as PENDING_PAYMENT and let later webhook resolve it.
+    // Pending — leave both rows as-is and let the webhook resolve them.
     this.logger.info(
       { scope: "votes", op: "confirm", reference, paystackStatus: verification.status },
       "vote still pending after verify",
@@ -111,7 +153,22 @@ export class ConfirmVoteUseCase {
     if (vote.status === VoteStatus.CONFIRMED || vote.status === VoteStatus.FAILED) {
       return;
     }
-    await this.votesRepository.updateStatus(vote.id, VoteStatus.FAILED);
+    await this.prisma.$transaction(async (tx) => {
+      await this.paymentsRepository.markFailed(
+        {
+          reference,
+          failureReason: "paystack:webhook-failed",
+          failedAt: new Date(),
+        },
+        tx,
+      );
+      await this.votesRepository.updateStatus(
+        vote.id,
+        VoteStatus.FAILED,
+        undefined,
+        tx,
+      );
+    });
     this.logger.warn(
       { scope: "votes", op: "mark-failed", reference, voteId: vote.id },
       "vote marked failed via webhook",

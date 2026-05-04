@@ -1,1 +1,2 @@
 export const VOTES_REPOSITORY = Symbol("VOTES_REPOSITORY");
+export const PAYMENTS_REPOSITORY = Symbol("PAYMENTS_REPOSITORY");

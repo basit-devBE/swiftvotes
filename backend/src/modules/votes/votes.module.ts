@@ -10,8 +10,9 @@ import { CastVoteUseCase } from "./application/use-cases/cast-vote.use-case";
 import { ConfirmVoteUseCase } from "./application/use-cases/confirm-vote.use-case";
 import { GetLeaderboardUseCase } from "./application/use-cases/get-leaderboard.use-case";
 import { HandlePaystackWebhookUseCase } from "./application/use-cases/handle-paystack-webhook.use-case";
-import { VOTES_REPOSITORY } from "./application/votes.tokens";
+import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "./application/votes.tokens";
 import { PaystackService } from "./infrastructure/payments/paystack.service";
+import { PrismaPaymentsRepository } from "./infrastructure/persistence/prisma-payments.repository";
 import { PrismaVotesRepository } from "./infrastructure/persistence/prisma-votes.repository";
 import { VotesController } from "./presentation/http/votes.controller";
 import { PaymentWebhooksController } from "./presentation/http/webhooks.controller";
@@ -35,7 +36,11 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
       provide: VOTES_REPOSITORY,
       useClass: PrismaVotesRepository,
     },
+    {
+      provide: PAYMENTS_REPOSITORY,
+      useClass: PrismaPaymentsRepository,
+    },
   ],
-  exports: [VOTES_REPOSITORY],
+  exports: [VOTES_REPOSITORY, PAYMENTS_REPOSITORY],
 })
 export class VotesModule {}

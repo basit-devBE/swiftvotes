@@ -226,9 +226,11 @@ function ReceiptTable({ vote }: { vote: VerifyVoteResponse }) {
         <dd className="font-semibold text-ink">{formatAmount(vote.amountMinor, vote.currency)}</dd>
       </div>
       {vote.reference && (
-        <div className="flex items-center justify-between px-4 py-3 text-sm">
+        <div className="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[6rem_1fr] sm:items-start">
           <dt className="text-ink/55">Reference</dt>
-          <dd className="font-mono text-xs text-ink/70">{vote.reference}</dd>
+          <dd className="break-all font-mono text-xs leading-5 text-ink/70 sm:text-right">
+            {vote.reference}
+          </dd>
         </div>
       )}
     </dl>

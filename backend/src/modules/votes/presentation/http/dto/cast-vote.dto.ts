@@ -1,4 +1,12 @@
-import { IsEmail, IsInt, IsString, MaxLength, Min } from "class-validator";
+import {
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  Min,
+} from "class-validator";
 
 export class CastVoteDto {
   @IsString()
@@ -14,4 +22,8 @@ export class CastVoteDto {
 
   @IsEmail()
   voterEmail!: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  callbackOrigin?: string;
 }

@@ -43,6 +43,7 @@ export class VotesController {
       quantity: body.quantity,
       voterName: body.voterName,
       voterEmail: body.voterEmail,
+      callbackOrigin: body.callbackOrigin,
       ipAddress: request.ip ?? null,
     });
     return CastVoteResponseDto.fromResult(result);

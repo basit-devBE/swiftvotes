@@ -56,61 +56,70 @@ enum VoteStatus {
   FAILED
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+  REFUNDED
+}
+
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   passwordHash String
   fullName     String
-  systemRole   SystemRole  @default(NONE)
-  status       UserStatus  @default(ACTIVE)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  systemRole   SystemRole @default(NONE)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  createdEvents           Event[]            @relation("EventCreator")
-  approvedEvents          Event[]            @relation("EventApprover")
-  rejectedEvents          Event[]            @relation("EventRejector")
-  eventMemberships        EventMembership[]  @relation("MembershipUser")
-  assignedMemberships     EventMembership[]  @relation("MembershipAssigner")
-  submittedNominations    Nomination[]       @relation("NominationSubmitter")
-  reviewedNominations     Nomination[]       @relation("NominationReviewer")
-  contestantProfile       Contestant?
-  magicLinkTokens         MagicLinkToken[]
+  createdEvents        Event[]           @relation("EventCreator")
+  approvedEvents       Event[]           @relation("EventApprover")
+  rejectedEvents       Event[]           @relation("EventRejector")
+  eventMemberships     EventMembership[] @relation("MembershipUser")
+  assignedMemberships  EventMembership[] @relation("MembershipAssigner")
+  submittedNominations Nomination[]      @relation("NominationSubmitter")
+  reviewedNominations  Nomination[]      @relation("NominationReviewer")
+  contestantProfile    Contestant?
+  magicLinkTokens      MagicLinkToken[]
 }
 
 model Event {
-  id               String      @id @default(cuid())
-  creatorUserId    String
-  name             String
-  slug             String      @unique
-  description      String
-  status           EventStatus @default(DRAFT)
-  primaryFlyerUrl  String
-  primaryFlyerKey  String
-  bannerUrl        String?
-  bannerKey        String?
-  nominationStartAt              DateTime?
-  nominationEndAt                DateTime?
-  votingStartAt                  DateTime
-  votingEndAt                    DateTime
-  contestantsCanViewOwnVotes     Boolean   @default(false)
-  contestantsCanViewLeaderboard  Boolean   @default(false)
-  submittedAt      DateTime?
-  approvedAt       DateTime?
-  approvedByUserId String?
-  rejectedAt       DateTime?
-  rejectedByUserId String?
-  rejectionReason  String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                            String      @id @default(cuid())
+  creatorUserId                 String
+  name                          String
+  slug                          String      @unique
+  description                   String
+  status                        EventStatus @default(DRAFT)
+  primaryFlyerUrl               String
+  primaryFlyerKey               String
+  bannerUrl                     String?
+  bannerKey                     String?
+  nominationStartAt             DateTime?
+  nominationEndAt               DateTime?
+  votingStartAt                 DateTime
+  votingEndAt                   DateTime
+  contestantsCanViewOwnVotes    Boolean     @default(false)
+  contestantsCanViewLeaderboard Boolean     @default(false)
+  submittedAt                   DateTime?
+  approvedAt                    DateTime?
+  approvedByUserId              String?
+  rejectedAt                    DateTime?
+  rejectedByUserId              String?
+  rejectionReason               String?
+  createdAt                     DateTime    @default(now())
+  updatedAt                     DateTime    @updatedAt
 
   creator     User              @relation("EventCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
   approvedBy  User?             @relation("EventApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   rejectedBy  User?             @relation("EventRejector", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
-  categories   EventCategory[]
-  memberships  EventMembership[]
-  nominations  Nomination[]
-  contestants  Contestant[]
-  votes        Vote[]
+  categories  EventCategory[]
+  memberships EventMembership[]
+  nominations Nomination[]
+  contestants Contestant[]
+  votes       Vote[]
+  payments    Payment[]
 
   @@index([creatorUserId, createdAt])
   @@index([status, submittedAt])
@@ -129,10 +138,10 @@ model EventCategory {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  nominations  Nomination[]
-  contestants  Contestant[]
-  votes        Vote[]
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  nominations Nomination[]
+  contestants Contestant[]
+  votes       Vote[]
 
   @@unique([eventId, name])
   @@index([eventId, sortOrder])
@@ -158,24 +167,24 @@ model EventMembership {
 }
 
 model Nomination {
-  id               String           @id @default(cuid())
-  eventId          String
-  categoryId       String
+  id                String           @id @default(cuid())
+  eventId           String
+  categoryId        String
   submittedByUserId String?
-  submitterName    String
-  submitterEmail   String?
-  submitterPhone   String?
-  nomineeName      String
-  nomineeEmail     String?
-  nomineePhone     String?
-  nomineeImageUrl  String?
-  nomineeImageKey  String?
-  status           NominationStatus @default(PENDING_REVIEW)
-  reviewedByUserId String?
-  reviewedAt       DateTime?
-  rejectionReason  String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  submitterName     String
+  submitterEmail    String?
+  submitterPhone    String?
+  nomineeName       String
+  nomineeEmail      String?
+  nomineePhone      String?
+  nomineeImageUrl   String?
+  nomineeImageKey   String?
+  status            NominationStatus @default(PENDING_REVIEW)
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  rejectionReason   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   category    EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -244,9 +253,74 @@ model Vote {
   event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   contestant Contestant    @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  payment    Payment?
 
   @@index([eventId, categoryId])
   @@index([contestantId])
   @@index([voterEmail])
   @@index([eventId, status, createdAt])
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  reference   String  @unique
+  providerRef String?
+  provider    String  @default("paystack")
+
+  amountMinor     Int
+  amountPaidMinor Int?
+  feeMinor        Int?
+  currency        String
+
+  status        PaymentStatus @default(PENDING)
+  initializedAt DateTime      @default(now())
+  paidAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+
+  voterEmail   String
+  voterName    String?
+  channel      String?
+  cardLast4    String?
+  mobileNumber String?
+  customerIp   String?
+
+  eventId      String
+  categoryId   String
+  contestantId String
+  voteId       String? @unique
+
+  rawInitResponse   Json?
+  rawVerifyResponse Json?
+  metadata          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event         Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  vote          Vote?                 @relation(fields: [voteId], references: [id], onDelete: SetNull)
+  webhookEvents PaymentWebhookEvent[]
+
+  @@index([eventId, status, createdAt])
+  @@index([voterEmail, createdAt])
+  @@index([providerRef])
+}
+
+model PaymentWebhookEvent {
+  id             String    @id @default(cuid())
+  paymentId      String?
+  provider       String    @default("paystack")
+  eventType      String
+  reference      String
+  signatureValid Boolean
+  rawPayload     Json
+  receivedAt     DateTime  @default(now())
+  processed      Boolean   @default(false)
+  processedAt    DateTime?
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([reference])
+  @@index([receivedAt])
 }
