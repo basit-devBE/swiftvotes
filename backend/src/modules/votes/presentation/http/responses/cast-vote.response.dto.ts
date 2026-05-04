@@ -8,6 +8,7 @@ export class CastVoteResponseDto {
   quantity!: number;
   amountMinor!: number;
   currency!: string;
+  reference!: string | null;
   paymentUrl!: string | null;
 
   static fromResult(result: CastVoteResult): CastVoteResponseDto {
@@ -19,6 +20,7 @@ export class CastVoteResponseDto {
         quantity: result.vote.quantity,
         amountMinor: result.vote.amountMinor,
         currency: result.vote.currency,
+        reference: null,
         paymentUrl: null,
       };
     }
@@ -26,9 +28,10 @@ export class CastVoteResponseDto {
       type: "payment",
       voteId: result.voteId,
       status: VoteStatus.PENDING_PAYMENT,
-      quantity: 0,
-      amountMinor: 0,
-      currency: "",
+      quantity: result.quantity,
+      amountMinor: result.amountMinor,
+      currency: result.currency,
+      reference: result.reference,
       paymentUrl: result.paymentUrl,
     };
   }

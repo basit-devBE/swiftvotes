@@ -233,6 +233,19 @@ function NominationCard({
             </span>{" "}
             · {formatDate(nomination.createdAt)}
           </p>
+          {(nomination.submitterPhone || nomination.submitterEmail) && (
+            <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-ink/48">
+              {nomination.submitterPhone && (
+                <span>{nomination.submitterPhone}</span>
+              )}
+              {nomination.submitterPhone && nomination.submitterEmail && (
+                <span className="text-ink/30">·</span>
+              )}
+              {nomination.submitterEmail && (
+                <span className="truncate">{nomination.submitterEmail}</span>
+              )}
+            </p>
+          )}
 
           {nomination.status === "REJECTED" && nomination.rejectionReason && (
             <p className="mt-2 text-xs italic text-accent/70">

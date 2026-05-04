@@ -163,7 +163,8 @@ model Nomination {
   categoryId       String
   submittedByUserId String?
   submitterName    String
-  submitterEmail   String
+  submitterEmail   String?
+  submitterPhone   String?
   nomineeName      String
   nomineeEmail     String?
   nomineePhone     String?

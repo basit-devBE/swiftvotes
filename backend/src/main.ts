@@ -10,6 +10,7 @@ import { AppConfig } from "./core/config/app.config";
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   const logger = app.get(Logger);
@@ -22,7 +23,7 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     appConfig.frontendOrigin,
     "https://almanac-patient-spookily.ngrok-free.dev",
-    "http://localhost:3002",
+    "http://localhost:3000",
     "https://swiftvotes-cpz3.vercel.app",
   ];
 

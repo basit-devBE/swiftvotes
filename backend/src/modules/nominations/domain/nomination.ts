@@ -6,7 +6,8 @@ export type Nomination = {
   categoryId: string;
   submittedByUserId: string | null;
   submitterName: string;
-  submitterEmail: string;
+  submitterEmail: string | null;
+  submitterPhone: string | null;
   nomineeName: string;
   nomineeEmail: string | null;
   nomineePhone: string | null;

@@ -13,6 +13,7 @@ import {
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
+  VoteConfirmationPayload,
 } from "../../application/ports/notifications.service";
 
 const TEMPLATES_DIR = path.join(__dirname, "templates");
@@ -186,6 +187,33 @@ export class NodemailerNotificationsService implements NotificationsService {
       contestantCode: payload.contestantCode,
       defaultPassword: payload.defaultPassword,
       magicLinkUrl: payload.magicLinkUrl,
+    });
+    await this.send(payload.recipientEmail, subject, html);
+  }
+
+  async sendVoteConfirmationEmail(payload: VoteConfirmationPayload): Promise<void> {
+    const subject = `Vote confirmed — ${payload.contestantName} (${payload.eventName})`;
+    const amountFormatted = payload.isFree
+      ? "Free"
+      : `${payload.currency} ${(payload.amountMinor / 100).toFixed(2)}`;
+    const html = await this.render("vote-confirmation", {
+      subject,
+      recipientName: payload.recipientName,
+      eventName: payload.eventName,
+      contestantName: payload.contestantName,
+      contestantCode: payload.contestantCode,
+      categoryName: payload.categoryName,
+      quantity: payload.quantity,
+      amountFormatted,
+      isFree: payload.isFree,
+      votedAt: payload.votedAt.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      eventUrl: this.eventUrl(payload.eventId),
     });
     await this.send(payload.recipientEmail, subject, html);
   }

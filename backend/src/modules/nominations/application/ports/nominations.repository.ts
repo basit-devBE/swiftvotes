@@ -6,10 +6,11 @@ export interface NominationsRepository {
     categoryId: string;
     submittedByUserId?: string | null;
     submitterName: string;
-    submitterEmail: string;
+    submitterEmail?: string | null;
+    submitterPhone: string;
     nomineeName: string;
     nomineeEmail?: string | null;
-    nomineePhone?: string | null;
+    nomineePhone: string;
     nomineeImageUrl?: string | null;
     nomineeImageKey?: string | null;
   }): Promise<Nomination>;

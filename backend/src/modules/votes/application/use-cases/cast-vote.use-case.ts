@@ -6,14 +6,18 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  NotImplementedException,
 } from "@nestjs/common";
+import { ConfigType } from "@nestjs/config";
 
+import { appConfig } from "../../../../core/config/app.config";
 import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
 import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { EventStatus } from "../../../events/domain/event-status";
+import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifications.tokens";
+import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
+import { PaystackService } from "../../infrastructure/payments/paystack.service";
 import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
 import { VOTES_REPOSITORY } from "../votes.tokens";
@@ -32,7 +36,15 @@ export type CastVoteInput = {
 
 export type CastVoteResult =
   | { type: "free"; vote: Vote }
-  | { type: "payment"; voteId: string; paymentUrl: string };
+  | {
+      type: "payment";
+      voteId: string;
+      reference: string;
+      paymentUrl: string;
+      quantity: number;
+      amountMinor: number;
+      currency: string;
+    };
 
 @Injectable()
 export class CastVoteUseCase {
@@ -43,6 +55,11 @@ export class CastVoteUseCase {
     private readonly eventsRepository: EventsRepository,
     @Inject(CONTESTANTS_REPOSITORY)
     private readonly contestantsRepository: ContestantsRepository,
+    @Inject(NOTIFICATIONS_SERVICE)
+    private readonly notifications: NotificationsService,
+    @Inject(appConfig.KEY)
+    private readonly app: ConfigType<typeof appConfig>,
+    private readonly paystack: PaystackService,
   ) {}
 
   async execute(input: CastVoteInput): Promise<CastVoteResult> {
@@ -110,12 +127,65 @@ export class CastVoteUseCase {
         status: VoteStatus.FREE,
         ipAddress: input.ipAddress ?? null,
       });
+
+      await this.notifications.sendVoteConfirmationEmail({
+        recipientEmail: voterEmail,
+        recipientName: voterName,
+        eventId: event.id,
+        eventName: event.name,
+        contestantName: contestant.name,
+        contestantCode: contestant.code,
+        categoryName: category.name,
+        quantity: vote.quantity,
+        amountMinor: 0,
+        currency: category.currency,
+        isFree: true,
+        votedAt: vote.createdAt,
+      });
+
       return { type: "free", vote };
     }
 
-    // Paid path is implemented in a later step (Paystack integration).
-    throw new NotImplementedException(
-      "Paid voting is not yet available. Please try again later.",
-    );
+    // Paid path — initialize a Paystack transaction and create a PENDING_PAYMENT vote.
+    const amountMinor = input.quantity * category.votePriceMinor;
+    const callbackUrl = `${this.app.frontendOrigin}/vote/callback?eventId=${encodeURIComponent(event.id)}`;
+
+    const init = await this.paystack.initializeTransaction({
+      email: voterEmail,
+      amountMinor,
+      currency: category.currency,
+      callbackUrl,
+      metadata: {
+        eventId: event.id,
+        contestantId: contestant.id,
+        categoryId: category.id,
+        quantity: input.quantity,
+        voterName,
+      },
+    });
+
+    const vote = await this.votesRepository.create({
+      eventId: event.id,
+      categoryId: category.id,
+      contestantId: contestant.id,
+      voterName,
+      voterEmail,
+      quantity: input.quantity,
+      amountMinor,
+      currency: category.currency,
+      status: VoteStatus.PENDING_PAYMENT,
+      transactionRef: init.reference,
+      ipAddress: input.ipAddress ?? null,
+    });
+
+    return {
+      type: "payment",
+      voteId: vote.id,
+      reference: init.reference,
+      paymentUrl: init.authorizationUrl,
+      quantity: vote.quantity,
+      amountMinor: vote.amountMinor,
+      currency: vote.currency,
+    };
   }
 }

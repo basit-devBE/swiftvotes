@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <%- include('_styles') %>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="card-header">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+      </div>
+      <div class="card-body">
+        <p>Hi <%= recipientName %>,</p>
+        <p>Thanks for voting on <strong><%= eventName %></strong>. Here are your vote details.</p>
+        <div class="event-name"><%= eventName %></div>
+        <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+          <tr>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Contestant</td>
+            <td style="padding:10px 14px;background:#f4f6fb;border-radius:6px 6px 0 0;border-bottom:1px solid #e2e7f0;font-weight:700;color:#07111f;">
+              <%= contestantName %>
+              <span style="font-family:monospace;color:#6b7a99;font-size:12px;margin-left:8px;">(<%= contestantCode %>)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Category</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-weight:600;color:#07111f;"><%= categoryName %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Votes Cast</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-weight:700;color:#07111f;"><%= quantity %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">Amount</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e7f0;font-weight:600;color:<%= isFree ? '#1b6f4b' : '#07111f' %>;"><%= amountFormatted %></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;">When</td>
+            <td style="padding:10px 14px;font-weight:600;color:#07111f;"><%= votedAt %></td>
+          </tr>
+        </table>
+        <div class="divider"></div>
+        <a href="<%= eventUrl %>" class="btn btn-primary">View event</a>
+      </div>
+      <div class="card-footer">
+        <p>This receipt is for your records. Keep it as proof of your vote.</p>
+        <p style="margin-top:6px"><a href="<%= frontendUrl %>">swiftvote.app</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

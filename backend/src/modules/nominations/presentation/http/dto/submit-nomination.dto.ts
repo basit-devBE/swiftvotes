@@ -1,4 +1,11 @@
-import { IsEmail, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from "class-validator";
 
 export class SubmitNominationDto {
   @IsString()
@@ -8,8 +15,14 @@ export class SubmitNominationDto {
   @MaxLength(160)
   submitterName!: string;
 
+  @IsOptional()
   @IsEmail()
-  submitterEmail!: string;
+  submitterEmail?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  submitterPhone!: string;
 
   @IsString()
   @MaxLength(160)
@@ -19,10 +32,10 @@ export class SubmitNominationDto {
   @IsEmail()
   nomineeEmail?: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(40)
-  nomineePhone?: string;
+  nomineePhone!: string;
 
   @IsOptional()
   @IsUrl()

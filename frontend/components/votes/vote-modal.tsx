@@ -101,7 +101,6 @@ export function VoteModal({
       });
 
       if (result.type === "payment" && result.paymentUrl) {
-        // Paid path is not yet wired up — but if it ever returns, just redirect.
         window.location.href = result.paymentUrl;
         return;
       }
