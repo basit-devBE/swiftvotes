@@ -67,6 +67,7 @@ export class PrismaNominationsRepository implements NominationsRepository {
     status: "CONFIRMED" | "REJECTED";
     reviewedByUserId: string;
     rejectionReason?: string | null;
+    nomineeEmail?: string | null;
   }): Promise<Nomination> {
     const nomination = await this.prisma.nomination.update({
       where: { id: input.nominationId },
@@ -75,6 +76,9 @@ export class PrismaNominationsRepository implements NominationsRepository {
         reviewedByUserId: input.reviewedByUserId,
         reviewedAt: new Date(),
         rejectionReason: input.rejectionReason ?? null,
+        ...(input.nomineeEmail !== undefined
+          ? { nomineeEmail: input.nomineeEmail?.trim().toLowerCase() ?? null }
+          : {}),
       },
     });
 

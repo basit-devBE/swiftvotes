@@ -21,5 +21,6 @@ export interface NominationsRepository {
     status: "CONFIRMED" | "REJECTED";
     reviewedByUserId: string;
     rejectionReason?: string | null;
+    nomineeEmail?: string | null;
   }): Promise<Nomination>;
 }

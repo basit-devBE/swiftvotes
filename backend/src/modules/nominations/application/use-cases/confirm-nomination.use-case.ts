@@ -31,6 +31,7 @@ export class ConfirmNominationUseCase {
   async execute(input: {
     nominationId: string;
     reviewerUserId: string;
+    nomineeEmail?: string;
   }): Promise<Nomination> {
     const nomination = await this.nominationsRepository.findById(
       input.nominationId,
@@ -46,6 +47,15 @@ export class ConfirmNominationUseCase {
       );
     }
 
+    const nomineeEmail =
+      input.nomineeEmail?.trim().toLowerCase() ?? nomination.nomineeEmail;
+
+    if (!nomineeEmail) {
+      throw new BadRequestException(
+        "A nominee email address is required before confirmation.",
+      );
+    }
+
     const event = await this.eventsRepository.findById(nomination.eventId);
 
     if (!event) {
@@ -57,6 +67,7 @@ export class ConfirmNominationUseCase {
       status: "CONFIRMED",
       reviewedByUserId: input.reviewerUserId,
       rejectionReason: null,
+      nomineeEmail,
     });
 
     const contestant = await this.contestantsRepository.createFromNomination({
@@ -65,21 +76,19 @@ export class ConfirmNominationUseCase {
       nominationId: nomination.id,
       codePrefix: extractEventInitials(event.name),
       name: nomination.nomineeName,
-      email: nomination.nomineeEmail,
+      email: nomineeEmail,
       phone: nomination.nomineePhone,
       imageUrl: nomination.nomineeImageUrl,
       imageKey: nomination.nomineeImageKey,
     });
 
-    if (nomination.nomineeEmail) {
-      await this.provisionContestantAccountUseCase.execute({
-        contestantId: contestant.id,
-        contestantCode: contestant.code,
-        name: nomination.nomineeName,
-        email: nomination.nomineeEmail,
-        eventName: event.name,
-      });
-    }
+    await this.provisionContestantAccountUseCase.execute({
+      contestantId: contestant.id,
+      contestantCode: contestant.code,
+      name: nomination.nomineeName,
+      email: nomineeEmail,
+      eventName: event.name,
+    });
 
     return confirmed;
   }

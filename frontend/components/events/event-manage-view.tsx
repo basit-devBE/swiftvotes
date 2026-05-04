@@ -148,13 +148,15 @@ function NominationCard({
   nomination: NominationResponse;
   categoryName: string;
   contestant?: ContestantResponse;
-  onConfirm: (id: string) => void;
+  onConfirm: (id: string, nomineeEmail?: string) => void;
   onReject: (id: string, reason: string) => void;
   isConfirming: boolean;
   isRejecting: boolean;
 }) {
   const [rejectMode, setRejectMode] = useState(false);
   const [reason, setReason] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState(nomination.nomineeEmail ?? "");
+  const [confirmEmailError, setConfirmEmailError] = useState<string | null>(null);
 
   const initials = nomination.nomineeName
     .split(" ")
@@ -167,6 +169,24 @@ function NominationCard({
     onReject(nomination.id, reason.trim());
     setRejectMode(false);
     setReason("");
+  }
+
+  function handleConfirm() {
+    const email = nomination.nomineeEmail ?? confirmEmail.trim();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email) {
+      setConfirmEmailError("Enter the nominee email before confirming.");
+      return;
+    }
+
+    if (!emailRe.test(email)) {
+      setConfirmEmailError("Enter a valid email address.");
+      return;
+    }
+
+    setConfirmEmailError(null);
+    onConfirm(nomination.id, nomination.nomineeEmail ? undefined : email);
   }
 
   return (
@@ -258,18 +278,33 @@ function NominationCard({
       {/* Action bar — pending only */}
       {nomination.status === "PENDING_REVIEW" && !rejectMode && (
         <div className="border-t border-primary/8 bg-[#f9fafb]">
-          {/* No-email warning */}
           {!nomination.nomineeEmail && (
             <div className="flex items-start gap-2 border-b border-[#fde68a]/60 bg-[#fffbeb] px-5 py-3">
               <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b45309]" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 5Zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
               </svg>
-              <p className="text-[11px] leading-4 text-[#92400e]">
-                <span className="font-semibold">No email on record.</span> Add an email to this nomination before confirming — login credentials will be sent to it.
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] leading-4 text-[#92400e]">
+                  <span className="font-semibold">No email on record.</span> Add one here so login details can be sent after confirmation.
+                </p>
+                <input
+                  type="email"
+                  value={confirmEmail}
+                  onChange={(e) => {
+                    setConfirmEmail(e.target.value);
+                    if (confirmEmailError) setConfirmEmailError(null);
+                  }}
+                  placeholder="nominee@example.com"
+                  className="mt-2 w-full rounded-lg border border-[#f3d28b] bg-white px-3 py-2 text-xs text-ink outline-none placeholder:text-ink/32 focus:border-[#b45309]/50 focus:ring-2 focus:ring-[#b45309]/10"
+                />
+                {confirmEmailError && (
+                  <p className="mt-1 text-[11px] font-medium text-accent">
+                    {confirmEmailError}
+                  </p>
+                )}
+              </div>
             </div>
           )}
-          {/* Email present — soft reminder */}
           {nomination.nomineeEmail && (
             <div className="flex items-start gap-2 border-b border-[#fde68a]/60 bg-[#fffbeb] px-5 py-3">
               <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b45309]" viewBox="0 0 16 16" fill="currentColor">
@@ -282,9 +317,8 @@ function NominationCard({
           )}
           <div className="flex gap-2 px-5 py-3">
             <button
-              onClick={() => onConfirm(nomination.id)}
-              disabled={isConfirming || !nomination.nomineeEmail}
-              title={!nomination.nomineeEmail ? "Add an email before confirming" : undefined}
+              onClick={handleConfirm}
+              disabled={isConfirming}
               className="rounded-full border border-[#cfe7da] bg-[#eef9f2] px-4 py-1.5 text-xs font-semibold text-[#1b6f4b] transition hover:bg-[#dcf5e8] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isConfirming ? "Confirming…" : "Confirm"}
@@ -635,10 +669,12 @@ function NominationsTab({
     };
   }, [eventId]);
 
-  async function handleConfirm(nominationId: string) {
+  async function handleConfirm(nominationId: string, nomineeEmail?: string) {
     setConfirmingId(nominationId);
     try {
-      const updated = await confirmNomination(eventId, nominationId);
+      const updated = await confirmNomination(eventId, nominationId, {
+        nomineeEmail,
+      });
       setNominations((prev) =>
         prev.map((n) => (n.id === updated.id ? updated : n)),
       );
