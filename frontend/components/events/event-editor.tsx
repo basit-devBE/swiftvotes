@@ -25,7 +25,7 @@ import {
 type EditableCategory = {
   name: string;
   description: string;
-  votePriceMinor: string;
+  votePrice: string;
   currency: string;
   sortOrder: number;
 };
@@ -83,9 +83,12 @@ function toIsoOrUndefined(value: string): string | undefined {
 }
 
 function formatPriceLabel(value: string, currency: string): string {
-  const numeric = Number.parseInt(value || "0", 10);
+  const numeric = Number.parseFloat(value || "0");
   if (!Number.isFinite(numeric) || numeric <= 0) return "Free voting";
-  return `${currency || "GHS"} ${numeric.toLocaleString()}`;
+  return `${currency || "GHS"} ${numeric.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function formatStatusLabel(status?: string): string {
@@ -251,11 +254,11 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       ? initialEvent.categories.map((c) => ({
           name: c.name,
           description: c.description,
-          votePriceMinor: String(c.votePriceMinor),
+          votePrice: (c.votePriceMinor / 100).toString(),
           currency: c.currency,
           sortOrder: c.sortOrder,
         }))
-      : [{ name: "", description: "", votePriceMinor: "0", currency: "GHS", sortOrder: 0 }],
+      : [{ name: "", description: "", votePrice: "0", currency: "GHS", sortOrder: 0 }],
   );
 
   // UI state
@@ -369,7 +372,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       {
         name: "",
         description: "",
-        votePriceMinor: "0",
+        votePrice: "0",
         currency: current[0]?.currency ?? "GHS",
         sortOrder: current.length,
       },
@@ -437,7 +440,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
-          votePriceMinor: Number.parseInt(c.votePriceMinor || "0", 10),
+          votePriceMinor: Math.round(Number.parseFloat(c.votePrice || "0") * 100),
           currency: c.currency.trim().toUpperCase(),
           sortOrder: i,
         })),
@@ -1019,13 +1022,16 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                           />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-                          <Field label="Vote price (minor units)" required hint={formatPriceLabel(category.votePriceMinor, category.currency)}>
+                          <Field label="Vote price" required hint={formatPriceLabel(category.votePrice, category.currency)}>
                             <input
                               type="number"
                               min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="0.00"
                               className={inputCls}
-                              value={category.votePriceMinor}
-                              onChange={(e) => updateCategoryField(index, "votePriceMinor", e.target.value)}
+                              value={category.votePrice}
+                              onChange={(e) => updateCategoryField(index, "votePrice", e.target.value)}
                               disabled={!isEditable}
                             />
                           </Field>
@@ -1146,7 +1152,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                           {c.name || `Category ${i + 1}`}
                         </span>
                         <span className="shrink-0 rounded-full bg-[#0f4cdb]/8 px-2 py-0.5 text-[11px] font-semibold text-[#0f4cdb]">
-                          {formatPriceLabel(c.votePriceMinor, c.currency)}
+                          {formatPriceLabel(c.votePrice, c.currency)}
                         </span>
                       </li>
                     ))}
