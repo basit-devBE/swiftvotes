@@ -325,6 +325,7 @@ type FormState = {
   categoryId: string;
   submitterName: string;
   submitterEmail: string;
+  submitterPhone: string;
   nomineeName: string;
   nomineeEmail: string;
   nomineePhone: string;
@@ -340,14 +341,18 @@ function validate(form: FormState): FormErrors {
 
   if (!form.categoryId) errors.categoryId = "Please select a category.";
   if (!form.submitterName.trim()) errors.submitterName = "Your name is required.";
-  if (!form.submitterEmail.trim()) {
-    errors.submitterEmail = "Your email is required.";
-  } else if (!emailRe.test(form.submitterEmail.trim())) {
+  if (form.submitterEmail && !emailRe.test(form.submitterEmail.trim())) {
     errors.submitterEmail = "Enter a valid email address.";
+  }
+  if (!form.submitterPhone.trim()) {
+    errors.submitterPhone = "Your phone number is required.";
   }
   if (!form.nomineeName.trim()) errors.nomineeName = "Nominee name is required.";
   if (form.nomineeEmail && !emailRe.test(form.nomineeEmail.trim())) {
     errors.nomineeEmail = "Enter a valid email address.";
+  }
+  if (!form.nomineePhone.trim()) {
+    errors.nomineePhone = "Nominee phone number is required.";
   }
   return errors;
 }
@@ -361,6 +366,7 @@ export function NominationForm({
     categoryId: event.categories.length === 1 ? event.categories[0]!.id : "",
     submitterName: "",
     submitterEmail: "",
+    submitterPhone: "",
     nomineeName: "",
     nomineeEmail: "",
     nomineePhone: "",
@@ -391,11 +397,12 @@ export function NominationForm({
     const input: SubmitNominationInput = {
       categoryId: form.categoryId,
       submitterName: form.submitterName.trim(),
-      submitterEmail: form.submitterEmail.trim(),
+      submitterPhone: form.submitterPhone.trim(),
       nomineeName: form.nomineeName.trim(),
+      nomineePhone: form.nomineePhone.trim(),
     };
+    if (form.submitterEmail.trim()) input.submitterEmail = form.submitterEmail.trim();
     if (form.nomineeEmail.trim()) input.nomineeEmail = form.nomineeEmail.trim();
-    if (form.nomineePhone.trim()) input.nomineePhone = form.nomineePhone.trim();
     if (form.nomineeImageUrl) {
       input.nomineeImageUrl = form.nomineeImageUrl;
       input.nomineeImageKey = form.nomineeImageKey;
@@ -503,7 +510,19 @@ export function NominationForm({
                 onChange={(e) => set("submitterName", e.target.value)}
               />
             </Field>
-            <Field label="Your email" required error={errors.submitterEmail}>
+            <Field label="Your phone" required error={errors.submitterPhone}>
+              <input
+                type="tel"
+                className={inputClass}
+                placeholder="+1 555 000 0000"
+                value={form.submitterPhone}
+                onChange={(e) => set("submitterPhone", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Your email"
+              error={errors.submitterEmail}
+            >
               <input
                 type="email"
                 className={inputClass}
@@ -549,7 +568,7 @@ export function NominationForm({
                 onChange={(e) => set("nomineeEmail", e.target.value)}
               />
             </Field>
-            <Field label="Nominee phone" error={errors.nomineePhone}>
+            <Field label="Nominee phone" required error={errors.nomineePhone}>
               <input
                 type="tel"
                 className={inputClass}

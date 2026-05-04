@@ -6,7 +6,8 @@ export class NominationResponseDto {
   categoryId!: string;
   submittedByUserId!: string | null;
   submitterName!: string;
-  submitterEmail!: string;
+  submitterEmail!: string | null;
+  submitterPhone!: string | null;
   nomineeName!: string;
   nomineeEmail!: string | null;
   nomineePhone!: string | null;
@@ -27,6 +28,7 @@ export class NominationResponseDto {
       submittedByUserId: nomination.submittedByUserId,
       submitterName: nomination.submitterName,
       submitterEmail: nomination.submitterEmail,
+      submitterPhone: nomination.submitterPhone,
       nomineeName: nomination.nomineeName,
       nomineeEmail: nomination.nomineeEmail,
       nomineePhone: nomination.nomineePhone,

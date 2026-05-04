@@ -25,6 +25,21 @@ export type ContestantWelcomePayload = {
   magicLinkUrl: string;
 };
 
+export type VoteConfirmationPayload = {
+  recipientEmail: string;
+  recipientName: string;
+  eventId: string;
+  eventName: string;
+  contestantName: string;
+  contestantCode: string;
+  categoryName: string;
+  quantity: number;
+  amountMinor: number;
+  currency: string;
+  isFree: boolean;
+  votedAt: Date;
+};
+
 export interface NotificationsService {
   sendEventPendingApprovalEmail(
     payload: EventNotificationPayload,
@@ -38,4 +53,5 @@ export interface NotificationsService {
     payload: NominationReceivedPayload,
   ): Promise<void>;
   sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void>;
+  sendVoteConfirmationEmail(payload: VoteConfirmationPayload): Promise<void>;
 }

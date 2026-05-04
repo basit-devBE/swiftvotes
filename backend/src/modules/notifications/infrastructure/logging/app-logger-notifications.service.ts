@@ -6,6 +6,7 @@ import {
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
+  VoteConfirmationPayload,
 } from "../../application/ports/notifications.service";
 
 @Injectable()
@@ -60,6 +61,16 @@ export class AppLoggerNotificationsService implements NotificationsService {
   async sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void> {
     this.logger.log(
       `Contestant welcome email queued for ${payload.recipientEmail} — code: ${payload.contestantCode}, event: ${payload.eventName}`,
+      "Notifications",
+    );
+  }
+
+  async sendVoteConfirmationEmail(payload: VoteConfirmationPayload): Promise<void> {
+    const amount = payload.isFree
+      ? "Free"
+      : `${payload.currency} ${(payload.amountMinor / 100).toFixed(2)}`;
+    this.logger.log(
+      `Vote confirmation email queued for ${payload.recipientEmail} — ${payload.quantity} vote(s) for ${payload.contestantName} (${payload.contestantCode}), event ${payload.eventName}, amount ${amount}`,
       "Notifications",
     );
   }

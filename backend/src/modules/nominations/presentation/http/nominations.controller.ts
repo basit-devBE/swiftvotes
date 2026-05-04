@@ -36,6 +36,7 @@ export class NominationsController {
       categoryId: body.categoryId,
       submitterName: body.submitterName,
       submitterEmail: body.submitterEmail,
+      submitterPhone: body.submitterPhone,
       nomineeName: body.nomineeName,
       nomineeEmail: body.nomineeEmail,
       nomineePhone: body.nomineePhone,

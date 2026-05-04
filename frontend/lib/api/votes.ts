@@ -3,6 +3,7 @@ import {
   CastVoteInput,
   CastVoteResponse,
   LeaderboardCategory,
+  VerifyVoteResponse,
 } from "./types";
 
 export function castVote(
@@ -13,6 +14,16 @@ export function castVote(
     method: "POST",
     body: input,
   });
+}
+
+export function verifyVote(
+  eventId: string,
+  reference: string,
+): Promise<VerifyVoteResponse> {
+  const qs = new URLSearchParams({ reference }).toString();
+  return apiRequest<VerifyVoteResponse>(
+    `/events/${eventId}/votes/verify?${qs}`,
+  );
 }
 
 export function getLeaderboard(

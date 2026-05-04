@@ -130,7 +130,8 @@ export type NominationResponse = {
   categoryId: string;
   submittedByUserId: string | null;
   submitterName: string;
-  submitterEmail: string;
+  submitterEmail: string | null;
+  submitterPhone: string | null;
   nomineeName: string;
   nomineeEmail: string | null;
   nomineePhone: string | null;
@@ -151,10 +152,11 @@ export type RejectNominationInput = {
 export type SubmitNominationInput = {
   categoryId: string;
   submitterName: string;
-  submitterEmail: string;
+  submitterEmail?: string;
+  submitterPhone: string;
   nomineeName: string;
   nomineeEmail?: string;
-  nomineePhone?: string;
+  nomineePhone: string;
   nomineeImageUrl?: string;
   nomineeImageKey?: string;
 };
@@ -212,7 +214,20 @@ export type CastVoteResponse = {
   quantity: number;
   amountMinor: number;
   currency: string;
+  reference: string | null;
   paymentUrl: string | null;
+};
+
+export type VerifyVoteResponse = {
+  voteId: string;
+  status: VoteStatus;
+  eventId: string;
+  contestantId: string;
+  categoryId: string;
+  quantity: number;
+  amountMinor: number;
+  currency: string;
+  reference: string | null;
 };
 
 export type LeaderboardEntry = {

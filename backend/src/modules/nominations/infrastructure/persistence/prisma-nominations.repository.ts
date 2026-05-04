@@ -18,10 +18,11 @@ export class PrismaNominationsRepository implements NominationsRepository {
     categoryId: string;
     submittedByUserId?: string | null;
     submitterName: string;
-    submitterEmail: string;
+    submitterEmail?: string | null;
+    submitterPhone: string;
     nomineeName: string;
     nomineeEmail?: string | null;
-    nomineePhone?: string | null;
+    nomineePhone: string;
     nomineeImageUrl?: string | null;
     nomineeImageKey?: string | null;
   }): Promise<Nomination> {
@@ -31,10 +32,11 @@ export class PrismaNominationsRepository implements NominationsRepository {
         categoryId: input.categoryId,
         submittedByUserId: input.submittedByUserId ?? null,
         submitterName: input.submitterName,
-        submitterEmail: input.submitterEmail.trim().toLowerCase(),
+        submitterEmail: input.submitterEmail?.trim().toLowerCase() ?? null,
+        submitterPhone: input.submitterPhone,
         nomineeName: input.nomineeName,
         nomineeEmail: input.nomineeEmail?.trim().toLowerCase() ?? null,
-        nomineePhone: input.nomineePhone ?? null,
+        nomineePhone: input.nomineePhone,
         nomineeImageUrl: input.nomineeImageUrl ?? null,
         nomineeImageKey: input.nomineeImageKey ?? null,
       },
@@ -87,6 +89,7 @@ export class PrismaNominationsRepository implements NominationsRepository {
       submittedByUserId: nomination.submittedByUserId,
       submitterName: nomination.submitterName,
       submitterEmail: nomination.submitterEmail,
+      submitterPhone: nomination.submitterPhone,
       nomineeName: nomination.nomineeName,
       nomineeEmail: nomination.nomineeEmail,
       nomineePhone: nomination.nomineePhone,
