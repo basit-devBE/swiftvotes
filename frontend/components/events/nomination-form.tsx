@@ -338,6 +338,7 @@ type FormErrors = Partial<Record<keyof FormState, string>>;
 function validate(form: FormState): FormErrors {
   const errors: FormErrors = {};
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRe = /^\d{10}$/;
 
   if (!form.categoryId) errors.categoryId = "Please select a category.";
   if (!form.submitterName.trim()) errors.submitterName = "Your name is required.";
@@ -346,6 +347,8 @@ function validate(form: FormState): FormErrors {
   }
   if (!form.submitterPhone.trim()) {
     errors.submitterPhone = "Your phone number is required.";
+  } else if (!phoneRe.test(form.submitterPhone.trim())) {
+    errors.submitterPhone = "Enter a 10-digit phone number, e.g. 0257323294.";
   }
   if (!form.nomineeName.trim()) errors.nomineeName = "Nominee name is required.";
   if (form.nomineeEmail && !emailRe.test(form.nomineeEmail.trim())) {
@@ -353,6 +356,8 @@ function validate(form: FormState): FormErrors {
   }
   if (!form.nomineePhone.trim()) {
     errors.nomineePhone = "Nominee phone number is required.";
+  } else if (!phoneRe.test(form.nomineePhone.trim())) {
+    errors.nomineePhone = "Enter a 10-digit phone number, e.g. 0257323294.";
   }
   return errors;
 }
@@ -513,8 +518,11 @@ export function NominationForm({
             <Field label="Your phone" required error={errors.submitterPhone}>
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
                 className={inputClass}
-                placeholder="+1 555 000 0000"
+                placeholder="0257323294"
                 value={form.submitterPhone}
                 onChange={(e) => set("submitterPhone", e.target.value)}
               />
@@ -571,8 +579,11 @@ export function NominationForm({
             <Field label="Nominee phone" required error={errors.nomineePhone}>
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
                 className={inputClass}
-                placeholder="+1 555 000 0000"
+                placeholder="0257323294"
                 value={form.nomineePhone}
                 onChange={(e) => set("nomineePhone", e.target.value)}
               />

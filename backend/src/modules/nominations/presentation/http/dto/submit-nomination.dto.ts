@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   MaxLength,
 } from "class-validator";
 
@@ -22,6 +23,9 @@ export class SubmitNominationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
+  @Matches(/^\d{10}$/, {
+    message: "submitterPhone must be a 10-digit phone number.",
+  })
   submitterPhone!: string;
 
   @IsString()
@@ -35,6 +39,9 @@ export class SubmitNominationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
+  @Matches(/^\d{10}$/, {
+    message: "nomineePhone must be a 10-digit phone number.",
+  })
   nomineePhone!: string;
 
   @IsOptional()
