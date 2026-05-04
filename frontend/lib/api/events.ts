@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 import {
   ContestantCredentialsResponse,
   ContestantResponse,
+  ConfirmNominationInput,
   CreateEventCategoryInput,
   CreateEventInput,
   EventCategoryResponse,
@@ -114,10 +115,11 @@ export function listNominations(eventId: string): Promise<NominationResponse[]> 
 export function confirmNomination(
   eventId: string,
   nominationId: string,
+  input: ConfirmNominationInput = {},
 ): Promise<NominationResponse> {
   return apiRequest<NominationResponse>(
     `/events/${eventId}/nominations/${nominationId}/confirm`,
-    { method: "POST" },
+    { method: "POST", body: input },
   );
 }
 

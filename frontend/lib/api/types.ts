@@ -149,6 +149,10 @@ export type RejectNominationInput = {
   reason: string;
 };
 
+export type ConfirmNominationInput = {
+  nomineeEmail?: string;
+};
+
 export type SubmitNominationInput = {
   categoryId: string;
   submitterName: string;

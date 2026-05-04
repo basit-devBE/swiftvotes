@@ -9,6 +9,7 @@ import { ConfirmNominationUseCase } from "../../application/use-cases/confirm-no
 import { ListNominationsUseCase } from "../../application/use-cases/list-nominations.use-case";
 import { RejectNominationUseCase } from "../../application/use-cases/reject-nomination.use-case";
 import { SubmitNominationUseCase } from "../../application/use-cases/submit-nomination.use-case";
+import { ConfirmNominationDto } from "./dto/confirm-nomination.dto";
 import { RejectNominationDto } from "./dto/reject-nomination.dto";
 import { SubmitNominationDto } from "./dto/submit-nomination.dto";
 import { NominationResponseDto } from "./responses/nomination.response.dto";
@@ -63,10 +64,12 @@ export class NominationsController {
   async confirmNomination(
     @Param("nominationId") nominationId: string,
     @CurrentUser() currentUser: AuthenticatedRequestUser,
+    @Body() body: ConfirmNominationDto,
   ): Promise<NominationResponseDto> {
     const nomination = await this.confirmNominationUseCase.execute({
       nominationId,
       reviewerUserId: currentUser.id,
+      nomineeEmail: body.nomineeEmail,
     });
 
     return NominationResponseDto.fromDomain(nomination);
