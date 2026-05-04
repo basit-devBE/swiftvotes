@@ -8,8 +8,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigType } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
 
 import { appConfig } from "../../../../core/config/app.config";
+import { PrismaService } from "../../../../core/prisma/prisma.service";
 import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
 import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
@@ -20,7 +22,8 @@ import { NotificationsService } from "../../../notifications/application/ports/n
 import { PaystackService } from "../../infrastructure/payments/paystack.service";
 import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
-import { VOTES_REPOSITORY } from "../votes.tokens";
+import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "../votes.tokens";
+import { PaymentsRepository } from "../ports/payments.repository";
 import { VotesRepository } from "../ports/votes.repository";
 
 const FREE_VOTE_COOLDOWN_MS = 60 * 60 * 1000;
@@ -52,6 +55,8 @@ export class CastVoteUseCase {
   constructor(
     @Inject(VOTES_REPOSITORY)
     private readonly votesRepository: VotesRepository,
+    @Inject(PAYMENTS_REPOSITORY)
+    private readonly paymentsRepository: PaymentsRepository,
     @Inject(EVENTS_REPOSITORY)
     private readonly eventsRepository: EventsRepository,
     @Inject(CONTESTANTS_REPOSITORY)
@@ -61,6 +66,7 @@ export class CastVoteUseCase {
     @Inject(appConfig.KEY)
     private readonly app: ConfigType<typeof appConfig>,
     private readonly paystack: PaystackService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(input: CastVoteInput): Promise<CastVoteResult> {
@@ -147,7 +153,8 @@ export class CastVoteUseCase {
       return { type: "free", vote };
     }
 
-    // Paid path — initialize a Paystack transaction and create a PENDING_PAYMENT vote.
+    // Paid path — initialize a Paystack transaction, then create a Payment + Vote
+    // pair atomically so both rows always exist together.
     const amountMinor = input.quantity * category.votePriceMinor;
     const callbackUrl = this.buildCallbackUrl({
       origin: input.callbackOrigin,
@@ -168,18 +175,49 @@ export class CastVoteUseCase {
       },
     });
 
-    const vote = await this.votesRepository.create({
-      eventId: event.id,
-      categoryId: category.id,
-      contestantId: contestant.id,
-      voterName,
-      voterEmail,
-      quantity: input.quantity,
-      amountMinor,
-      currency: category.currency,
-      status: VoteStatus.PENDING_PAYMENT,
-      transactionRef: init.reference,
-      ipAddress: input.ipAddress ?? null,
+    const rawInitResponse: Prisma.InputJsonValue = {
+      reference: init.reference,
+      authorizationUrl: init.authorizationUrl,
+      accessCode: init.accessCode,
+    };
+
+    const vote = await this.prisma.$transaction(async (tx) => {
+      const payment = await this.paymentsRepository.createPending(
+        {
+          reference: init.reference,
+          amountMinor,
+          currency: category.currency,
+          voterEmail,
+          voterName,
+          customerIp: input.ipAddress ?? null,
+          eventId: event.id,
+          categoryId: category.id,
+          contestantId: contestant.id,
+          rawInitResponse,
+        },
+        tx,
+      );
+
+      const createdVote = await this.votesRepository.create(
+        {
+          eventId: event.id,
+          categoryId: category.id,
+          contestantId: contestant.id,
+          voterName,
+          voterEmail,
+          quantity: input.quantity,
+          amountMinor,
+          currency: category.currency,
+          status: VoteStatus.PENDING_PAYMENT,
+          transactionRef: init.reference,
+          ipAddress: input.ipAddress ?? null,
+        },
+        tx,
+      );
+
+      await this.paymentsRepository.linkVote(payment.id, createdVote.id, tx);
+
+      return createdVote;
     });
 
     return {

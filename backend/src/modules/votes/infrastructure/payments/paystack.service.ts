@@ -30,9 +30,16 @@ export type VerifyTransactionStatus = "success" | "failed" | "abandoned" | "pend
 export type VerifyTransactionResult = {
   status: VerifyTransactionStatus;
   reference: string;
+  providerRef: string | null;
   amount: number;
+  fees: number | null;
   currency: string;
   paidAt: string | null;
+  channel: string | null;
+  cardLast4: string | null;
+  mobileNumber: string | null;
+  gatewayResponse: string | null;
+  raw: Record<string, unknown>;
 };
 
 type PaystackInitializeResponse = {
@@ -49,12 +56,20 @@ type PaystackVerifyResponse = {
   status: boolean;
   message: string;
   data?: {
+    id?: number;
     status: string;
     reference: string;
     amount: number;
+    fees?: number | null;
     currency: string;
     paid_at: string | null;
-  };
+    channel?: string | null;
+    gateway_response?: string | null;
+    authorization?: {
+      last4?: string | null;
+      mobile_money_number?: string | null;
+    } | null;
+  } & Record<string, unknown>;
 };
 
 @Injectable()
@@ -188,12 +203,20 @@ export class PaystackService {
       "paystack verify success",
     );
 
+    const data = json.data;
     return {
       status,
-      reference: json.data.reference,
-      amount: json.data.amount,
-      currency: json.data.currency,
-      paidAt: json.data.paid_at,
+      reference: data.reference,
+      providerRef: data.id != null ? String(data.id) : null,
+      amount: data.amount,
+      fees: data.fees ?? null,
+      currency: data.currency,
+      paidAt: data.paid_at,
+      channel: data.channel ?? null,
+      cardLast4: data.authorization?.last4 ?? null,
+      mobileNumber: data.authorization?.mobile_money_number ?? null,
+      gatewayResponse: data.gateway_response ?? null,
+      raw: data as Record<string, unknown>,
     };
   }
 

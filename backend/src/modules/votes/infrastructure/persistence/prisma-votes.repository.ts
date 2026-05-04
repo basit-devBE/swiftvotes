@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Vote as PrismaVote } from "@prisma/client";
+import { Prisma, Vote as PrismaVote } from "@prisma/client";
 
 import { PrismaService } from "../../../../core/prisma/prisma.service";
 import { VoteStatus } from "../../domain/vote-status";
@@ -16,8 +16,12 @@ const COUNTABLE_STATUSES: VoteStatus[] = [VoteStatus.FREE, VoteStatus.CONFIRMED]
 export class PrismaVotesRepository implements VotesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateVoteInput): Promise<Vote> {
-    const vote = await this.prisma.vote.create({
+  async create(
+    input: CreateVoteInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Vote> {
+    const client = tx ?? this.prisma;
+    const vote = await client.vote.create({
       data: {
         eventId: input.eventId,
         categoryId: input.categoryId,
@@ -51,8 +55,10 @@ export class PrismaVotesRepository implements VotesRepository {
     voteId: string,
     status: VoteStatus,
     transactionRef?: string | null,
+    tx?: Prisma.TransactionClient,
   ): Promise<Vote> {
-    const vote = await this.prisma.vote.update({
+    const client = tx ?? this.prisma;
+    const vote = await client.vote.update({
       where: { id: voteId },
       data: {
         status,
