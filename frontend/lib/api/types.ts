@@ -207,6 +207,7 @@ export type CastVoteInput = {
   quantity: number;
   voterName: string;
   voterEmail: string;
+  callbackOrigin?: string;
 };
 
 export type VoteStatus = "FREE" | "PENDING_PAYMENT" | "CONFIRMED" | "FAILED";

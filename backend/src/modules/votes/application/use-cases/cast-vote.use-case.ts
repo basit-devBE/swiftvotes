@@ -31,6 +31,7 @@ export type CastVoteInput = {
   quantity: number;
   voterName: string;
   voterEmail: string;
+  callbackOrigin?: string;
   ipAddress?: string | null;
 };
 
@@ -148,7 +149,10 @@ export class CastVoteUseCase {
 
     // Paid path — initialize a Paystack transaction and create a PENDING_PAYMENT vote.
     const amountMinor = input.quantity * category.votePriceMinor;
-    const callbackUrl = `${this.app.frontendOrigin}/vote/callback?eventId=${encodeURIComponent(event.id)}`;
+    const callbackUrl = this.buildCallbackUrl({
+      origin: input.callbackOrigin,
+      eventId: event.id,
+    });
 
     const init = await this.paystack.initializeTransaction({
       email: voterEmail,
@@ -187,5 +191,15 @@ export class CastVoteUseCase {
       amountMinor: vote.amountMinor,
       currency: vote.currency,
     };
+  }
+
+  private buildCallbackUrl(input: {
+    origin?: string;
+    eventId: string;
+  }): string {
+    const origin = input.origin?.trim() || this.app.frontendOrigin;
+    const url = new URL("/vote/callback", origin);
+    url.searchParams.set("eventId", input.eventId);
+    return url.toString();
   }
 }
