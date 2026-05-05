@@ -248,6 +248,9 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   const [contestantsCanViewLeaderboard, setContestantsCanViewLeaderboard] = useState(
     initialEvent?.contestantsCanViewLeaderboard ?? false,
   );
+  const [publicCanViewLeaderboard, setPublicCanViewLeaderboard] = useState(
+    initialEvent?.publicCanViewLeaderboard ?? true,
+  );
 
   const [categories, setCategories] = useState<EditableCategory[]>(
     initialEvent?.categories.length
@@ -437,6 +440,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         votingEndAt: votingEndDate.toISOString(),
         contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard,
+        publicCanViewLeaderboard,
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
@@ -796,10 +800,10 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                 {/* Visibility settings */}
                 <div className="mt-6 rounded-2xl border border-[#e8edf6] bg-[#f7f9fc] p-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#07111f]/50">
-                    Contestant visibility
+                    Visibility controls
                   </p>
                   <p className="mt-1 text-[13px] leading-5 text-[#07111f]/50">
-                    Control what contestants can see while voting is live.
+                    Control what contestants and public visitors can see while voting is live.
                   </p>
                   <div className="mt-4 space-y-3">
                     <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${contestantsCanViewOwnVotes ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
@@ -834,6 +838,24 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                         </p>
                         <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
                           All contestants can view total vote counts for every other contestant.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${publicCanViewLeaderboard ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0f4cdb]"
+                        checked={publicCanViewLeaderboard}
+                        onChange={(e) => setPublicCanViewLeaderboard(e.target.checked)}
+                        disabled={!isEditable}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#07111f]">
+                          Public can see the event leaderboard
+                        </p>
+                        <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
+                          Visitors on the public event page can view live vote totals.
                         </p>
                       </div>
                     </label>

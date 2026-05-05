@@ -25,6 +25,7 @@ export type UpdateEventInput = {
   votingEndAt?: Date;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
 };
 
 @Injectable()

@@ -102,6 +102,7 @@ model Event {
   votingEndAt                   DateTime
   contestantsCanViewOwnVotes    Boolean     @default(false)
   contestantsCanViewLeaderboard Boolean     @default(false)
+  publicCanViewLeaderboard      Boolean     @default(true)
   submittedAt                   DateTime?
   approvedAt                    DateTime?
   approvedByUserId              String?

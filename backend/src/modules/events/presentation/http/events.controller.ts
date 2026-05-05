@@ -92,6 +92,7 @@ export class EventsController {
       votingEndAt: new Date(body.votingEndAt),
       contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes ?? false,
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard ?? false,
+      publicCanViewLeaderboard: body.publicCanViewLeaderboard ?? true,
       categories: body.categories.map((category) => ({
         ...category,
         currency: category.currency.trim().toUpperCase(),
@@ -190,6 +191,7 @@ export class EventsController {
       votingEndAt: body.votingEndAt ? new Date(body.votingEndAt) : undefined,
       contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
+      publicCanViewLeaderboard: body.publicCanViewLeaderboard,
     });
 
     return EventResponseDto.fromDomain(event);
@@ -205,6 +207,7 @@ export class EventsController {
       eventId,
       contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
+      publicCanViewLeaderboard: body.publicCanViewLeaderboard,
     });
     return EventResponseDto.fromDomain(event);
   }

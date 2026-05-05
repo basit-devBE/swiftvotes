@@ -40,42 +40,49 @@ export function VoteCallbackView() {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
-    if (!eventId || !reference) {
-      setState({ kind: "missing-params" });
-      return;
-    }
-
     let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 4;
 
-    async function poll() {
-      attempts += 1;
-      try {
-        const result = await verifyVote(eventId!, reference!);
-        if (cancelled) return;
-
-        if (result.status === "PENDING_PAYMENT" && attempts < maxAttempts) {
-          // Paystack may still be propagating — wait a bit and try again.
-          setTimeout(() => {
-            if (!cancelled) void poll();
-          }, 2000);
-          return;
-        }
-
-        setState({ kind: "result", vote: result });
-      } catch (err) {
-        if (cancelled) return;
-        const message =
-          err instanceof ApiClientError
-            ? err.message
-            : "Could not verify your payment. Please contact support if you were charged.";
-        setState({ kind: "error", message });
+    async function verifyPayment() {
+      if (!eventId || !reference) {
+        setState({ kind: "missing-params" });
+        return;
       }
+
+      const safeEventId = eventId;
+      const safeReference = reference;
+      let attempts = 0;
+      const maxAttempts = 4;
+
+      async function poll() {
+        attempts += 1;
+        try {
+          const result = await verifyVote(safeEventId, safeReference);
+          if (cancelled) return;
+
+          if (result.status === "PENDING_PAYMENT" && attempts < maxAttempts) {
+            // Paystack may still be propagating — wait a bit and try again.
+            setTimeout(() => {
+              if (!cancelled) void poll();
+            }, 2000);
+            return;
+          }
+
+          setState({ kind: "result", vote: result });
+        } catch (err) {
+          if (cancelled) return;
+          const message =
+            err instanceof ApiClientError
+              ? err.message
+              : "Could not verify your payment. Please contact support if you were charged.";
+          setState({ kind: "error", message });
+        }
+      }
+
+      setState({ kind: "loading" });
+      await poll();
     }
 
-    setState({ kind: "loading" });
-    void poll();
+    void verifyPayment();
 
     return () => { cancelled = true; };
   }, [eventId, reference]);

@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PinoLogger } from "nestjs-pino";
 
@@ -9,7 +14,11 @@ import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifications.tokens";
 import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
-import { PaystackService } from "../../infrastructure/payments/paystack.service";
+import {
+  PaystackService,
+  VerifyTransactionResult,
+} from "../../infrastructure/payments/paystack.service";
+import { Payment } from "../../domain/payment";
 import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
 import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "../votes.tokens";
@@ -63,10 +72,56 @@ export class ConfirmVoteUseCase {
       return { vote, alreadyResolved: true };
     }
 
+    const payment = await this.paymentsRepository.findByReference(reference);
+    if (!payment) {
+      throw new NotFoundException("No payment found for this reference.");
+    }
+
     const verification = await this.paystack.verifyTransaction(reference);
     const rawVerifyResponse = verification.raw as Prisma.InputJsonValue;
 
     if (verification.status === "success") {
+      const mismatchReason = this.getVerificationMismatchReason({
+        reference,
+        payment,
+        vote,
+        verification,
+      });
+      if (mismatchReason) {
+        const updated = await this.prisma.$transaction(async (tx) => {
+          await this.paymentsRepository.markFailed(
+            {
+              reference,
+              providerRef: verification.providerRef,
+              failureReason: mismatchReason,
+              failedAt: new Date(),
+              rawVerifyResponse,
+            },
+            tx,
+          );
+          return this.votesRepository.updateStatus(
+            vote.id,
+            VoteStatus.FAILED,
+            undefined,
+            tx,
+          );
+        });
+        this.logger.warn(
+          {
+            scope: "votes",
+            op: "confirm",
+            reference,
+            voteId: updated.id,
+            decision: "failed",
+            reason: mismatchReason,
+          },
+          "payment verification did not match local record",
+        );
+        throw new ConflictException(
+          "Payment verification did not match the local payment record.",
+        );
+      }
+
       const updated = await this.prisma.$transaction(async (tx) => {
         await this.paymentsRepository.markSucceeded(
           {
@@ -173,6 +228,36 @@ export class ConfirmVoteUseCase {
       { scope: "votes", op: "mark-failed", reference, voteId: vote.id },
       "vote marked failed via webhook",
     );
+  }
+
+  private getVerificationMismatchReason(input: {
+    reference: string;
+    payment: Payment;
+    vote: Vote;
+    verification: VerifyTransactionResult;
+  }): string | null {
+    if (input.verification.reference !== input.reference) {
+      return "paystack:reference-mismatch";
+    }
+    if (input.payment.amountMinor !== input.verification.amount) {
+      return "paystack:payment-amount-mismatch";
+    }
+    if (input.vote.amountMinor !== input.verification.amount) {
+      return "paystack:vote-amount-mismatch";
+    }
+    if (
+      input.payment.currency.toUpperCase() !==
+      input.verification.currency.toUpperCase()
+    ) {
+      return "paystack:payment-currency-mismatch";
+    }
+    if (
+      input.vote.currency.toUpperCase() !==
+      input.verification.currency.toUpperCase()
+    ) {
+      return "paystack:vote-currency-mismatch";
+    }
+    return null;
   }
 
   private async dispatchConfirmationEmail(vote: Vote): Promise<void> {

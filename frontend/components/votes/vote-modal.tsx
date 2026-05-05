@@ -50,6 +50,7 @@ export function VoteModal({
 }: Props) {
   const { user } = useAuth();
   const [quantity, setQuantity] = useState<number>(1);
+  const [customQuantity, setCustomQuantity] = useState<string>("");
   const [voterName, setVoterName] = useState<string>(user?.fullName ?? "");
   const [voterEmail, setVoterEmail] = useState<string>(user?.email ?? "");
   const [step, setStep] = useState<Step>("form");
@@ -241,9 +242,12 @@ export function VoteModal({
                       <button
                         key={preset}
                         type="button"
-                        onClick={() => setQuantity(preset)}
+                        onClick={() => {
+                          setQuantity(preset);
+                          setCustomQuantity("");
+                        }}
                         className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                          quantity === preset
+                          customQuantity === "" && quantity === preset
                             ? "bg-primary text-white shadow-[0_4px_14px_-4px_rgba(15,76,219,0.5)]"
                             : "border border-[#d6deeb] bg-white text-ink/70 hover:border-primary/40 hover:text-primary"
                         }`}
@@ -252,15 +256,19 @@ export function VoteModal({
                       </button>
                     ))}
                     <input
-                      type="number"
-                      min={1}
-                      value={QUANTITY_PRESETS.includes(quantity) ? "" : quantity}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={customQuantity}
                       onChange={(e) => {
-                        const n = Number.parseInt(e.target.value, 10);
-                        if (Number.isFinite(n) && n >= 1) setQuantity(n);
+                        const raw = e.target.value.replace(/\D/g, "");
+                        setCustomQuantity(raw);
+                        const n = Number.parseInt(raw, 10);
+                        setQuantity(Number.isFinite(n) && n >= 1 ? n : 1);
                       }}
                       placeholder="Custom"
-                      className="w-24 rounded-full border border-[#d6deeb] bg-white px-3 py-1.5 text-center text-sm text-ink outline-none placeholder:text-ink/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                      aria-label="Custom number of votes"
+                      className="w-28 rounded-full border border-[#d6deeb] bg-white px-3 py-1.5 text-center text-sm text-ink outline-none placeholder:text-ink/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
                     />
                   </div>
                   <p className="mt-3 rounded-xl bg-[#f7f9fc] px-4 py-3 text-sm text-ink/70">

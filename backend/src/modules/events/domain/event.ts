@@ -18,6 +18,7 @@ export type Event = {
   votingEndAt: Date;
   contestantsCanViewOwnVotes: boolean;
   contestantsCanViewLeaderboard: boolean;
+  publicCanViewLeaderboard: boolean;
   submittedAt: Date | null;
   approvedAt: Date | null;
   approvedByUserId: string | null;

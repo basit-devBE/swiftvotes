@@ -251,7 +251,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
   const votingLive = event.status === "VOTING_LIVE";
 
   const showLeaderboard =
-    event.contestantsCanViewLeaderboard &&
+    event.publicCanViewLeaderboard &&
     (event.status === "VOTING_LIVE" ||
       event.status === "VOTING_CLOSED" ||
       event.status === "ARCHIVED");

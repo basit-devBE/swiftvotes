@@ -55,6 +55,9 @@ export class HandlePaystackWebhookUseCase {
 
     const eventType = payload.event ?? "unknown";
     const reference = payload.data?.reference ?? "";
+    const payment = reference
+      ? await this.paymentsRepository.findByReference(reference)
+      : null;
 
     // Step 3 — append-only audit log. Best-effort: do not let a record failure
     // block webhook handling.
@@ -65,7 +68,7 @@ export class HandlePaystackWebhookUseCase {
         eventType,
         signatureValid,
         rawPayload: payload as unknown as Prisma.InputJsonValue,
-        paymentId: null,
+        paymentId: payment?.id ?? null,
       });
       webhookEventId = recorded.id;
     } catch (err) {

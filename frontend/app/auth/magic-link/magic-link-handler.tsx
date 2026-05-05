@@ -16,32 +16,34 @@ export function MagicLinkHandler() {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
+    let cancelled = false;
     const token = searchParams.get("token");
 
-    if (!token) {
-      setState("error");
-      setErrorMessage("No login token found in this URL.");
-      return;
-    }
+    async function verifyToken() {
+      if (!token) {
+        setState("error");
+        setErrorMessage("No login token found in this URL.");
+        return;
+      }
 
-    let cancelled = false;
-
-    magicLinkLogin(token)
-      .then((session) => {
+      try {
+        const session = await magicLinkLogin(token);
         if (cancelled) return;
         loginWithSession(session);
         setState("success");
         setTimeout(() => {
           router.replace("/my-events");
         }, 1200);
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (cancelled) return;
         setState("error");
         setErrorMessage(
           err instanceof Error ? err.message : "This link is invalid, expired, or has already been used.",
         );
-      });
+      }
+    }
+
+    void verifyToken();
 
     return () => {
       cancelled = true;

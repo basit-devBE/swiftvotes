@@ -20,6 +20,7 @@ export type CreateEventInput = {
   votingEndAt: Date;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
   categories: Array<{
     name: string;
     description: string;

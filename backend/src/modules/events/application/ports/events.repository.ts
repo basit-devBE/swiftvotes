@@ -27,6 +27,7 @@ export type CreateDraftEventRecord = {
   votingEndAt: Date;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
   categories: EventCategoryRecord[];
 };
 
@@ -43,6 +44,7 @@ export type UpdateDraftEventRecord = {
   votingEndAt?: Date;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
 };
 
 export interface EventsRepository {
@@ -55,7 +57,11 @@ export interface EventsRepository {
   findPendingApproval(): Promise<Event[]>;
   findLifecycleCandidates(): Promise<Event[]>;
   updateDraft(eventId: string, input: UpdateDraftEventRecord): Promise<Event>;
-  updateVisibility(eventId: string, input: { contestantsCanViewOwnVotes?: boolean; contestantsCanViewLeaderboard?: boolean }): Promise<Event>;
+  updateVisibility(eventId: string, input: {
+    contestantsCanViewOwnVotes?: boolean;
+    contestantsCanViewLeaderboard?: boolean;
+    publicCanViewLeaderboard?: boolean;
+  }): Promise<Event>;
   updateStatus(input: {
     eventId: string;
     status: EventStatus;

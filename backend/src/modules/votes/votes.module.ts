@@ -8,12 +8,16 @@ import { EventsModule } from "../events/events.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { CastVoteUseCase } from "./application/use-cases/cast-vote.use-case";
 import { ConfirmVoteUseCase } from "./application/use-cases/confirm-vote.use-case";
+import { GetEventVotesSummaryUseCase } from "./application/use-cases/get-event-votes-summary.use-case";
 import { GetLeaderboardUseCase } from "./application/use-cases/get-leaderboard.use-case";
+import { GetPaymentDetailUseCase } from "./application/use-cases/get-payment-detail.use-case";
 import { HandlePaystackWebhookUseCase } from "./application/use-cases/handle-paystack-webhook.use-case";
+import { ListEventPaymentsUseCase } from "./application/use-cases/list-event-payments.use-case";
 import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "./application/votes.tokens";
 import { PaystackService } from "./infrastructure/payments/paystack.service";
 import { PrismaPaymentsRepository } from "./infrastructure/persistence/prisma-payments.repository";
 import { PrismaVotesRepository } from "./infrastructure/persistence/prisma-votes.repository";
+import { PaymentsController } from "./presentation/http/payments.controller";
 import { VotesController } from "./presentation/http/votes.controller";
 import { PaymentWebhooksController } from "./presentation/http/webhooks.controller";
 
@@ -25,12 +29,15 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
     NotificationsModule,
     forwardRef(() => ContestantsModule),
   ],
-  controllers: [VotesController, PaymentWebhooksController],
+  controllers: [VotesController, PaymentWebhooksController, PaymentsController],
   providers: [
     CastVoteUseCase,
     ConfirmVoteUseCase,
     GetLeaderboardUseCase,
     HandlePaystackWebhookUseCase,
+    ListEventPaymentsUseCase,
+    GetPaymentDetailUseCase,
+    GetEventVotesSummaryUseCase,
     PaystackService,
     {
       provide: VOTES_REPOSITORY,

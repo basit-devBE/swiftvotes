@@ -20,6 +20,14 @@ export type ContestantWithContext = Contestant & {
   };
 };
 
+export type UpdateContestantDetailsRecord = {
+  categoryId?: string;
+  name?: string;
+  phone?: string | null;
+  imageUrl?: string | null;
+  imageKey?: string | null;
+};
+
 export interface ContestantsRepository {
   createFromNomination(input: {
     eventId: string;
@@ -35,6 +43,10 @@ export interface ContestantsRepository {
   findByEvent(eventId: string): Promise<Contestant[]>;
   findByEventAndCategory(eventId: string, categoryId: string): Promise<Contestant[]>;
   findById(contestantId: string): Promise<Contestant | null>;
+  updateDetails(
+    contestantId: string,
+    input: UpdateContestantDetailsRecord,
+  ): Promise<Contestant>;
   updateUserId(contestantId: string, userId: string): Promise<Contestant>;
   findWithContextByUserId(userId: string): Promise<ContestantWithContext[]>;
 }
