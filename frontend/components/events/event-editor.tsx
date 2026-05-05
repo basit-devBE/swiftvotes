@@ -37,6 +37,8 @@ type EventEditorProps = {
 
 type StepKey = "basics" | "schedule" | "media" | "categories" | "review";
 
+const MIN_PAID_VOTE_PRICE_MINOR = 50;
+
 const STEPS: { key: StepKey; title: string; subtitle: string; description: string }[] = [
   {
     key: "basics",
@@ -82,13 +84,24 @@ function toIsoOrUndefined(value: string): string | undefined {
   return value ? new Date(value).toISOString() : undefined;
 }
 
-function formatPriceLabel(value: string, currency: string): string {
+function toVotePriceMinor(value: string): number {
   const numeric = Number.parseFloat(value || "0");
-  if (!Number.isFinite(numeric) || numeric <= 0) return "Free voting";
-  return `${currency || "GHS"} ${numeric.toLocaleString(undefined, {
+  if (!Number.isFinite(numeric)) return Number.NaN;
+  return Math.round(numeric * 100);
+}
+
+function formatPriceLabel(value: string, currency: string): string {
+  const minor = toVotePriceMinor(value);
+  if (!Number.isFinite(minor)) return "Enter a GHS amount";
+  if (minor < 0) return "Price cannot be below 0";
+  if (minor === 0) return "Free voting (0 pesewas)";
+  if (minor < MIN_PAID_VOTE_PRICE_MINOR) {
+    return `Below paid minimum: ${currency || "GHS"} 0.50 = 50 pesewas`;
+  }
+  return `${currency || "GHS"} ${(minor / 100).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  })} = ${minor} pesewas`;
 }
 
 function formatStatusLabel(status?: string): string {
@@ -424,6 +437,24 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       return;
     }
 
+    const invalidPriceCategory = categories.find((category) => {
+      const minor = toVotePriceMinor(category.votePrice);
+      return (
+        !Number.isFinite(minor) ||
+        minor < 0 ||
+        (minor > 0 && minor < MIN_PAID_VOTE_PRICE_MINOR)
+      );
+    });
+
+    if (invalidPriceCategory) {
+      const label = invalidPriceCategory.name.trim() || "This category";
+      setError(
+        `${label}: use 0 for free voting, or at least GHS 0.50 for paid voting. GHS 0.50 is 50 pesewas.`,
+      );
+      setStepIndex(STEPS.findIndex((step) => step.key === "categories"));
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -444,7 +475,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
-          votePriceMinor: Math.round(Number.parseFloat(c.votePrice || "0") * 100),
+          votePriceMinor: toVotePriceMinor(c.votePrice),
           currency: c.currency.trim().toUpperCase(),
           sortOrder: i,
         })),
@@ -1050,7 +1081,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                               min="0"
                               step="0.01"
                               inputMode="decimal"
-                              placeholder="0.00"
+                              placeholder="0 or 0.50"
                               className={inputCls}
                               value={category.votePrice}
                               onChange={(e) => updateCategoryField(index, "votePrice", e.target.value)}

@@ -10,7 +10,10 @@ export class CreateEventCategoryDto {
   description!: string;
 
   @IsInt()
-  @Min(0)
+  @Min(0, {
+    message:
+      "votePriceMinor must be 0 for free voting or at least 50 for paid voting.",
+  })
   votePriceMinor!: number;
 
   @IsString()

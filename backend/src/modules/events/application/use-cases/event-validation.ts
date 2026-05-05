@@ -6,6 +6,20 @@ import {
   UpdateDraftEventRecord,
 } from "../ports/events.repository";
 
+export const MIN_PAID_VOTE_PRICE_MINOR = 50;
+
+export function assertValidVotePriceMinor(votePriceMinor: number): void {
+  if (votePriceMinor < 0) {
+    throw new BadRequestException("Category vote price cannot be below zero.");
+  }
+
+  if (votePriceMinor > 0 && votePriceMinor < MIN_PAID_VOTE_PRICE_MINOR) {
+    throw new BadRequestException(
+      "Paid category vote price must be at least GHS 0.50 (50 pesewas). Use 0 for free voting.",
+    );
+  }
+}
+
 function normalizeComparableDate(input: Date | null | undefined): number | null {
   return input ? input.getTime() : null;
 }
@@ -18,11 +32,7 @@ function ensureCategorySet(categories: EventCategoryRecord[]): void {
   const baseCurrency = categories[0].currency.trim().toUpperCase();
 
   for (const category of categories) {
-    if (category.votePriceMinor < 0) {
-      throw new BadRequestException(
-        "Category vote price cannot be below zero.",
-      );
-    }
+    assertValidVotePriceMinor(category.votePriceMinor);
 
     if (category.currency.trim().toUpperCase() !== baseCurrency) {
       throw new BadRequestException(
