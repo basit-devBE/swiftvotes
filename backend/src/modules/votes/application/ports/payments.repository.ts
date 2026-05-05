@@ -48,6 +48,63 @@ export type RecordWebhookEventInput = {
   paymentId?: string | null;
 };
 
+export type ListPaymentsFilters = {
+  status?: PaymentStatus;
+  from?: Date;
+  to?: Date;
+};
+
+export type ListPaymentsInput = {
+  eventId: string;
+  filters: ListPaymentsFilters;
+  page: number;
+  pageSize: number;
+};
+
+export type ListPaymentsResult = {
+  rows: Payment[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type PaymentWithContext = Payment & {
+  contestantName: string | null;
+  contestantCode: string | null;
+  categoryName: string | null;
+};
+
+export type PaymentDetail = {
+  payment: Payment;
+  webhookEvents: PaymentWebhookEvent[];
+};
+
+export type ChannelBreakdownEntry = {
+  channel: string;
+  count: number;
+  totalAmountMinor: number;
+};
+
+export type StatusBreakdownEntry = {
+  status: PaymentStatus;
+  count: number;
+};
+
+export type PaymentSummary = {
+  totalCount: number;
+  successCount: number;
+  pendingCount: number;
+  failedCount: number;
+  abandonedCount: number;
+  refundedCount: number;
+  grossMinor: number;
+  feesMinor: number;
+  netMinor: number;
+  currency: string | null;
+  byStatus: StatusBreakdownEntry[];
+  byChannel: ChannelBreakdownEntry[];
+};
+
 export interface PaymentsRepository {
   createPending(
     input: CreatePendingPaymentInput,
@@ -80,4 +137,10 @@ export interface PaymentsRepository {
 
   // Re-exposed for callers that need to know the current status without re-fetching.
   getStatus(reference: string): Promise<PaymentStatus | null>;
+
+  list(input: ListPaymentsInput): Promise<ListPaymentsResult>;
+
+  findDetailById(paymentId: string): Promise<PaymentDetail | null>;
+
+  summarize(eventId: string, filters?: ListPaymentsFilters): Promise<PaymentSummary>;
 }

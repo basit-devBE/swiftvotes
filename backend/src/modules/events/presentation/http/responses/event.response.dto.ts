@@ -18,6 +18,7 @@ export class EventResponseDto {
   votingEndAt!: Date;
   contestantsCanViewOwnVotes!: boolean;
   contestantsCanViewLeaderboard!: boolean;
+  publicCanViewLeaderboard!: boolean;
   submittedAt!: Date | null;
   approvedAt!: Date | null;
   approvedByUserId!: string | null;
@@ -46,6 +47,7 @@ export class EventResponseDto {
       votingEndAt: event.votingEndAt,
       contestantsCanViewOwnVotes: event.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: event.contestantsCanViewLeaderboard,
+      publicCanViewLeaderboard: event.publicCanViewLeaderboard,
       submittedAt: event.submittedAt,
       approvedAt: event.approvedAt,
       approvedByUserId: event.approvedByUserId,

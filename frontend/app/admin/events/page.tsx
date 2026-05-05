@@ -17,14 +17,24 @@ export default function AdminEventsPage() {
 
   useEffect(() => {
     if (tab === "all" && !loadedAll) {
-      setIsLoadingAll(true);
+      let cancelled = false;
 
-      listAllAdminEvents()
-        .then((events) => {
+      async function loadAllEvents() {
+        setIsLoadingAll(true);
+        try {
+          const events = await listAllAdminEvents();
+          if (cancelled) return;
           setAllEvents(events);
           setLoadedAll(true);
-        })
-        .finally(() => setIsLoadingAll(false));
+        } finally {
+          if (!cancelled) setIsLoadingAll(false);
+        }
+      }
+
+      void loadAllEvents();
+      return () => {
+        cancelled = true;
+      };
     }
   }, [tab, loadedAll]);
 

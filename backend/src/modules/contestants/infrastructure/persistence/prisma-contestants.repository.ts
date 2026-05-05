@@ -5,7 +5,11 @@ import { PrismaService } from "../../../../core/prisma/prisma.service";
 import { EventStatus } from "../../../events/domain/event-status";
 import { buildContestantCode } from "../../domain/build-contestant-code";
 import { Contestant } from "../../domain/contestant";
-import { ContestantsRepository, ContestantWithContext } from "../../application/ports/contestants.repository";
+import {
+  ContestantsRepository,
+  ContestantWithContext,
+  UpdateContestantDetailsRecord,
+} from "../../application/ports/contestants.repository";
 
 @Injectable()
 export class PrismaContestantsRepository implements ContestantsRepository {
@@ -74,6 +78,39 @@ export class PrismaContestantsRepository implements ContestantsRepository {
     });
 
     return contestant ? this.toDomain(contestant) : null;
+  }
+
+  async updateDetails(
+    contestantId: string,
+    input: UpdateContestantDetailsRecord,
+  ): Promise<Contestant> {
+    const contestant = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.contestant.update({
+        where: { id: contestantId },
+        data: {
+          categoryId: input.categoryId,
+          name: input.name,
+          phone: input.phone,
+          imageUrl: input.imageUrl,
+          imageKey: input.imageKey,
+        },
+      });
+
+      await tx.nomination.update({
+        where: { id: updated.nominationId },
+        data: {
+          categoryId: input.categoryId,
+          nomineeName: input.name,
+          nomineePhone: input.phone,
+          nomineeImageUrl: input.imageUrl,
+          nomineeImageKey: input.imageKey,
+        },
+      });
+
+      return updated;
+    });
+
+    return this.toDomain(contestant);
   }
 
   async updateUserId(contestantId: string, userId: string): Promise<Contestant> {

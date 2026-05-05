@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 
 import { EventRole } from "../../../access-control/domain/event-role";
 import { EventRoles } from "../../../access-control/presentation/http/decorators/event-roles.decorator";
@@ -7,6 +7,8 @@ import { GetContestantCredentialsUseCase } from "../../application/use-cases/get
 import { GetContestantUseCase } from "../../application/use-cases/get-contestant.use-case";
 import { ListContestantsUseCase } from "../../application/use-cases/list-contestants.use-case";
 import { RegenerateMagicLinkUseCase } from "../../application/use-cases/regenerate-magic-link.use-case";
+import { UpdateContestantUseCase } from "../../application/use-cases/update-contestant.use-case";
+import { UpdateContestantDto } from "./dto/update-contestant.dto";
 import { ContestantResponseDto } from "./responses/contestant.response.dto";
 
 @Controller({
@@ -19,6 +21,7 @@ export class ContestantsController {
     private readonly getContestantUseCase: GetContestantUseCase,
     private readonly getContestantCredentialsUseCase: GetContestantCredentialsUseCase,
     private readonly regenerateMagicLinkUseCase: RegenerateMagicLinkUseCase,
+    private readonly updateContestantUseCase: UpdateContestantUseCase,
   ) {}
 
   @Public()
@@ -37,6 +40,26 @@ export class ContestantsController {
     @Param("contestantId") contestantId: string,
   ): Promise<ContestantResponseDto> {
     const contestant = await this.getContestantUseCase.execute(contestantId);
+    return ContestantResponseDto.fromDomain(contestant);
+  }
+
+  @Patch(":contestantId")
+  @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
+  async updateContestant(
+    @Param("eventId") eventId: string,
+    @Param("contestantId") contestantId: string,
+    @Body() body: UpdateContestantDto,
+  ): Promise<ContestantResponseDto> {
+    const contestant = await this.updateContestantUseCase.execute({
+      eventId,
+      contestantId,
+      categoryId: body.categoryId,
+      name: body.name,
+      phone: body.phone,
+      imageUrl: body.imageUrl,
+      imageKey: body.imageKey,
+    });
+
     return ContestantResponseDto.fromDomain(contestant);
   }
 

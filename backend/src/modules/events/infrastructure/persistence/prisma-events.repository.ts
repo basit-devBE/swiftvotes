@@ -50,6 +50,7 @@ export class PrismaEventsRepository implements EventsRepository {
           votingEndAt: input.votingEndAt,
           contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes ?? false,
           contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard ?? false,
+          publicCanViewLeaderboard: input.publicCanViewLeaderboard ?? true,
           categories: {
             create: input.categories.map((category) => ({
               name: category.name,
@@ -183,6 +184,7 @@ export class PrismaEventsRepository implements EventsRepository {
         votingEndAt: input.votingEndAt,
         contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
+        publicCanViewLeaderboard: input.publicCanViewLeaderboard,
       },
       include: EVENT_INCLUDE,
     });
@@ -190,12 +192,17 @@ export class PrismaEventsRepository implements EventsRepository {
     return this.toDomainEvent(event);
   }
 
-  async updateVisibility(eventId: string, input: { contestantsCanViewOwnVotes?: boolean; contestantsCanViewLeaderboard?: boolean }): Promise<Event> {
+  async updateVisibility(eventId: string, input: {
+    contestantsCanViewOwnVotes?: boolean;
+    contestantsCanViewLeaderboard?: boolean;
+    publicCanViewLeaderboard?: boolean;
+  }): Promise<Event> {
     const event = await this.prisma.event.update({
       where: { id: eventId },
       data: {
         contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
+        publicCanViewLeaderboard: input.publicCanViewLeaderboard,
       },
       include: EVENT_INCLUDE,
     });
@@ -301,6 +308,7 @@ export class PrismaEventsRepository implements EventsRepository {
       votingEndAt: event.votingEndAt,
       contestantsCanViewOwnVotes: event.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: event.contestantsCanViewLeaderboard,
+      publicCanViewLeaderboard: event.publicCanViewLeaderboard,
       submittedAt: event.submittedAt,
       approvedAt: event.approvedAt,
       approvedByUserId: event.approvedByUserId,

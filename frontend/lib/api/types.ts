@@ -80,6 +80,7 @@ export type EventResponse = {
   votingEndAt: string;
   contestantsCanViewOwnVotes: boolean;
   contestantsCanViewLeaderboard: boolean;
+  publicCanViewLeaderboard: boolean;
   submittedAt: string | null;
   approvedAt: string | null;
   approvedByUserId: string | null;
@@ -114,12 +115,14 @@ export type CreateEventInput = {
   votingEndAt: string;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
   categories: CreateEventCategoryInput[];
 };
 
 export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">> & {
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
 };
 
 export type NominationStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
@@ -179,6 +182,14 @@ export type ContestantResponse = {
   imageKey: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type UpdateContestantInput = {
+  categoryId?: string;
+  name?: string;
+  phone?: string | null;
+  imageUrl?: string | null;
+  imageKey?: string | null;
 };
 
 export type ContestantCredentialsResponse = {
@@ -248,6 +259,99 @@ export type LeaderboardCategory = {
   categoryId: string;
   categoryName: string;
   contestants: LeaderboardEntry[];
+};
+
+export type PaymentStatus =
+  | "PENDING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "ABANDONED"
+  | "REFUNDED";
+
+export type PaymentResponse = {
+  id: string;
+  reference: string;
+  providerRef: string | null;
+  provider: string;
+  amountMinor: number;
+  amountPaidMinor: number | null;
+  feeMinor: number | null;
+  currency: string;
+  status: PaymentStatus;
+  initializedAt: string;
+  paidAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  voterEmail: string;
+  voterName: string | null;
+  channel: string | null;
+  cardLast4: string | null;
+  mobileNumber: string | null;
+  customerIp: string | null;
+  eventId: string;
+  categoryId: string;
+  categoryName: string | null;
+  contestantId: string;
+  contestantName: string | null;
+  contestantCode: string | null;
+  voteId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PaymentWebhookEventResponse = {
+  id: string;
+  eventType: string;
+  signatureValid: boolean;
+  receivedAt: string;
+  processed: boolean;
+  processedAt: string | null;
+};
+
+export type PaymentSummaryResponse = {
+  totalCount: number;
+  successCount: number;
+  pendingCount: number;
+  failedCount: number;
+  abandonedCount: number;
+  refundedCount: number;
+  grossMinor: number;
+  feesMinor: number;
+  netMinor: number;
+  currency: string | null;
+  byStatus: Array<{ status: PaymentStatus; count: number }>;
+  byChannel: Array<{ channel: string; count: number; totalAmountMinor: number }>;
+};
+
+export type PaymentListResponse = {
+  rows: PaymentResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
+  summary: PaymentSummaryResponse;
+};
+
+export type PaymentDetailResponse = {
+  payment: PaymentResponse;
+  webhookEvents: PaymentWebhookEventResponse[];
+};
+
+export type EventVotesSummaryResponse = {
+  votes: {
+    totalVotes: number;
+    freeVotes: number;
+    paidVotes: number;
+    uniqueVoters: number;
+  };
+  payments: PaymentSummaryResponse;
+};
+
+export type ListPaymentsFilters = {
+  status?: PaymentStatus;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
 };
 
 export type MyContestantSummaryResponse = {

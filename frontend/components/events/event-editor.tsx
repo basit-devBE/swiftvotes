@@ -37,6 +37,8 @@ type EventEditorProps = {
 
 type StepKey = "basics" | "schedule" | "media" | "categories" | "review";
 
+const MIN_PAID_VOTE_PRICE_MINOR = 50;
+
 const STEPS: { key: StepKey; title: string; subtitle: string; description: string }[] = [
   {
     key: "basics",
@@ -82,13 +84,24 @@ function toIsoOrUndefined(value: string): string | undefined {
   return value ? new Date(value).toISOString() : undefined;
 }
 
-function formatPriceLabel(value: string, currency: string): string {
+function toVotePriceMinor(value: string): number {
   const numeric = Number.parseFloat(value || "0");
-  if (!Number.isFinite(numeric) || numeric <= 0) return "Free voting";
-  return `${currency || "GHS"} ${numeric.toLocaleString(undefined, {
+  if (!Number.isFinite(numeric)) return Number.NaN;
+  return Math.round(numeric * 100);
+}
+
+function formatPriceLabel(value: string, currency: string): string {
+  const minor = toVotePriceMinor(value);
+  if (!Number.isFinite(minor)) return "Enter a GHS amount";
+  if (minor < 0) return "Price cannot be below 0";
+  if (minor === 0) return "Free voting (0 pesewas)";
+  if (minor < MIN_PAID_VOTE_PRICE_MINOR) {
+    return `Below paid minimum: ${currency || "GHS"} 0.50 = 50 pesewas`;
+  }
+  return `${currency || "GHS"} ${(minor / 100).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  })} = ${minor} pesewas`;
 }
 
 function formatStatusLabel(status?: string): string {
@@ -247,6 +260,9 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
   );
   const [contestantsCanViewLeaderboard, setContestantsCanViewLeaderboard] = useState(
     initialEvent?.contestantsCanViewLeaderboard ?? false,
+  );
+  const [publicCanViewLeaderboard, setPublicCanViewLeaderboard] = useState(
+    initialEvent?.publicCanViewLeaderboard ?? true,
   );
 
   const [categories, setCategories] = useState<EditableCategory[]>(
@@ -421,6 +437,24 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       return;
     }
 
+    const invalidPriceCategory = categories.find((category) => {
+      const minor = toVotePriceMinor(category.votePrice);
+      return (
+        !Number.isFinite(minor) ||
+        minor < 0 ||
+        (minor > 0 && minor < MIN_PAID_VOTE_PRICE_MINOR)
+      );
+    });
+
+    if (invalidPriceCategory) {
+      const label = invalidPriceCategory.name.trim() || "This category";
+      setError(
+        `${label}: use 0 for free voting, or at least GHS 0.50 for paid voting. GHS 0.50 is 50 pesewas.`,
+      );
+      setStepIndex(STEPS.findIndex((step) => step.key === "categories"));
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -437,10 +471,11 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
         votingEndAt: votingEndDate.toISOString(),
         contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard,
+        publicCanViewLeaderboard,
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
-          votePriceMinor: Math.round(Number.parseFloat(c.votePrice || "0") * 100),
+          votePriceMinor: toVotePriceMinor(c.votePrice),
           currency: c.currency.trim().toUpperCase(),
           sortOrder: i,
         })),
@@ -796,10 +831,10 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                 {/* Visibility settings */}
                 <div className="mt-6 rounded-2xl border border-[#e8edf6] bg-[#f7f9fc] p-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#07111f]/50">
-                    Contestant visibility
+                    Visibility controls
                   </p>
                   <p className="mt-1 text-[13px] leading-5 text-[#07111f]/50">
-                    Control what contestants can see while voting is live.
+                    Control what contestants and public visitors can see while voting is live.
                   </p>
                   <div className="mt-4 space-y-3">
                     <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${contestantsCanViewOwnVotes ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
@@ -834,6 +869,24 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                         </p>
                         <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
                           All contestants can view total vote counts for every other contestant.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${publicCanViewLeaderboard ? "border-[#0f4cdb]/28 bg-[#eef4ff]" : "border-[#e4eaf4] bg-white"} ${!isEditable ? "opacity-50" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0f4cdb]"
+                        checked={publicCanViewLeaderboard}
+                        onChange={(e) => setPublicCanViewLeaderboard(e.target.checked)}
+                        disabled={!isEditable}
+                      />
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#07111f]">
+                          Public can see the event leaderboard
+                        </p>
+                        <p className="mt-0.5 text-[12px] leading-5 text-[#07111f]/50">
+                          Visitors on the public event page can view live vote totals.
                         </p>
                       </div>
                     </label>
@@ -1028,7 +1081,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                               min="0"
                               step="0.01"
                               inputMode="decimal"
-                              placeholder="0.00"
+                              placeholder="0 or 0.50"
                               className={inputCls}
                               value={category.votePrice}
                               onChange={(e) => updateCategoryField(index, "votePrice", e.target.value)}

@@ -8,6 +8,7 @@ import {
   ContestantVoteCount,
   CreateVoteInput,
   VotesRepository,
+  VotesSummary,
 } from "../../application/ports/votes.repository";
 
 const COUNTABLE_STATUSES: VoteStatus[] = [VoteStatus.FREE, VoteStatus.CONFIRMED];
@@ -112,6 +113,36 @@ export class PrismaVotesRepository implements VotesRepository {
       orderBy: { createdAt: "desc" },
     });
     return votes.map((v) => this.toDomain(v));
+  }
+
+  async summarize(eventId: string): Promise<VotesSummary> {
+    const [byStatus, uniqueRows] = await Promise.all([
+      this.prisma.vote.groupBy({
+        by: ["status"],
+        where: { eventId, status: { in: COUNTABLE_STATUSES } },
+        _sum: { quantity: true },
+      }),
+      this.prisma.vote.findMany({
+        where: { eventId, status: { in: COUNTABLE_STATUSES } },
+        select: { voterEmail: true },
+        distinct: ["voterEmail"],
+      }),
+    ]);
+
+    let freeVotes = 0;
+    let paidVotes = 0;
+    for (const row of byStatus) {
+      const sum = row._sum.quantity ?? 0;
+      if (row.status === VoteStatus.FREE) freeVotes += sum;
+      else if (row.status === VoteStatus.CONFIRMED) paidVotes += sum;
+    }
+
+    return {
+      totalVotes: freeVotes + paidVotes,
+      freeVotes,
+      paidVotes,
+      uniqueVoters: uniqueRows.length,
+    };
   }
 
   async findRecentFreeVoteByIp(input: {

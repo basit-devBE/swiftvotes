@@ -13,15 +13,32 @@ import {
   listNominations,
   regenerateMagicLink,
   rejectNomination,
+  updateContestant,
   updateEventVisibility,
 } from "@/lib/api/events";
 import {
+  createNominationImageUploadIntent,
+  uploadFileToSignedUrl,
+} from "@/lib/api/uploads";
+import {
+  exportEventPaymentsCsv,
+  getEventPayment,
+  getEventVotesSummary,
+  listEventPayments,
+} from "@/lib/api/votes";
+import {
   ContestantCredentialsResponse,
   ContestantResponse,
+  EventVotesSummaryResponse,
   EventCategoryResponse,
   EventResponse,
+  PaymentDetailResponse,
+  PaymentListResponse,
+  PaymentResponse,
+  PaymentStatus,
   NominationResponse,
   NominationStatus,
+  UpdateContestantInput,
 } from "@/lib/api/types";
 
 // ---------------------------------------------------------------------------
@@ -30,6 +47,7 @@ import {
 
 type Tab = "overview" | "nominations" | "contestants" | "votes";
 type NomFilter = "all" | NominationStatus;
+type PaymentStatusFilter = "all" | PaymentStatus;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,9 +111,50 @@ function formatDate(date: string | null): string {
   });
 }
 
+function formatDateTime(date: string | null): string {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatCurrency(minor: number, currency: string): string {
   if (minor === 0) return "Free";
   return `${currency} ${(minor / 100).toFixed(2)}`;
+}
+
+function formatMoney(minor: number | null | undefined, currency?: string | null): string {
+  if (minor === null || minor === undefined) return "-";
+  return `${currency ?? ""} ${(minor / 100).toFixed(2)}`.trim();
+}
+
+function formatPaymentStatus(status: PaymentStatus): string {
+  if (status === "SUCCEEDED") return "Succeeded";
+  if (status === "PENDING") return "Pending";
+  if (status === "FAILED") return "Failed";
+  if (status === "ABANDONED") return "Abandoned";
+  if (status === "REFUNDED") return "Refunded";
+  return status;
+}
+
+function getPaymentStatusBadgeClass(status: PaymentStatus): string {
+  if (status === "SUCCEEDED") {
+    return "border-[#cfe7da] bg-[#eef9f2] text-[#1b6f4b]";
+  }
+  if (status === "PENDING") {
+    return "border-[#fde68a] bg-[#fffbeb] text-[#92400e]";
+  }
+  if (status === "FAILED") {
+    return "border-[#f0cfd3] bg-[#fff2f4] text-accent";
+  }
+  if (status === "REFUNDED") {
+    return "border-[#d8e1f5] bg-[#eef4ff] text-primary";
+  }
+  return "border-[#dce4f1] bg-[#f7f9fc] text-ink/56";
 }
 
 // ---------------------------------------------------------------------------
@@ -412,14 +471,18 @@ function OverviewTab({
   event,
   onToggleOwnVotes,
   onToggleLeaderboard,
+  onTogglePublicLeaderboard,
   togglingOwnVotes,
   togglingLeaderboard,
+  togglingPublicLeaderboard,
 }: {
   event: EventResponse;
   onToggleOwnVotes: () => void;
   onToggleLeaderboard: () => void;
+  onTogglePublicLeaderboard: () => void;
   togglingOwnVotes: boolean;
   togglingLeaderboard: boolean;
+  togglingPublicLeaderboard: boolean;
 }) {
   // Build the step list — insert REJECTED after PENDING_APPROVAL if relevant
   const displaySteps =
@@ -542,10 +605,10 @@ function OverviewTab({
           </div>
         </div>
 
-        {/* Contestant visibility */}
+        {/* Visibility */}
         <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
-            Contestant Visibility
+            Visibility Controls
           </p>
           <div className="mt-5 space-y-5">
             <VisibilityToggle
@@ -562,6 +625,14 @@ function OverviewTab({
               checked={event.contestantsCanViewLeaderboard}
               loading={togglingLeaderboard}
               onToggle={onToggleLeaderboard}
+            />
+            <div className="border-t border-primary/8" />
+            <VisibilityToggle
+              label="Public can see the event leaderboard"
+              description="Visitors on the public event page can view the live leaderboard."
+              checked={event.publicCanViewLeaderboard}
+              loading={togglingPublicLeaderboard}
+              onToggle={onTogglePublicLeaderboard}
             />
           </div>
         </div>
@@ -831,20 +902,33 @@ function NominationsTab({
 function ContestantDrawer({
   contestant,
   eventId,
-  categoryName,
+  categories,
+  onUpdated,
   onClose,
 }: {
   contestant: ContestantResponse;
   eventId: string;
-  categoryName: string;
+  categories: EventCategoryResponse[];
+  onUpdated: (contestant: ContestantResponse) => void;
   onClose: () => void;
 }) {
   const [creds, setCreds] = useState<ContestantCredentialsResponse | null>(null);
   const [loadingCreds, setLoadingCreds] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [name, setName] = useState(contestant.name);
+  const [phone, setPhone] = useState(contestant.phone ?? "");
+  const [categoryId, setCategoryId] = useState(contestant.categoryId);
+  const [imageUrl, setImageUrl] = useState<string | null>(contestant.imageUrl);
+  const [imageKey, setImageKey] = useState<string | null>(contestant.imageKey);
+  const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const initials = contestant.name
+  const currentCategoryName =
+    categories.find((category) => category.id === categoryId)?.name ?? "Unknown";
+
+  const initials = name
     .split(" ")
     .map((w) => w[0] ?? "")
     .join("")
@@ -853,11 +937,20 @@ function ContestantDrawer({
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingCreds(true);
-    getContestantCredentials(eventId, contestant.id)
-      .then((c) => { if (!cancelled) setCreds(c); })
-      .catch(() => { if (!cancelled) setCreds(null); })
-      .finally(() => { if (!cancelled) setLoadingCreds(false); });
+
+    async function loadCredentials() {
+      setLoadingCreds(true);
+      try {
+        const c = await getContestantCredentials(eventId, contestant.id);
+        if (!cancelled) setCreds(c);
+      } catch {
+        if (!cancelled) setCreds(null);
+      } finally {
+        if (!cancelled) setLoadingCreds(false);
+      }
+    }
+
+    void loadCredentials();
     return () => { cancelled = true; };
   }, [eventId, contestant.id]);
 
@@ -875,6 +968,82 @@ function ContestantDrawer({
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handlePhotoUpload(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setFormError("Please select an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setFormError("Image must be smaller than 8 MB.");
+      return;
+    }
+
+    setFormError(null);
+    setUploadingPhoto(true);
+    try {
+      const intent = await createNominationImageUploadIntent({
+        fileName: file.name,
+        contentType: file.type,
+        eventId,
+        nominationId: contestant.nominationId,
+      });
+      await uploadFileToSignedUrl(intent.uploadUrl, file);
+      setImageUrl(intent.publicUrl);
+      setImageKey(intent.key);
+    } catch (uploadError) {
+      setFormError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload photo.",
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleSaveDetails() {
+    const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName) {
+      setFormError("Contestant name is required.");
+      return;
+    }
+
+    if (!categoryId) {
+      setFormError("Choose a category.");
+      return;
+    }
+
+    if (trimmedPhone && !/^\d{10}$/.test(trimmedPhone)) {
+      setFormError("Phone must be a 10-digit number.");
+      return;
+    }
+
+    const input: UpdateContestantInput = {
+      name: trimmedName,
+      categoryId,
+      phone: trimmedPhone || null,
+      imageUrl,
+      imageKey,
+    };
+
+    setSaving(true);
+    setFormError(null);
+    try {
+      const updated = await updateContestant(eventId, contestant.id, input);
+      onUpdated(updated);
+    } catch (saveError) {
+      setFormError(
+        saveError instanceof ApiClientError
+          ? saveError.message
+          : "Unable to update contestant.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -905,8 +1074,8 @@ function ContestantDrawer({
           {/* Photo + identity */}
           <div className="flex items-center gap-4 px-6 py-5">
             <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[#eff3f8]">
-              {contestant.imageUrl ? (
-                <Image src={contestant.imageUrl} alt={contestant.name} fill className="object-cover" />
+              {imageUrl ? (
+                <Image src={imageUrl} alt={name} fill className="object-cover" />
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <span className="font-display text-xl font-semibold text-primary/40">{initials}</span>
@@ -915,7 +1084,7 @@ function ContestantDrawer({
             </div>
             <div className="min-w-0">
               <p className="font-display text-lg font-semibold leading-tight tracking-[-0.03em] text-ink">
-                {contestant.name}
+                {name}
               </p>
               {contestant.email && (
                 <p className="mt-0.5 truncate text-sm text-ink/48">{contestant.email}</p>
@@ -925,9 +1094,104 @@ function ContestantDrawer({
                   {contestant.code}
                 </span>
                 <span className="rounded-full border border-primary/16 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
-                  {categoryName}
+                  {currentCategoryName}
                 </span>
               </div>
+            </div>
+          </div>
+
+          <div className="border-t border-primary/8 px-6 py-5">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-ink/40">
+              Edit details
+            </p>
+            <div className="mt-4 space-y-4">
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/52">Name</span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-primary/12 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-primary/42 focus:ring-2 focus:ring-primary/10"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/52">Category</span>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-primary/12 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-primary/42 focus:ring-2 focus:ring-primary/10"
+                >
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/52">Phone</span>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="0240000000"
+                  className="mt-1.5 w-full rounded-xl border border-primary/12 bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-primary/42 focus:ring-2 focus:ring-primary/10"
+                />
+              </label>
+              <div>
+                <span className="text-xs font-semibold text-ink/52">Photo</span>
+                <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-primary/12 bg-[#f7f9fc] p-3">
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[#e4ecf8]">
+                    {imageUrl ? (
+                      <Image src={imageUrl} alt={name} fill className="object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-xs font-semibold text-primary/50">
+                        {initials}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    <label className="cursor-pointer rounded-full border border-primary/18 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
+                      {uploadingPhoto ? "Uploading..." : "Change photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploadingPhoto}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) await handlePhotoUpload(file);
+                        }}
+                      />
+                    </label>
+                    {imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageUrl(null);
+                          setImageKey(null);
+                        }}
+                        className="rounded-full border border-[#f0cfd3] bg-white px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-[#fff2f4]"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {formError && (
+                <p className="rounded-xl border border-accent/14 bg-accent/5 px-3 py-2 text-xs font-medium text-accent">
+                  {formError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleSaveDetails()}
+                disabled={saving || uploadingPhoto}
+                className="w-full rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
             </div>
           </div>
 
@@ -1040,6 +1304,15 @@ function ContestantsTab({
     () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
     [categories],
   );
+
+  function handleContestantUpdated(updated: ContestantResponse) {
+    setContestants((current) =>
+      current.map((contestant) =>
+        contestant.id === updated.id ? updated : contestant,
+      ),
+    );
+    setSelectedContestant(updated);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1165,9 +1438,11 @@ function ContestantsTab({
 
       {selectedContestant && (
         <ContestantDrawer
+          key={selectedContestant.id}
           contestant={selectedContestant}
           eventId={eventId}
-          categoryName={categoryMap[selectedContestant.categoryId] ?? "Unknown"}
+          categories={categories}
+          onUpdated={handleContestantUpdated}
           onClose={() => setSelectedContestant(null)}
         />
       )}
@@ -1176,34 +1451,467 @@ function ContestantsTab({
 }
 
 // ---------------------------------------------------------------------------
-// Votes placeholder tab
+// Votes tab
 // ---------------------------------------------------------------------------
 
-function VotesTab() {
+const PAYMENT_FILTERS: { key: PaymentStatusFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "SUCCEEDED", label: "Succeeded" },
+  { key: "PENDING", label: "Pending" },
+  { key: "FAILED", label: "Failed" },
+  { key: "ABANDONED", label: "Abandoned" },
+  { key: "REFUNDED", label: "Refunded" },
+];
+
+function MetricTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[1.8rem] border border-primary/10 bg-white/60 py-20 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eef4ff]">
-        <svg
-          className="h-7 w-7 text-primary/60"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z"
-          />
-        </svg>
-      </div>
-      <h3 className="mt-4 font-display text-xl font-semibold tracking-[-0.03em] text-ink">
-        Votes are on their way
-      </h3>
-      <p className="mt-2 max-w-sm text-sm leading-6 text-ink/50">
-        Once voting opens, you will see live vote counts, category breakdowns,
-        and real-time results right here.
+    <div className="rounded-[1.3rem] border border-primary/10 bg-white/86 p-5 shadow-[0_10px_32px_-20px_rgba(7,17,31,0.18)]">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-ink/40">
+        {label}
       </p>
+      <p className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-ink">
+        {value}
+      </p>
+      {hint && <p className="mt-1 text-xs text-ink/44">{hint}</p>}
+    </div>
+  );
+}
+
+function PaymentDetailDrawer({
+  detail,
+  onClose,
+}: {
+  detail: PaymentDetailResponse;
+  onClose: () => void;
+}) {
+  const payment = detail.payment;
+  const amount = payment.amountPaidMinor ?? payment.amountMinor;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-[#07111f]/30 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-[0_0_60px_-20px_rgba(7,17,31,0.36)]">
+        <div className="flex items-center justify-between border-b border-primary/10 px-6 py-4">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Payment Detail
+          </p>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-ink/40 transition hover:bg-primary/8 hover:text-ink"
+            aria-label="Close payment detail"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-display text-xl font-semibold leading-tight tracking-[-0.03em] text-ink">
+                {payment.voterName || "Unnamed voter"}
+              </p>
+              <p className="mt-1 truncate text-sm text-ink/48">
+                {payment.voterEmail}
+              </p>
+            </div>
+            <span
+              className={`rounded-full border px-3 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.18em] ${getPaymentStatusBadgeClass(payment.status)}`}
+            >
+              {formatPaymentStatus(payment.status)}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <MetricTile
+              label="Amount"
+              value={formatMoney(amount, payment.currency)}
+              hint={`Fee ${formatMoney(payment.feeMinor, payment.currency)}`}
+            />
+            <MetricTile
+              label="Net"
+              value={formatMoney(
+                payment.amountPaidMinor != null && payment.feeMinor != null
+                  ? payment.amountPaidMinor - payment.feeMinor
+                  : null,
+                payment.currency,
+              )}
+              hint={payment.channel ?? "Channel pending"}
+            />
+          </div>
+
+          <div className="mt-6 space-y-3 border-t border-primary/10 pt-5 text-sm">
+            {[
+              ["Contestant", `${payment.contestantName ?? "Unknown"}${payment.contestantCode ? ` (${payment.contestantCode})` : ""}`],
+              ["Category", payment.categoryName ?? "Unknown"],
+              ["Reference", payment.reference],
+              ["Provider ref", payment.providerRef ?? "-"],
+              ["Card last4", payment.cardLast4 ?? "-"],
+              ["Mobile", payment.mobileNumber ?? "-"],
+              ["Initialized", formatDateTime(payment.initializedAt)],
+              ["Paid", formatDateTime(payment.paidAt)],
+              ["Failed", formatDateTime(payment.failedAt)],
+              ["Failure reason", payment.failureReason ?? "-"],
+            ].map(([label, value]) => (
+              <div key={label} className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/34">
+                  {label}
+                </span>
+                <span className="min-w-0 break-words text-ink/68">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-7 border-t border-primary/10 pt-5">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+              Webhook Timeline
+            </p>
+            {detail.webhookEvents.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-[#dce4f1] bg-[#f7f9fc] px-4 py-3 text-sm text-ink/48">
+                No webhook deliveries recorded for this payment.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {detail.webhookEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-primary/10 bg-[#fbfcff] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-xs font-semibold text-ink">
+                          {event.eventType}
+                        </p>
+                        <p className="mt-1 text-xs text-ink/42">
+                          {formatDateTime(event.receivedAt)}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] ${
+                          event.signatureValid
+                            ? "border-[#cfe7da] bg-[#eef9f2] text-[#1b6f4b]"
+                            : "border-[#f0cfd3] bg-[#fff2f4] text-accent"
+                        }`}
+                      >
+                        {event.signatureValid ? "Valid" : "Invalid"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-ink/44">
+                      {event.processed
+                        ? `Processed ${formatDateTime(event.processedAt)}`
+                        : "Not processed"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function VotesTab({ eventId }: { eventId: string }) {
+  const [summary, setSummary] = useState<EventVotesSummaryResponse | null>(null);
+  const [payments, setPayments] = useState<PaymentListResponse | null>(null);
+  const [status, setStatus] = useState<PaymentStatusFilter>("all");
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [detail, setDetail] = useState<PaymentDetailResponse | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [votesSummary, paymentList] = await Promise.all([
+          getEventVotesSummary(eventId),
+          listEventPayments(eventId, {
+            status: status === "all" ? undefined : status,
+            page,
+            pageSize: 10,
+          }),
+        ]);
+        if (!cancelled) {
+          setSummary(votesSummary);
+          setPayments(paymentList);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof ApiClientError
+              ? loadError.message
+              : "Unable to load vote records.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, page, status]);
+
+  const statusCounts = useMemo(() => {
+    const counts = new Map<PaymentStatus, number>();
+    for (const bucket of summary?.payments.byStatus ?? []) {
+      counts.set(bucket.status, bucket.count);
+    }
+    return counts;
+  }, [summary]);
+
+  const pageCount = payments
+    ? Math.max(1, Math.ceil(payments.total / payments.pageSize))
+    : 1;
+  const currency = summary?.payments.currency ?? payments?.rows[0]?.currency ?? null;
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const csv = await exportEventPaymentsCsv(eventId, {
+        status: status === "all" ? undefined : status,
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `payments-${eventId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function openPayment(payment: PaymentResponse) {
+    setLoadingDetailId(payment.id);
+    try {
+      const result = await getEventPayment(eventId, payment.id);
+      setDetail(result);
+    } finally {
+      setLoadingDetailId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricTile
+          label="Total votes"
+          value={String(summary?.votes.totalVotes ?? 0)}
+          hint={`${summary?.votes.uniqueVoters ?? 0} unique voters`}
+        />
+        <MetricTile
+          label="Paid votes"
+          value={String(summary?.votes.paidVotes ?? 0)}
+          hint={`${summary?.votes.freeVotes ?? 0} free votes`}
+        />
+        <MetricTile
+          label="Gross collected"
+          value={formatMoney(summary?.payments.grossMinor ?? 0, currency)}
+          hint={`${summary?.payments.successCount ?? 0} successful payments`}
+        />
+        <MetricTile
+          label="Net after fees"
+          value={formatMoney(summary?.payments.netMinor ?? 0, currency)}
+          hint={`${formatMoney(summary?.payments.feesMinor ?? 0, currency)} fees`}
+        />
+      </div>
+
+      <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
+        <div className="flex flex-col gap-4 border-b border-primary/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+              Payment Records
+            </p>
+            <p className="mt-1 text-sm text-ink/48">
+              {payments ? `${payments.total} records` : "Loading records"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {PAYMENT_FILTERS.map((filter) => {
+              const count =
+                filter.key === "all"
+                  ? summary?.payments.totalCount
+                  : statusCounts.get(filter.key);
+              return (
+                <button
+                  key={filter.key}
+                  onClick={() => {
+                    setStatus(filter.key);
+                    setPage(1);
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                    status === filter.key
+                      ? "border-primary bg-primary text-white"
+                      : "border-primary/12 bg-white text-ink/52 hover:border-primary/28 hover:text-ink"
+                  }`}
+                >
+                  {filter.label}
+                  {count !== undefined && (
+                    <span className="ml-1.5 opacity-70">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => void handleExport()}
+              disabled={exporting || isLoading}
+              className="rounded-full border border-[#cfe7da] bg-[#eef9f2] px-4 py-1.5 text-xs font-semibold text-[#1b6f4b] transition hover:bg-[#dcf5e8] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {exporting ? "Exporting..." : "Export CSV"}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="m-5 rounded-[1rem] border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+            {error}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full text-left text-sm">
+            <thead className="bg-[#f7f9fc] text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-ink/38">
+              <tr>
+                <th className="px-5 py-3">Voter</th>
+                <th className="px-5 py-3">Contestant</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Amount</th>
+                <th className="px-5 py-3 text-right">Fee</th>
+                <th className="px-5 py-3">Channel</th>
+                <th className="px-5 py-3">Paid</th>
+                <th className="px-5 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-primary/8">
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-ink/44">
+                    Loading payment records...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && payments?.rows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-12 text-center">
+                    <p className="font-display text-lg font-semibold tracking-[-0.03em] text-ink">
+                      No payment records
+                    </p>
+                    <p className="mt-1 text-sm text-ink/44">
+                      Confirmed and pending paid votes will appear here.
+                    </p>
+                  </td>
+                </tr>
+              )}
+              {!isLoading &&
+                payments?.rows.map((payment) => (
+                  <tr
+                    key={payment.id}
+                    className="transition hover:bg-[#f8fbff]"
+                  >
+                    <td className="px-5 py-4">
+                      <p className="font-medium text-ink">
+                        {payment.voterName || "Unnamed voter"}
+                      </p>
+                      <p className="mt-0.5 max-w-[220px] truncate text-xs text-ink/44">
+                        {payment.voterEmail}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="font-medium text-ink">
+                        {payment.contestantName ?? "Unknown contestant"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink/44">
+                        {payment.contestantCode ?? "-"} · {payment.categoryName ?? "Unknown category"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] ${getPaymentStatusBadgeClass(payment.status)}`}
+                      >
+                        {formatPaymentStatus(payment.status)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right font-mono text-xs text-ink/70">
+                      {formatMoney(
+                        payment.amountPaidMinor ?? payment.amountMinor,
+                        payment.currency,
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right font-mono text-xs text-ink/54">
+                      {formatMoney(payment.feeMinor, payment.currency)}
+                    </td>
+                    <td className="px-5 py-4 text-ink/56">
+                      {payment.channel ?? "-"}
+                    </td>
+                    <td className="px-5 py-4 text-ink/56">
+                      {formatDateTime(payment.paidAt)}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={() => void openPayment(payment)}
+                        disabled={loadingDetailId === payment.id}
+                        className="rounded-full border border-primary/16 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {loadingDetailId === payment.id ? "Opening..." : "View"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+
+        {payments && payments.total > 0 && (
+          <div className="flex items-center justify-between border-t border-primary/10 px-5 py-4 text-sm text-ink/48">
+            <span>
+              Page {payments.page} of {pageCount}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isLoading}
+                className="rounded-full border border-primary/12 px-3 py-1.5 text-xs font-semibold text-ink/56 transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={page >= pageCount || isLoading}
+                className="rounded-full border border-primary/12 px-3 py-1.5 text-xs font-semibold text-ink/56 transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {detail && (
+        <PaymentDetailDrawer detail={detail} onClose={() => setDetail(null)} />
+      )}
     </div>
   );
 }
@@ -1219,6 +1927,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [togglingOwnVotes, setTogglingOwnVotes] = useState(false);
   const [togglingLeaderboard, setTogglingLeaderboard] = useState(false);
+  const [togglingPublicLeaderboard, setTogglingPublicLeaderboard] = useState(false);
 
   async function handleToggleOwnVotes() {
     if (!event || togglingOwnVotes) return;
@@ -1243,6 +1952,19 @@ export function EventManageView({ eventId }: { eventId: string }) {
       setEvent(updated);
     } finally {
       setTogglingLeaderboard(false);
+    }
+  }
+
+  async function handleTogglePublicLeaderboard() {
+    if (!event || togglingPublicLeaderboard) return;
+    setTogglingPublicLeaderboard(true);
+    try {
+      const updated = await updateEventVisibility(eventId, {
+        publicCanViewLeaderboard: !event.publicCanViewLeaderboard,
+      });
+      setEvent(updated);
+    } finally {
+      setTogglingPublicLeaderboard(false);
     }
   }
 
@@ -1431,8 +2153,10 @@ export function EventManageView({ eventId }: { eventId: string }) {
             event={event}
             onToggleOwnVotes={handleToggleOwnVotes}
             onToggleLeaderboard={handleToggleLeaderboard}
+            onTogglePublicLeaderboard={handleTogglePublicLeaderboard}
             togglingOwnVotes={togglingOwnVotes}
             togglingLeaderboard={togglingLeaderboard}
+            togglingPublicLeaderboard={togglingPublicLeaderboard}
           />
         )}
         {activeTab === "nominations" && (
@@ -1448,7 +2172,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
             categories={event.categories}
           />
         )}
-        {activeTab === "votes" && <VotesTab />}
+        {activeTab === "votes" && <VotesTab eventId={event.id} />}
       </div>
     </div>
   );

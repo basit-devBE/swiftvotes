@@ -9,6 +9,7 @@ import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 import { EventCategory } from "../../domain/event-category";
 import { EventStatus } from "../../domain/event-status";
+import { assertValidVotePriceMinor } from "./event-validation";
 
 @Injectable()
 export class UpdateCategoryUseCase {
@@ -45,8 +46,8 @@ export class UpdateCategoryUseCase {
       );
     }
 
-    if (input.votePriceMinor !== undefined && input.votePriceMinor < 0) {
-      throw new BadRequestException("Vote price cannot be below zero.");
+    if (input.votePriceMinor !== undefined) {
+      assertValidVotePriceMinor(input.votePriceMinor);
     }
 
     return this.eventsRepository.updateCategory(input.categoryId, input);

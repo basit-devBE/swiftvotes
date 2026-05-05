@@ -10,6 +10,7 @@ import {
   NominationResponse,
   RejectNominationInput,
   SubmitNominationInput,
+  UpdateContestantInput,
   UpdateEventInput,
 } from "./types";
 
@@ -44,7 +45,11 @@ export function updateEvent(
 
 export function updateEventVisibility(
   eventId: string,
-  input: { contestantsCanViewOwnVotes?: boolean; contestantsCanViewLeaderboard?: boolean },
+  input: {
+    contestantsCanViewOwnVotes?: boolean;
+    contestantsCanViewLeaderboard?: boolean;
+    publicCanViewLeaderboard?: boolean;
+  },
 ): Promise<EventResponse> {
   return apiRequest<EventResponse>(`/events/${eventId}/visibility`, {
     method: "PATCH",
@@ -140,6 +145,17 @@ export function listContestants(
 ): Promise<ContestantResponse[]> {
   const query = categoryId ? `?categoryId=${categoryId}` : "";
   return apiRequest<ContestantResponse[]>(`/events/${eventId}/contestants${query}`);
+}
+
+export function updateContestant(
+  eventId: string,
+  contestantId: string,
+  input: UpdateContestantInput,
+): Promise<ContestantResponse> {
+  return apiRequest<ContestantResponse>(
+    `/events/${eventId}/contestants/${contestantId}`,
+    { method: "PATCH", body: input },
+  );
 }
 
 export function getContestantCredentials(

@@ -58,6 +58,10 @@ export class CreateEventDto {
   @IsBoolean()
   contestantsCanViewLeaderboard?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  publicCanViewLeaderboard?: boolean;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

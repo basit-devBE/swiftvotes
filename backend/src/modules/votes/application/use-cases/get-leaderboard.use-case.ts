@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
 import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
@@ -37,6 +42,10 @@ export class GetLeaderboardUseCase {
     const event = await this.eventsRepository.findById(eventId);
     if (!event) {
       throw new NotFoundException("Event not found.");
+    }
+
+    if (!event.publicCanViewLeaderboard) {
+      throw new ForbiddenException("Leaderboard is not public for this event.");
     }
 
     const [contestants, voteCounts] = await Promise.all([

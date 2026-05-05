@@ -8,11 +8,18 @@ import {
 
 import { PrismaService } from "../../../../core/prisma/prisma.service";
 import {
+  ChannelBreakdownEntry,
   CreatePendingPaymentInput,
+  ListPaymentsFilters,
+  ListPaymentsInput,
+  ListPaymentsResult,
   MarkPaymentFailedInput,
   MarkPaymentSucceededInput,
+  PaymentDetail,
+  PaymentSummary,
   PaymentsRepository,
   RecordWebhookEventInput,
+  StatusBreakdownEntry,
 } from "../../application/ports/payments.repository";
 import { Payment, PaymentWebhookEvent } from "../../domain/payment";
 import { PaymentStatus } from "../../domain/payment-status";
@@ -139,6 +146,131 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
       select: { status: true },
     });
     return row ? (row.status as PaymentStatus) : null;
+  }
+
+  async list(input: ListPaymentsInput): Promise<ListPaymentsResult> {
+    const where = this.buildWhere(input.eventId, input.filters);
+    const skip = (input.page - 1) * input.pageSize;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: input.pageSize,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      rows: rows.map((p) => this.toDomain(p)),
+      total,
+      page: input.page,
+      pageSize: input.pageSize,
+    };
+  }
+
+  async findDetailById(paymentId: string): Promise<PaymentDetail | null> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        webhookEvents: {
+          orderBy: { receivedAt: "asc" },
+        },
+      },
+    });
+    if (!payment) return null;
+    return {
+      payment: this.toDomain(payment),
+      webhookEvents: payment.webhookEvents.map((e) => this.toWebhookDomain(e)),
+    };
+  }
+
+  async summarize(
+    eventId: string,
+    filters: ListPaymentsFilters = {},
+  ): Promise<PaymentSummary> {
+    const where = this.buildWhere(eventId, filters);
+
+    const [byStatusRows, byChannelRows, currencyRow] = await Promise.all([
+      this.prisma.payment.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+        _sum: { amountPaidMinor: true, feeMinor: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ["channel"],
+        where: { ...where, status: PrismaPaymentStatus.SUCCEEDED },
+        _count: { _all: true },
+        _sum: { amountPaidMinor: true },
+      }),
+      this.prisma.payment.findFirst({
+        where: { eventId },
+        select: { currency: true },
+      }),
+    ]);
+
+    const buckets: Record<PrismaPaymentStatus, number> = {
+      PENDING: 0,
+      SUCCEEDED: 0,
+      FAILED: 0,
+      ABANDONED: 0,
+      REFUNDED: 0,
+    };
+    let totalCount = 0;
+    let grossMinor = 0;
+    let feesMinor = 0;
+
+    for (const r of byStatusRows) {
+      buckets[r.status] = r._count._all;
+      totalCount += r._count._all;
+      if (r.status === PrismaPaymentStatus.SUCCEEDED) {
+        grossMinor += r._sum.amountPaidMinor ?? 0;
+        feesMinor += r._sum.feeMinor ?? 0;
+      }
+    }
+
+    const byStatus: StatusBreakdownEntry[] = (
+      Object.keys(buckets) as PrismaPaymentStatus[]
+    ).map((s) => ({ status: s as PaymentStatus, count: buckets[s] }));
+
+    const byChannel: ChannelBreakdownEntry[] = byChannelRows.map((r) => ({
+      channel: r.channel ?? "unknown",
+      count: r._count._all,
+      totalAmountMinor: r._sum.amountPaidMinor ?? 0,
+    }));
+
+    return {
+      totalCount,
+      successCount: buckets.SUCCEEDED,
+      pendingCount: buckets.PENDING,
+      failedCount: buckets.FAILED,
+      abandonedCount: buckets.ABANDONED,
+      refundedCount: buckets.REFUNDED,
+      grossMinor,
+      feesMinor,
+      netMinor: grossMinor - feesMinor,
+      currency: currencyRow?.currency ?? null,
+      byStatus,
+      byChannel,
+    };
+  }
+
+  private buildWhere(
+    eventId: string,
+    filters: ListPaymentsFilters,
+  ): Prisma.PaymentWhereInput {
+    const where: Prisma.PaymentWhereInput = { eventId };
+    if (filters.status) {
+      where.status = filters.status as PrismaPaymentStatus;
+    }
+    if (filters.from || filters.to) {
+      where.createdAt = {};
+      if (filters.from) where.createdAt.gte = filters.from;
+      if (filters.to) where.createdAt.lte = filters.to;
+    }
+    return where;
   }
 
   private toDomain(payment: PrismaPayment): Payment {

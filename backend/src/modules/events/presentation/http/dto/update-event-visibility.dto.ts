@@ -8,4 +8,8 @@ export class UpdateEventVisibilityDto {
   @IsOptional()
   @IsBoolean()
   contestantsCanViewLeaderboard?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  publicCanViewLeaderboard?: boolean;
 }

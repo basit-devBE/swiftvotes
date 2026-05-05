@@ -8,6 +8,7 @@ export type UpdateEventVisibilityInput = {
   eventId: string;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
+  publicCanViewLeaderboard?: boolean;
 };
 
 @Injectable()
@@ -27,6 +28,7 @@ export class UpdateEventVisibilityUseCase {
     return this.eventsRepository.updateVisibility(input.eventId, {
       contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
+      publicCanViewLeaderboard: input.publicCanViewLeaderboard,
     });
   }
 }

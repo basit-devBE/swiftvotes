@@ -22,6 +22,13 @@ export type ContestantVoteCount = {
   totalVotes: number;
 };
 
+export type VotesSummary = {
+  totalVotes: number;
+  freeVotes: number;
+  paidVotes: number;
+  uniqueVoters: number;
+};
+
 export interface VotesRepository {
   create(input: CreateVoteInput, tx?: Prisma.TransactionClient): Promise<Vote>;
   findById(voteId: string): Promise<Vote | null>;
@@ -44,4 +51,5 @@ export interface VotesRepository {
     ipAddress: string;
     since: Date;
   }): Promise<Vote | null>;
+  summarize(eventId: string): Promise<VotesSummary>;
 }

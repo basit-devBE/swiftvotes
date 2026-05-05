@@ -93,15 +93,22 @@ function LeaderboardSection({ profile }: { profile: MyContestantProfileResponse 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!event.contestantsCanViewLeaderboard) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
-    listContestants(event.id, category.id)
-      .then((data) => { if (!cancelled) setContestants(data); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
+
+    async function loadLeaderboard() {
+      if (!event.contestantsCanViewLeaderboard) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const data = await listContestants(event.id, category.id);
+        if (!cancelled) setContestants(data);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadLeaderboard();
     return () => { cancelled = true; };
   }, [event.id, event.contestantsCanViewLeaderboard, category.id]);
 
