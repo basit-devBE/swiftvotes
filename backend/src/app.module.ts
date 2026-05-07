@@ -11,6 +11,7 @@ import { emailConfig } from "./core/config/email.config";
 import { validationSchema } from "./core/config/env.validation";
 import { paystackConfig } from "./core/config/paystack.config";
 import { storageConfig } from "./core/config/storage.config";
+import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AccessControlModule } from "./modules/access-control/access-control.module";
 import { ContestantsModule } from "./modules/contestants/contestants.module";
@@ -53,6 +54,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     VotesModule,
     SchedulingModule,
     HealthModule,
+    AdminModule,
   ],
   providers: [
     {

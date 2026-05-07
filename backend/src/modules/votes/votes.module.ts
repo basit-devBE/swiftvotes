@@ -12,6 +12,7 @@ import { GetEventVotesSummaryUseCase } from "./application/use-cases/get-event-v
 import { GetLeaderboardUseCase } from "./application/use-cases/get-leaderboard.use-case";
 import { GetPaymentDetailUseCase } from "./application/use-cases/get-payment-detail.use-case";
 import { HandlePaystackWebhookUseCase } from "./application/use-cases/handle-paystack-webhook.use-case";
+import { ListAllPaymentsUseCase } from "./application/use-cases/list-all-payments.use-case";
 import { ListEventPaymentsUseCase } from "./application/use-cases/list-event-payments.use-case";
 import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "./application/votes.tokens";
 import { PaystackService } from "./infrastructure/payments/paystack.service";
@@ -36,6 +37,7 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
     GetLeaderboardUseCase,
     HandlePaystackWebhookUseCase,
     ListEventPaymentsUseCase,
+    ListAllPaymentsUseCase,
     GetPaymentDetailUseCase,
     GetEventVotesSummaryUseCase,
     PaystackService,

@@ -74,6 +74,31 @@ export type PaymentWithContext = Payment & {
   categoryName: string | null;
 };
 
+export type PaymentWithFullContext = PaymentWithContext & {
+  eventName: string | null;
+};
+
+export type ListAllPaymentsFilters = {
+  status?: PaymentStatus;
+  eventId?: string;
+  from?: Date;
+  to?: Date;
+  search?: string;
+};
+
+export type ListAllPaymentsInput = {
+  filters: ListAllPaymentsFilters;
+  page: number;
+  pageSize: number;
+};
+
+export type ListAllPaymentsResult = {
+  rows: PaymentWithFullContext[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type PaymentDetail = {
   payment: Payment;
   webhookEvents: PaymentWebhookEvent[];
@@ -140,7 +165,11 @@ export interface PaymentsRepository {
 
   list(input: ListPaymentsInput): Promise<ListPaymentsResult>;
 
+  listAll(input: ListAllPaymentsInput): Promise<ListAllPaymentsResult>;
+
   findDetailById(paymentId: string): Promise<PaymentDetail | null>;
 
   summarize(eventId: string, filters?: ListPaymentsFilters): Promise<PaymentSummary>;
+
+  summarizeAll(filters?: ListAllPaymentsFilters): Promise<PaymentSummary>;
 }
