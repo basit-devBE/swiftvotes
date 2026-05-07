@@ -22,6 +22,7 @@ import {
 } from "@/lib/api/uploads";
 import {
   exportEventPaymentsCsv,
+  getAdminLeaderboard,
   getEventPayment,
   getEventVotesSummary,
   listEventPayments,
@@ -32,6 +33,7 @@ import {
   EventVotesSummaryResponse,
   EventCategoryResponse,
   EventResponse,
+  LeaderboardCategory,
   PaymentDetailResponse,
   PaymentListResponse,
   PaymentResponse,
@@ -40,12 +42,22 @@ import {
   NominationStatus,
   UpdateContestantInput,
 } from "@/lib/api/types";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "overview" | "nominations" | "contestants" | "votes";
+type Tab = "overview" | "nominations" | "contestants" | "votes" | "leaderboard";
 type NomFilter = "all" | NominationStatus;
 type PaymentStatusFilter = "all" | PaymentStatus;
 
@@ -1917,6 +1929,283 @@ function VotesTab({ eventId }: { eventId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Leaderboard tab
+// ---------------------------------------------------------------------------
+
+const LEADERBOARD_BAR_COLORS = [
+  "#0f4cdb",
+  "#2f6fed",
+  "#5b8def",
+  "#8aafff",
+  "#b9ccff",
+  "#d8e1f5",
+];
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function LeaderboardTab({ eventId }: { eventId: string }) {
+  const [categories, setCategories] = useState<LeaderboardCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await getAdminLeaderboard(eventId);
+        if (!cancelled) setCategories(data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof ApiClientError
+              ? err.message
+              : "Unable to load leaderboard.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, refreshKey]);
+
+  const totals = useMemo(() => {
+    let totalVotes = 0;
+    let totalContestants = 0;
+    for (const cat of categories) {
+      totalContestants += cat.contestants.length;
+      for (const entry of cat.contestants) {
+        totalVotes += entry.voteCount;
+      }
+    }
+    return { totalVotes, totalContestants };
+  }, [categories]);
+
+  const populated = categories.filter((c) => c.contestants.length > 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-[1.5rem] border border-primary/10 bg-white/86 p-5 shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)] sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Live leaderboard
+          </p>
+          <p className="mt-1 text-sm text-ink/56">
+            Admin view — visible regardless of public visibility settings.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="font-mono text-xs text-ink/40">
+              {totals.totalContestants} contestants · {totals.totalVotes} votes
+            </p>
+          </div>
+          <button
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={isLoading}
+            className="rounded-full border border-primary/16 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isLoading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-[1.25rem] border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+          {error}
+        </div>
+      )}
+
+      {isLoading && !error && (
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-10 text-center text-sm text-ink/44 shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
+          Loading leaderboard...
+        </div>
+      )}
+
+      {!isLoading && !error && populated.length === 0 && (
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-10 text-center shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
+          <p className="font-display text-lg font-semibold tracking-[-0.03em] text-ink">
+            No votes yet
+          </p>
+          <p className="mt-1 text-sm text-ink/44">
+            Once contestants start receiving votes, the leaderboard will appear here.
+          </p>
+        </div>
+      )}
+
+      {!isLoading && !error &&
+        populated.map((cat) => <LeaderboardCategoryPanel key={cat.categoryId} category={cat} />)}
+    </div>
+  );
+}
+
+function LeaderboardCategoryPanel({ category }: { category: LeaderboardCategory }) {
+  const top = category.contestants.slice(0, 10);
+  const chartData = top.map((entry) => ({
+    name: entry.name,
+    code: entry.code,
+    rank: entry.rank,
+    votes: entry.voteCount,
+  }));
+  const totalCategoryVotes = category.contestants.reduce(
+    (sum, entry) => sum + entry.voteCount,
+    0,
+  );
+
+  return (
+    <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
+      <div className="flex flex-col gap-1 border-b border-primary/10 px-5 py-4 sm:flex-row sm:items-baseline sm:justify-between">
+        <p className="font-display text-base font-semibold tracking-tight text-ink">
+          {category.categoryName}
+        </p>
+        <p className="font-mono text-xs text-ink/44">
+          {category.contestants.length} contestants · {totalCategoryVotes} votes
+        </p>
+      </div>
+
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="border-b border-primary/8 p-5 lg:border-b-0 lg:border-r">
+          <p className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-ink/40">
+            Top {top.length}
+          </p>
+          <div className="h-[260px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ top: 6, right: 24, bottom: 6, left: 8 }}
+              >
+                <CartesianGrid stroke="#eef2f9" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "#5d6577" }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="code"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  width={56}
+                  tick={{ fontSize: 11, fill: "#5d6577" }}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(15,76,219,0.06)" }}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,76,219,0.12)",
+                    fontSize: 12,
+                    boxShadow: "0 12px 28px -18px rgba(7,17,31,0.2)",
+                  }}
+                  formatter={(value) => [`${value} votes`, "Votes"]}
+                  labelFormatter={(label, payload) => {
+                    const item = payload?.[0]?.payload as
+                      | { name: string; rank: number }
+                      | undefined;
+                    return item ? `#${item.rank} · ${item.name}` : String(label);
+                  }}
+                />
+                <Bar dataKey="votes" radius={[0, 6, 6, 0]}>
+                  {chartData.map((_, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={
+                        LEADERBOARD_BAR_COLORS[
+                          Math.min(idx, LEADERBOARD_BAR_COLORS.length - 1)
+                        ]
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <p className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-ink/40">
+            Standings
+          </p>
+          <ol className="flex flex-col gap-2">
+            {category.contestants.map((entry) => {
+              const share =
+                totalCategoryVotes > 0
+                  ? (entry.voteCount / totalCategoryVotes) * 100
+                  : 0;
+              return (
+                <li
+                  key={entry.id}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                    entry.rank === 1
+                      ? "bg-[#fff8e8] ring-1 ring-[#f1c849]/40"
+                      : "bg-[#f7f9fc]"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      entry.rank === 1
+                        ? "bg-[#f1c849] text-white"
+                        : entry.rank <= 3
+                        ? "bg-ink/8 text-ink/60"
+                        : "bg-transparent text-ink/30"
+                    }`}
+                  >
+                    {entry.rank}
+                  </span>
+                  <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[#e4ecf8]">
+                    {entry.imageUrl ? (
+                      <Image
+                        src={entry.imageUrl}
+                        alt={entry.name}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-[0.6rem] font-semibold text-primary/50">
+                        {getInitials(entry.name)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium text-ink">
+                      {entry.name}
+                    </span>
+                    <span className="font-mono text-[0.65rem] text-ink/40">
+                      {share.toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 font-mono text-[0.65rem] font-semibold text-ink/50 ring-1 ring-ink/8">
+                    {entry.code}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                    {entry.voteCount}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -2017,6 +2306,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
     { key: "nominations", label: "Nominations" },
     { key: "contestants", label: "Contestants" },
     { key: "votes", label: "Votes" },
+    { key: "leaderboard", label: "Leaderboard" },
   ];
 
   return (
@@ -2173,6 +2463,9 @@ export function EventManageView({ eventId }: { eventId: string }) {
           />
         )}
         {activeTab === "votes" && <VotesTab eventId={event.id} />}
+        {activeTab === "leaderboard" && (
+          <LeaderboardTab eventId={event.id} />
+        )}
       </div>
     </div>
   );

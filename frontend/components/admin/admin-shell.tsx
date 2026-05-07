@@ -33,6 +33,18 @@ const navItems = [
     ),
   },
   {
+    href: "/admin/payments",
+    label: "Payments",
+    exact: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="1" y="3.5" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M1 6.5h14" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M3.5 10.5h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/users",
     label: "Users",
     exact: false,

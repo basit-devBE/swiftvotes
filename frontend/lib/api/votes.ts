@@ -36,6 +36,14 @@ export function getLeaderboard(
   return apiRequest<LeaderboardCategory[]>(`/events/${eventId}/leaderboard`);
 }
 
+export function getAdminLeaderboard(
+  eventId: string,
+): Promise<LeaderboardCategory[]> {
+  return apiRequest<LeaderboardCategory[]>(
+    `/events/${eventId}/votes/leaderboard`,
+  );
+}
+
 function buildPaymentsQuery(filters: ListPaymentsFilters = {}): string {
   const qs = new URLSearchParams();
   if (filters.status) qs.set("status", filters.status);

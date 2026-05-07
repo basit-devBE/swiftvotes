@@ -2,8 +2,10 @@ import { Payment, PaymentWebhookEvent } from "../../../domain/payment";
 import {
   PaymentSummary,
   PaymentWithContext,
+  PaymentWithFullContext,
 } from "../../../application/ports/payments.repository";
 import { PaymentDetailWithContext } from "../../../application/use-cases/get-payment-detail.use-case";
+import { ListAllPaymentsUseCaseResult } from "../../../application/use-cases/list-all-payments.use-case";
 import { ListEventPaymentsResult } from "../../../application/use-cases/list-event-payments.use-case";
 
 export class PaymentResponseDto {
@@ -27,6 +29,7 @@ export class PaymentResponseDto {
   mobileNumber!: string | null;
   customerIp!: string | null;
   eventId!: string;
+  eventName!: string | null;
   categoryId!: string;
   categoryName!: string | null;
   contestantId!: string;
@@ -36,7 +39,9 @@ export class PaymentResponseDto {
   createdAt!: Date;
   updatedAt!: Date;
 
-  static fromDomain(payment: Payment | PaymentWithContext): PaymentResponseDto {
+  static fromDomain(
+    payment: Payment | PaymentWithContext | PaymentWithFullContext,
+  ): PaymentResponseDto {
     return {
       id: payment.id,
       reference: payment.reference,
@@ -58,6 +63,7 @@ export class PaymentResponseDto {
       mobileNumber: payment.mobileNumber,
       customerIp: payment.customerIp,
       eventId: payment.eventId,
+      eventName: "eventName" in payment ? payment.eventName : null,
       categoryId: payment.categoryId,
       categoryName: "categoryName" in payment ? payment.categoryName : null,
       contestantId: payment.contestantId,
@@ -146,6 +152,18 @@ export class PaymentListResponseDto {
   summary!: PaymentSummaryResponseDto;
 
   static fromResult(result: ListEventPaymentsResult): PaymentListResponseDto {
+    return {
+      rows: result.rows.map((p) => PaymentResponseDto.fromDomain(p)),
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      summary: PaymentSummaryResponseDto.fromDomain(result.summary),
+    };
+  }
+
+  static fromAllResult(
+    result: ListAllPaymentsUseCaseResult,
+  ): PaymentListResponseDto {
     return {
       rows: result.rows.map((p) => PaymentResponseDto.fromDomain(p)),
       total: result.total,

@@ -10,6 +10,9 @@ import { PrismaService } from "../../../../core/prisma/prisma.service";
 import {
   ChannelBreakdownEntry,
   CreatePendingPaymentInput,
+  ListAllPaymentsFilters,
+  ListAllPaymentsInput,
+  ListAllPaymentsResult,
   ListPaymentsFilters,
   ListPaymentsInput,
   ListPaymentsResult,
@@ -18,6 +21,7 @@ import {
   PaymentDetail,
   PaymentSummary,
   PaymentsRepository,
+  PaymentWithFullContext,
   RecordWebhookEventInput,
   StatusBreakdownEntry,
 } from "../../application/ports/payments.repository";
@@ -170,6 +174,129 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
     };
   }
 
+  async listAll(input: ListAllPaymentsInput): Promise<ListAllPaymentsResult> {
+    const where = this.buildAllWhere(input.filters);
+    const skip = (input.page - 1) * input.pageSize;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: input.pageSize,
+        include: { event: { select: { name: true } } },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    const categoryIds = Array.from(new Set(rows.map((r) => r.categoryId)));
+    const contestantIds = Array.from(new Set(rows.map((r) => r.contestantId)));
+
+    const [categories, contestants] = await Promise.all([
+      categoryIds.length > 0
+        ? this.prisma.eventCategory.findMany({
+            where: { id: { in: categoryIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      contestantIds.length > 0
+        ? this.prisma.contestant.findMany({
+            where: { id: { in: contestantIds } },
+            select: { id: true, name: true, code: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const categoryById = new Map(categories.map((c) => [c.id, c]));
+    const contestantById = new Map(contestants.map((c) => [c.id, c]));
+
+    const mapped: PaymentWithFullContext[] = rows.map((p) => ({
+      ...this.toDomain(p),
+      eventName: p.event?.name ?? null,
+      categoryName: categoryById.get(p.categoryId)?.name ?? null,
+      contestantName: contestantById.get(p.contestantId)?.name ?? null,
+      contestantCode: contestantById.get(p.contestantId)?.code ?? null,
+    }));
+
+    return {
+      rows: mapped,
+      total,
+      page: input.page,
+      pageSize: input.pageSize,
+    };
+  }
+
+  async summarizeAll(filters: ListAllPaymentsFilters = {}): Promise<PaymentSummary> {
+    const where = this.buildAllWhere(filters);
+
+    const [byStatusRows, byChannelRows, currencyRow] = await Promise.all([
+      this.prisma.payment.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+        _sum: { amountPaidMinor: true, feeMinor: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ["channel"],
+        where: { ...where, status: PrismaPaymentStatus.SUCCEEDED },
+        _count: { _all: true },
+        _sum: { amountPaidMinor: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ["currency"],
+        where: { ...where, status: PrismaPaymentStatus.SUCCEEDED },
+        _count: { _all: true },
+        orderBy: { _count: { id: "desc" } },
+        take: 1,
+      }),
+    ]);
+
+    const buckets: Record<PrismaPaymentStatus, number> = {
+      PENDING: 0,
+      SUCCEEDED: 0,
+      FAILED: 0,
+      ABANDONED: 0,
+      REFUNDED: 0,
+    };
+    let totalCount = 0;
+    let grossMinor = 0;
+    let feesMinor = 0;
+
+    for (const r of byStatusRows) {
+      buckets[r.status] = r._count._all;
+      totalCount += r._count._all;
+      if (r.status === PrismaPaymentStatus.SUCCEEDED) {
+        grossMinor += r._sum.amountPaidMinor ?? 0;
+        feesMinor += r._sum.feeMinor ?? 0;
+      }
+    }
+
+    const byStatus: StatusBreakdownEntry[] = (
+      Object.keys(buckets) as PrismaPaymentStatus[]
+    ).map((s) => ({ status: s as PaymentStatus, count: buckets[s] }));
+
+    const byChannel: ChannelBreakdownEntry[] = byChannelRows.map((r) => ({
+      channel: r.channel ?? "unknown",
+      count: r._count._all,
+      totalAmountMinor: r._sum.amountPaidMinor ?? 0,
+    }));
+
+    return {
+      totalCount,
+      successCount: buckets.SUCCEEDED,
+      pendingCount: buckets.PENDING,
+      failedCount: buckets.FAILED,
+      abandonedCount: buckets.ABANDONED,
+      refundedCount: buckets.REFUNDED,
+      grossMinor,
+      feesMinor,
+      netMinor: grossMinor - feesMinor,
+      currency: currencyRow[0]?.currency ?? null,
+      byStatus,
+      byChannel,
+    };
+  }
+
   async findDetailById(paymentId: string): Promise<PaymentDetail | null> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -269,6 +396,28 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
       where.createdAt = {};
       if (filters.from) where.createdAt.gte = filters.from;
       if (filters.to) where.createdAt.lte = filters.to;
+    }
+    return where;
+  }
+
+  private buildAllWhere(filters: ListAllPaymentsFilters): Prisma.PaymentWhereInput {
+    const where: Prisma.PaymentWhereInput = {};
+    if (filters.status) where.status = filters.status as PrismaPaymentStatus;
+    if (filters.eventId) where.eventId = filters.eventId;
+    if (filters.from || filters.to) {
+      where.createdAt = {};
+      if (filters.from) where.createdAt.gte = filters.from;
+      if (filters.to) where.createdAt.lte = filters.to;
+    }
+    if (filters.search) {
+      const term = filters.search.trim();
+      if (term.length > 0) {
+        where.OR = [
+          { voterEmail: { contains: term, mode: "insensitive" } },
+          { reference: { contains: term, mode: "insensitive" } },
+          { providerRef: { contains: term, mode: "insensitive" } },
+        ];
+      }
     }
     return where;
   }

@@ -38,13 +38,16 @@ export class GetLeaderboardUseCase {
     private readonly contestantsRepository: ContestantsRepository,
   ) {}
 
-  async execute(eventId: string): Promise<LeaderboardCategory[]> {
+  async execute(
+    eventId: string,
+    options: { skipVisibilityCheck?: boolean } = {},
+  ): Promise<LeaderboardCategory[]> {
     const event = await this.eventsRepository.findById(eventId);
     if (!event) {
       throw new NotFoundException("Event not found.");
     }
 
-    if (!event.publicCanViewLeaderboard) {
+    if (!options.skipVisibilityCheck && !event.publicCanViewLeaderboard) {
       throw new ForbiddenException("Leaderboard is not public for this event.");
     }
 

@@ -289,6 +289,7 @@ export type PaymentResponse = {
   mobileNumber: string | null;
   customerIp: string | null;
   eventId: string;
+  eventName: string | null;
   categoryId: string;
   categoryName: string | null;
   contestantId: string;
