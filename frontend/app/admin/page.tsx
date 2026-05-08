@@ -292,7 +292,7 @@ export default function AdminDashboardPage() {
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
-              Platform command
+              Admin metrics
             </p>
             <h1 className="mt-2 font-display text-3xl font-semibold text-ink">
               Dashboard
@@ -333,7 +333,7 @@ export default function AdminDashboardPage() {
 
         {isLoading && !overview ? (
           <div className="rounded-[1.5rem] border border-line bg-white p-8 text-sm text-ink/45">
-            Loading dashboard data...
+            Loading votes, revenue, and event metrics...
           </div>
         ) : overview ? (
           <>

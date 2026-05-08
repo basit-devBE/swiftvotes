@@ -542,14 +542,14 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
             {pageHeading}
           </h1>
           <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#07111f]/62">
-            Build the event in guided steps with a live card preview and a cleaner approval workflow.
+            Add the public details, media, schedules, categories, and vote pricing that admins will review before approval.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
               5-step setup
             </span>
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
-              Live preview enabled
+              Approval-ready preview
             </span>
           </div>
         </div>
@@ -584,10 +584,10 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                 Event setup
               </p>
               <p className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.03em]">
-                Guided creation flow
+                Event approval checklist
               </p>
               <p className="mt-2 text-[12px] leading-5 text-white/70">
-                Each section moves the event closer to a publish-ready draft.
+                Complete each section before sending the event to the SwiftVote admin queue.
               </p>
             </div>
 
@@ -722,7 +722,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                       Identity
                     </p>
                     <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                      Use a specific event name and a description that tells voters exactly what this event is about.
+                      Use the event name people already know, then explain who can nominate, who can vote, and what the categories represent.
                     </p>
                   </div>
                 </div>
@@ -745,13 +745,13 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                         className={textareaCls}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Tell people what this event is about…"
+                        placeholder="Example: Campus Choice Awards celebrates student leaders across fashion, talent, impact, and entertainment categories. Public voting opens after nominations are confirmed."
                         disabled={!isEditable}
                       />
                     </Field>
                 </div>
                 <div className="mt-5 rounded-[20px] border border-[#e8eef7] bg-[#fafcff] px-4 py-3 text-[13px] leading-6 text-[#07111f]/58">
-                  Use a public-facing name, state what people are voting for, and keep the first sentence strong because it appears in previews.
+                  The first sentence appears on event cards, so write it like an announcement supporters would understand immediately.
                 </div>
               </div>
             )}
@@ -902,7 +902,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                     Visual assets
                   </p>
                   <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                    The flyer drives the card preview. Add a banner if you want a more polished event detail page.
+                    The flyer appears in event listings and voting pages. Add a banner when you have landscape artwork for the public event header.
                   </p>
                 </div>
                 <div className="grid gap-6 lg:grid-cols-2">

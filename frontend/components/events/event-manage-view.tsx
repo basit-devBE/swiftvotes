@@ -144,6 +144,17 @@ function formatMoney(minor: number | null | undefined, currency?: string | null)
   return `${currency ?? ""} ${(minor / 100).toFixed(2)}`.trim();
 }
 
+function normalizePhoneInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function validateOptionalPhone(value: string): string | null {
+  if (!value) return null;
+  if (!/^\d{10}$/.test(value)) return "Phone must be a 10-digit number.";
+  if (/^(\d)\1{9}$/.test(value)) return "Enter a real phone number, not repeated digits.";
+  return null;
+}
+
 function formatPaymentStatus(status: PaymentStatus): string {
   if (status === "SUCCEEDED") return "Succeeded";
   if (status === "PENDING") return "Pending";
@@ -660,7 +671,7 @@ function OverviewTab({
         </p>
         <div className="mt-5 space-y-3">
           {event.categories.length === 0 ? (
-            <p className="text-sm text-ink/46">No categories added yet.</p>
+            <p className="text-sm text-ink/46">Add at least one voting category before submitting this event.</p>
           ) : (
             event.categories.map((cat) => (
               <div
@@ -875,7 +886,7 @@ function NominationsTab({
         <div className="mt-8 rounded-[1.5rem] border border-primary/10 bg-white/60 p-12 text-center">
           <p className="text-base font-semibold text-ink/46">
             {filter === "all"
-              ? "No nominations yet."
+              ? "No nominations have been submitted for review yet."
               : `No ${formatNomStatus(filter as NominationStatus).toLowerCase()} nominations.`}
           </p>
           {filter === "all" && !notOpenYet && (
@@ -1029,8 +1040,9 @@ function ContestantDrawer({
       return;
     }
 
-    if (trimmedPhone && !/^\d{10}$/.test(trimmedPhone)) {
-      setFormError("Phone must be a 10-digit number.");
+    const phoneError = validateOptionalPhone(trimmedPhone);
+    if (phoneError) {
+      setFormError(phoneError);
       return;
     }
 
@@ -1143,7 +1155,7 @@ function ContestantDrawer({
                 <span className="text-xs font-semibold text-ink/52">Phone</span>
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
                   inputMode="numeric"
                   placeholder="0240000000"
                   className="mt-1.5 w-full rounded-xl border border-primary/12 bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-primary/42 focus:ring-2 focus:ring-primary/10"
@@ -1357,7 +1369,7 @@ function ContestantsTab({
           </svg>
         </div>
         <h3 className="mt-4 font-display text-xl font-semibold tracking-[-0.03em] text-ink">
-          No contestants yet
+          No confirmed contestants yet
         </h3>
         <p className="mt-2 max-w-sm text-sm leading-6 text-ink/50">
           Contestants appear here once nominations are confirmed. Go to the Nominations tab to review and confirm pending nominations.
@@ -2038,7 +2050,7 @@ function LeaderboardTab({ eventId }: { eventId: string }) {
       {!isLoading && !error && populated.length === 0 && (
         <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-10 text-center shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
           <p className="font-display text-lg font-semibold tracking-[-0.03em] text-ink">
-            No votes yet
+            No counted votes yet
           </p>
           <p className="mt-1 text-sm text-ink/44">
             Once contestants start receiving votes, the leaderboard will appear here.

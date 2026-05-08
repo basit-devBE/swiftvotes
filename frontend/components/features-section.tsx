@@ -10,27 +10,27 @@ import { SectionHeading } from "@/components/section-heading";
 const features = [
   {
     icon: <BallotIcon />,
-    title: "Easy voting",
+    title: "Category-based voting",
     description:
-      "Give supporters a direct path from discovery to checkout with a fast voting flow that removes friction.",
+      "Let supporters vote from the public event page with contestant codes, quantities, and per-category pricing clearly shown.",
   },
   {
     icon: <LockIcon />,
-    title: "Secure payments",
+    title: "Paystack-backed payments",
     description:
-      "Support trusted payment experiences with confirmation-ready records built for confidence and accountability.",
+      "Paid votes stay pending until Paystack verification succeeds, with payment rows, fees, references, and webhook history recorded.",
   },
   {
     icon: <PulseIcon />,
-    title: "Real-time results",
+    title: "Controlled leaderboards",
     description:
-      "Keep event teams informed with live activity, fast visibility, and clean result tracking across every category.",
+      "Show public rankings when the organiser allows it, while contestants can separately be granted access to their own counts.",
   },
   {
     icon: <LayersIcon />,
-    title: "Multi-event support",
+    title: "Event approval workflow",
     description:
-      "Run pageants, awards, and campaigns from one platform without sacrificing clarity or control.",
+      "Creators draft events, submit them for review, and move through nominations and voting on scheduled dates.",
   },
 ];
 
@@ -40,8 +40,8 @@ export function FeaturesSection() {
       <div className="page-shell">
         <SectionHeading
           kicker="Features"
-          title="Everything needed to run a polished voting experience."
-          description="SwiftVote is designed for elegant public interactions on the front end and dependable control behind the scenes."
+          title="The pieces an organiser actually needs before voting day."
+          description="SwiftVote connects the public campaign page to the operational work behind it: approvals, contestants, vote pricing, payments, and reporting."
           align="center"
         />
 

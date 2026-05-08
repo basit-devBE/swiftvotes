@@ -37,7 +37,7 @@ export default function AdminUsersPage() {
       <div className="mb-8 border-b border-line pb-8">
         <p className="section-kicker">Users</p>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.04em] text-ink">
-          User management
+          Account access control
         </h1>
         {!isLoading && (
           <p className="mt-1.5 text-sm text-ink/50">
@@ -54,7 +54,7 @@ export default function AdminUsersPage() {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-ink/40">Loading users…</p>
+        <p className="text-sm text-ink/40">Loading organiser and voter accounts…</p>
       ) : (
         <UsersTable initialUsers={users} />
       )}

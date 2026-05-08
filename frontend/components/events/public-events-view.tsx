@@ -114,10 +114,11 @@ export function PublicEventsView() {
                 Event directory
               </p>
               <h1 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[0.96] text-ink sm:text-5xl lg:text-[4.5rem]">
-                Browse campaigns ready for public voting.
+                Browse approved event campaigns.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
-                Find approved events, open nomination windows, scheduled voting campaigns, and live contests from one polished directory.
+                These events have passed platform review. Some are collecting nominations,
+                some are scheduled, and live campaigns can accept votes immediately.
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -162,7 +163,7 @@ export function PublicEventsView() {
               </>
             ) : (
               <div className="flex h-full min-h-[360px] items-center justify-center text-sm text-white/50">
-                No featured event yet
+                Approved events will appear here after review
               </div>
             )}
           </div>
@@ -241,8 +242,10 @@ export function PublicEventsView() {
 
       {!isLoading && filteredEvents.length === 0 ? (
         <div className="mt-6 rounded-[1.5rem] border border-dashed border-line bg-white p-10 text-center">
-          <p className="font-display text-2xl font-semibold text-ink">No matching events</p>
-          <p className="mt-2 text-sm text-ink/50">Clear the search or choose another status.</p>
+          <p className="font-display text-2xl font-semibold text-ink">No events match those filters</p>
+          <p className="mt-2 text-sm text-ink/50">
+            Try another status, search by category, or clear the search field.
+          </p>
         </div>
       ) : null}
 

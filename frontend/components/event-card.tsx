@@ -9,6 +9,7 @@ type EventCardProps = {
   imageSrc?: string;
   visualTone: "blue" | "indigo" | "amber" | "slate" | "crimson";
   ctaLabel?: string;
+  href?: string;
   indexLabel?: string;
   isActive?: boolean;
   onSelect?: () => void;
@@ -35,6 +36,7 @@ export function EventCard({
   imageSrc,
   visualTone,
   ctaLabel,
+  href = "/events",
   indexLabel,
   isActive = false,
   onSelect,
@@ -86,7 +88,7 @@ export function EventCard({
         {isActive ? (
           <div className="mt-7 flex items-center justify-between gap-4">
             <Link
-              href="/signup"
+              href={href}
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center justify-center rounded-full bg-white/90 px-6 py-3 text-sm font-semibold text-[#07111f] transition duration-300 hover:bg-white"
             >

@@ -116,10 +116,11 @@ export function MyEventsView() {
                 Event workspace
               </p>
               <h1 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[0.96] text-ink sm:text-5xl lg:text-[4.5rem]">
-                Manage every campaign from one clear board.
+                Keep every event moving toward approval and voting day.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
-                Track drafts, approvals, live voting, and rejected events without digging through a basic list.
+                See which drafts still need work, which events are waiting for review,
+                and which campaigns are already taking nominations or votes.
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-4">
@@ -137,10 +138,10 @@ export function MyEventsView() {
                 Next action
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold leading-none text-white">
-                Build the next event.
+                Start the next voting campaign.
               </h2>
               <p className="mt-3 text-sm leading-6 text-white/60">
-                Start with event details, upload media, add categories, and submit for approval.
+                Add the flyer, categories, prices, nominations, and voting dates before sending it to admin review.
               </p>
               <Link
                 href="/events/create"
@@ -234,9 +235,9 @@ export function MyEventsView() {
 
       {!isLoading && filteredEvents.length === 0 ? (
         <div className="mt-6 rounded-[1.5rem] border border-dashed border-line bg-white p-10 text-center">
-          <p className="font-display text-2xl font-semibold text-ink">No matching events</p>
+          <p className="font-display text-2xl font-semibold text-ink">No events match this workspace view</p>
           <p className="mt-2 text-sm text-ink/50">
-            Clear the filters or create a new event to get started.
+            Clear the filters, search by event name, or start a new campaign draft.
           </p>
           <Link
             href="/events/create"

@@ -111,7 +111,7 @@ export function Navbar() {
                   href="/signup"
                   className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-deep"
                 >
-                  Get Started
+                  Create account
                 </Link>
               </>
             )}
@@ -213,7 +213,7 @@ export function Navbar() {
                     onClick={() => setIsOpen(false)}
                     className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white"
                   >
-                    Get Started
+                    Create account
                   </Link>
                 </>
               )}

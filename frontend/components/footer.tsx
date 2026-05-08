@@ -3,10 +3,10 @@ import Link from "next/link";
 import { SiteLogo } from "@/components/site-logo";
 
 const footerLinks = [
-  { href: "/#features", label: "Features" },
-  { href: "/#how-it-works", label: "How it Works" },
-  { href: "/#events", label: "Events" },
-  { href: "/signup", label: "Get Started" },
+  { href: "/#features", label: "Voting tools" },
+  { href: "/#how-it-works", label: "Workflow" },
+  { href: "/#events", label: "Live campaigns" },
+  { href: "/signup", label: "Create event" },
 ];
 
 export function Footer() {
@@ -17,8 +17,8 @@ export function Footer() {
           <div className="max-w-md">
             <SiteLogo className="rounded-[1.5rem] bg-white px-4 py-2 shadow-soft" />
             <p className="mt-6 text-base leading-7 text-white/62">
-              SwiftVote delivers a clean, secure path from nomination to final
-              result for modern events and pageantry teams.
+              SwiftVote helps organisers run reviewed campaigns with nominations,
+              contestant profiles, paid vote verification, and payment records.
             </p>
           </div>
 
@@ -36,7 +36,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-6 text-sm text-white/45">
-          © 2026 SwiftVote. Fast, secured and trusted.
+          © 2026 SwiftVote. Built for nominations, paid voting, and event reporting.
         </div>
       </div>
     </footer>

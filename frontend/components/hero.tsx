@@ -2,21 +2,21 @@ import Image from "next/image";
 import Link from "next/link";
 
 const trustPoints = [
-  "Secure voting flow",
-  "Live event visibility",
-  "Multi-event ready",
+  "Paid and free categories",
+  "Contestant vote visibility controls",
+  "Admin approval before launch",
 ];
 
 const heroMetrics = [
-  { value: "24/7", label: "Always-on access" },
-  { value: "Live", label: "Result tracking" },
-  { value: "Swift", label: "Checkout experience" },
+  { value: "GHS", label: "Paystack-ready payments" },
+  { value: "Live", label: "Category leaderboards" },
+  { value: "Auto", label: "Scheduled voting windows" },
 ];
 
 const stageNotes = [
-  "Live vote tracking",
-  "Direct nomination flow",
-  "Fast confirmations",
+  "Nomination review",
+  "Payment receipts",
+  "Contestant profiles",
 ];
 
 export function Hero() {
@@ -24,22 +24,22 @@ export function Hero() {
     <section className="page-shell pb-16 pt-10 sm:pb-20 sm:pt-14 lg:pb-24 lg:pt-20">
       <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1.02fr)_minmax(24rem,0.98fr)] lg:gap-16">
         <div className="max-w-3xl">
-          <span className="eyebrow">Fast, secured and trusted</span>
+          <span className="eyebrow">Built for Ghanaian awards and pageants</span>
           <h1 className="mt-7 max-w-4xl font-display text-6xl font-semibold leading-[0.9] tracking-[-0.05em] text-ink text-balance sm:text-7xl lg:text-[6.35rem]">
-            Vote smarter. Decide faster.
+            Run nominations, voting, and payments in one place.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-ink/72 sm:text-xl">
-            SwiftVote gives events and pageantry teams a premium platform for
-            nominations, secure voting, live tracking, and audience trust from
-            the first click.
+            SwiftVote helps event teams publish approved campaigns, collect nominations,
+            onboard contestants, take paid votes through Paystack, and keep every vote
+            traceable from public page to admin ledger.
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <Link href="/signup" className="button-primary">
-              Get Started
+              Create an event
             </Link>
             <Link href="/#events" className="button-secondary">
-              Explore Events
+              View live campaigns
             </Link>
           </div>
 
@@ -78,23 +78,23 @@ export function Hero() {
 
               <div className="relative z-10 flex items-center justify-between px-6 pt-6 sm:px-8 sm:pt-8">
                 <div className="rounded-full border border-primary/12 bg-white/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-primary shadow-soft">
-                  Crowd powered
+                  Public campaign page
                 </div>
                 <div className="rounded-full border border-primary/12 bg-primary-soft/84 px-4 py-2 text-sm font-semibold text-primary-deep shadow-soft">
-                  Secure
+                  Paystack-ready
                 </div>
               </div>
 
               <div className="relative z-10 max-w-[27rem] px-6 pb-52 pt-8 sm:px-8 sm:pb-56">
                 <p className="text-sm font-medium text-primary/72">
-                  Built for modern voting moments
+                  Built around real event operations
                 </p>
                 <h2 className="mt-4 max-w-md font-display text-4xl font-semibold leading-[0.95] tracking-[-0.04em] text-ink sm:text-5xl">
-                  Energy from the crowd. Control for the team.
+                  Public voting for supporters. Controls for organisers.
                 </h2>
                 <p className="mt-4 max-w-sm text-base leading-7 text-ink/66">
-                  High-attention events need a front page that feels alive
-                  without sacrificing clarity or trust.
+                  Open nominations, approve contestants, sell paid vote bundles,
+                  and decide who can see live results.
                 </p>
 
                 <div className="mt-7 flex flex-wrap gap-3">
@@ -119,7 +119,7 @@ export function Hero() {
 
               <div className="absolute right-6 top-20 z-20 sm:right-8">
                 <div className="rounded-full bg-[#07111f] px-4 py-2 text-sm font-medium text-white shadow-[0_18px_40px_rgba(7,17,31,0.22)]">
-                  Live voting
+                  Voting live
                 </div>
               </div>
 
@@ -127,10 +127,10 @@ export function Hero() {
                 <div className="flex flex-col gap-4 rounded-[1.6rem] border border-white/90 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(244,247,252,0.96))] px-5 py-4 shadow-[0_20px_50px_rgba(7,17,31,0.18)] sm:flex-row sm:items-end sm:justify-between sm:px-6">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.26em] text-primary/80">
-                      Audience confidence
+                      Voter receipt trail
                     </p>
                     <p className="mt-2 font-display text-[1.9rem] font-semibold leading-none tracking-[-0.03em] text-[#12306f] sm:text-[2.15rem]">
-                      Clear flow. Real momentum.
+                      Every paid vote verifies before it counts.
                     </p>
                   </div>
                   <div className="sm:text-right">
