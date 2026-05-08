@@ -144,6 +144,17 @@ function formatMoney(minor: number | null | undefined, currency?: string | null)
   return `${currency ?? ""} ${(minor / 100).toFixed(2)}`.trim();
 }
 
+function normalizePhoneInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function validateOptionalPhone(value: string): string | null {
+  if (!value) return null;
+  if (!/^\d{10}$/.test(value)) return "Phone must be a 10-digit number.";
+  if (/^(\d)\1{9}$/.test(value)) return "Enter a real phone number, not repeated digits.";
+  return null;
+}
+
 function formatPaymentStatus(status: PaymentStatus): string {
   if (status === "SUCCEEDED") return "Succeeded";
   if (status === "PENDING") return "Pending";
@@ -1029,8 +1040,9 @@ function ContestantDrawer({
       return;
     }
 
-    if (trimmedPhone && !/^\d{10}$/.test(trimmedPhone)) {
-      setFormError("Phone must be a 10-digit number.");
+    const phoneError = validateOptionalPhone(trimmedPhone);
+    if (phoneError) {
+      setFormError(phoneError);
       return;
     }
 
@@ -1143,7 +1155,7 @@ function ContestantDrawer({
                 <span className="text-xs font-semibold text-ink/52">Phone</span>
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
                   inputMode="numeric"
                   placeholder="0240000000"
                   className="mt-1.5 w-full rounded-xl border border-primary/12 bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-primary/42 focus:ring-2 focus:ring-primary/10"

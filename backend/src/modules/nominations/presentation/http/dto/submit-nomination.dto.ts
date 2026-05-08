@@ -23,8 +23,8 @@ export class SubmitNominationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
-  @Matches(/^\d{10}$/, {
-    message: "submitterPhone must be a 10-digit phone number.",
+  @Matches(/^(?!([0-9])\1{9}$)\d{10}$/, {
+    message: "submitterPhone must be a valid 10-digit phone number.",
   })
   submitterPhone!: string;
 
@@ -39,8 +39,8 @@ export class SubmitNominationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
-  @Matches(/^\d{10}$/, {
-    message: "nomineePhone must be a 10-digit phone number.",
+  @Matches(/^(?!([0-9])\1{9}$)\d{10}$/, {
+    message: "nomineePhone must be a valid 10-digit phone number.",
   })
   nomineePhone!: string;
 

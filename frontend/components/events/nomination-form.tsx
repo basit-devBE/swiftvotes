@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ApiClientError } from "@/lib/api/client";
 import { submitNomination } from "@/lib/api/events";
@@ -28,6 +28,21 @@ function formatDate(date: string | null): string {
 function formatCurrency(minor: number, currency: string): string {
   if (minor === 0) return "Free";
   return `${currency} ${(minor / 100).toFixed(2)}`;
+}
+
+function normalizePhoneInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function validateGhanaPhone(value: string): string | null {
+  const normalized = value.trim();
+  if (!/^\d{10}$/.test(normalized)) {
+    return "Enter a 10-digit phone number, e.g. 0257323294.";
+  }
+  if (/^(\d)\1{9}$/.test(normalized)) {
+    return "Enter a real phone number, not repeated digits.";
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +353,6 @@ type FormErrors = Partial<Record<keyof FormState, string>>;
 function validate(form: FormState): FormErrors {
   const errors: FormErrors = {};
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRe = /^\d{10}$/;
 
   if (!form.categoryId) errors.categoryId = "Please select a category.";
   if (!form.submitterName.trim()) errors.submitterName = "Your name is required.";
@@ -347,8 +361,9 @@ function validate(form: FormState): FormErrors {
   }
   if (!form.submitterPhone.trim()) {
     errors.submitterPhone = "Your phone number is required.";
-  } else if (!phoneRe.test(form.submitterPhone.trim())) {
-    errors.submitterPhone = "Enter a 10-digit phone number, e.g. 0257323294.";
+  } else {
+    const phoneError = validateGhanaPhone(form.submitterPhone);
+    if (phoneError) errors.submitterPhone = phoneError;
   }
   if (!form.nomineeName.trim()) errors.nomineeName = "Nominee name is required.";
   if (form.nomineeEmail && !emailRe.test(form.nomineeEmail.trim())) {
@@ -356,8 +371,9 @@ function validate(form: FormState): FormErrors {
   }
   if (!form.nomineePhone.trim()) {
     errors.nomineePhone = "Nominee phone number is required.";
-  } else if (!phoneRe.test(form.nomineePhone.trim())) {
-    errors.nomineePhone = "Enter a 10-digit phone number, e.g. 0257323294.";
+  } else {
+    const phoneError = validateGhanaPhone(form.nomineePhone);
+    if (phoneError) errors.nomineePhone = phoneError;
   }
   return errors;
 }
@@ -367,6 +383,9 @@ export function NominationForm({
 }: {
   event: EventResponse;
 }) {
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
   const [form, setForm] = useState<FormState>({
     categoryId: event.categories.length === 1 ? event.categories[0]!.id : "",
     submitterName: "",
@@ -387,6 +406,26 @@ export function NominationForm({
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
+
+  function selectCategory(categoryId: string, options: { jumpToDetails?: boolean } = {}) {
+    set("categoryId", categoryId);
+    setCategoryPickerOpen(false);
+    setCategorySearch("");
+    if (options.jumpToDetails) {
+      window.setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
+    }
+  }
+
+  useEffect(() => {
+    if (!categoryPickerOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [categoryPickerOpen]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -476,23 +515,125 @@ export function NominationForm({
   }
 
   const selectedCategory = event.categories.find((c) => c.id === form.categoryId);
+  const hasLongCategoryList = event.categories.length > 4;
+  const categoryQuery = categorySearch.trim().toLowerCase();
+  const mobileCategories = categoryQuery
+    ? event.categories.filter((category) =>
+        [category.name, category.description ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(categoryQuery),
+      )
+    : event.categories;
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} noValidate>
       <div className="space-y-6">
+        <div className="sticky top-3 z-20 rounded-2xl border border-primary/14 bg-white/95 p-3 shadow-[0_14px_34px_-24px_rgba(7,17,31,0.38)] backdrop-blur">
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-ink/36">
+            Nomination context
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-ink">
+            {event.name}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                selectedCategory
+                  ? "bg-primary text-white"
+                  : "border border-[#d6deeb] bg-[#f8fafc] text-ink/50"
+              }`}
+            >
+              {selectedCategory ? selectedCategory.name : "Choose a category"}
+            </span>
+            {selectedCategory ? (
+              <button
+                type="button"
+                onClick={() => detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="rounded-full border border-primary/18 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/6"
+              >
+                Continue to details
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         {/* Category */}
         <Field
           label="Which category?"
           required
           error={errors.categoryId}
         >
-          <div className="mt-2 space-y-2.5">
+          {hasLongCategoryList ? (
+            <p className="mt-1 hidden text-xs text-ink/42 sm:block">
+              {event.categories.length} categories available. This list scrolls independently on larger screens.
+            </p>
+          ) : null}
+          <div className="mt-2 sm:hidden">
+            <button
+              type="button"
+              onClick={() => setCategoryPickerOpen(true)}
+              className={`flex min-h-[52px] w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                selectedCategory
+                  ? "border-primary bg-[#eef4ff]"
+                  : "border-[#d6deeb] bg-white"
+              }`}
+              aria-haspopup="dialog"
+              aria-expanded={categoryPickerOpen}
+            >
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-ink/38">
+                  Category
+                </span>
+                <span className="mt-1 block truncate text-sm font-semibold text-ink">
+                  {selectedCategory ? selectedCategory.name : "Choose a nomination category"}
+                </span>
+              </span>
+              <svg
+                className="h-5 w-5 shrink-0 text-primary"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+            {selectedCategory ? (
+              <div className="mt-3 rounded-2xl border border-primary/14 bg-[#f8fbff] px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">{selectedCategory.name}</p>
+                    {selectedCategory.description ? (
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-ink/52">
+                        {selectedCategory.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 rounded-full border border-primary/18 bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-primary/80">
+                    {formatCurrency(selectedCategory.votePriceMinor, selectedCategory.currency)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div
+            className={[
+              "mt-2 hidden space-y-2.5 sm:block",
+              hasLongCategoryList
+                ? "max-h-[320px] overflow-y-auto pr-1 [scrollbar-width:thin]"
+                : "",
+            ].join(" ")}
+          >
             {event.categories.map((cat) => (
               <CategoryOption
                 key={cat.id}
                 category={cat}
                 selected={form.categoryId === cat.id}
-                onSelect={() => set("categoryId", cat.id)}
+                onSelect={() => selectCategory(cat.id)}
               />
             ))}
           </div>
@@ -501,7 +642,7 @@ export function NominationForm({
         <div className="border-t border-[#edf0f6]" />
 
         {/* Submitter */}
-        <div>
+        <div ref={detailsRef} className="scroll-mt-28">
           <p className="mb-4 text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
             Your details
           </p>
@@ -524,7 +665,7 @@ export function NominationForm({
                 className={inputClass}
                 placeholder="0257323294"
                 value={form.submitterPhone}
-                onChange={(e) => set("submitterPhone", e.target.value)}
+                onChange={(e) => set("submitterPhone", normalizePhoneInput(e.target.value))}
               />
             </Field>
             <Field
@@ -585,7 +726,7 @@ export function NominationForm({
                 className={inputClass}
                 placeholder="0257323294"
                 value={form.nomineePhone}
-                onChange={(e) => set("nomineePhone", e.target.value)}
+                onChange={(e) => set("nomineePhone", normalizePhoneInput(e.target.value))}
               />
             </Field>
           </div>
@@ -619,6 +760,108 @@ export function NominationForm({
           Nominations are reviewed by the event team before going live.
         </p>
       </div>
+
+      {categoryPickerOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-ink/45 backdrop-blur-[2px] sm:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose nomination category"
+        >
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close category picker"
+            onClick={() => setCategoryPickerOpen(false)}
+          />
+          <div className="relative max-h-[82vh] w-full overflow-hidden rounded-t-[1.5rem] bg-white shadow-[0_-24px_70px_rgba(7,17,31,0.22)]">
+            <div className="border-b border-[#edf0f6] px-5 py-4">
+              <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-[#d6deeb]" />
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[0.64rem] font-semibold uppercase tracking-[0.22em] text-ink/38">
+                    {event.name}
+                  </p>
+                  <h3 className="mt-1 font-display text-2xl font-semibold tracking-[-0.03em] text-ink">
+                    Choose category
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCategoryPickerOpen(false)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f6fb] text-ink/55"
+                  aria-label="Close"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
+                </button>
+              </div>
+              {event.categories.length > 6 ? (
+                <div className="mt-4">
+                  <input
+                    type="search"
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    placeholder="Search category"
+                    className={inputClass}
+                    autoFocus
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="max-h-[58vh] overflow-y-auto px-5 py-4">
+              {mobileCategories.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#d6deeb] bg-[#f8fafc] px-4 py-8 text-center text-sm text-ink/48">
+                  No category matches that search.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {mobileCategories.map((category) => {
+                    const selected = form.categoryId === category.id;
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => selectCategory(category.id, { jumpToDetails: true })}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                          selected
+                            ? "border-primary bg-[#eef4ff] shadow-[0_0_0_3px_rgba(15,76,219,0.1)]"
+                            : "border-[#dce4f1] bg-white"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-ink">{category.name}</p>
+                            {category.description ? (
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-ink/52">
+                                {category.description}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <span className="rounded-full border border-primary/18 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
+                              {formatCurrency(category.votePriceMinor, category.currency)}
+                            </span>
+                            {selected ? (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white">
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                  <path d="M12.78 5.22a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 1 1 1.06-1.06L7 9.94l4.72-4.72a.75.75 0 0 1 1.06 0Z" />
+                                </svg>
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

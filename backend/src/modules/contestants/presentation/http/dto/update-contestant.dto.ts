@@ -19,8 +19,8 @@ export class UpdateContestantDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
-  @Matches(/^\d{10}$/, {
-    message: "phone must be a 10-digit phone number.",
+  @Matches(/^(?!([0-9])\1{9}$)\d{10}$/, {
+    message: "phone must be a valid 10-digit phone number.",
   })
   phone?: string | null;
 
