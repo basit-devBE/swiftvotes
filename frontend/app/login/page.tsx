@@ -13,10 +13,10 @@ export default function LoginPage() {
         <main className="flex-1">
         <AuthShell
           eyebrow="Sign in"
-          title="Sign in to SwiftVote."
-          description="Use your account to continue into SwiftVote and verify the live auth flow against the backend."
-          footerText="Don’t have an account yet?"
-          footerLinkLabel="Create one"
+          title="Sign in to manage your events."
+          description="Continue to your event workspace, approve nominations, review contestants, or check vote and payment activity."
+          footerText="Running a new campaign?"
+          footerLinkLabel="Create an organiser account"
           footerLinkHref="/signup"
         >
           <Suspense fallback={<div className="text-sm text-ink/54">Loading sign-in form...</div>}>

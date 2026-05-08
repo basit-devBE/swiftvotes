@@ -23,13 +23,13 @@ export function RequireAuth({
   if (status !== "authenticated") {
     return (
       <div className="mx-auto max-w-3xl border-t border-primary/15 pt-10">
-        <p className="section-kicker">Session check</p>
+        <p className="section-kicker">Checking organiser access</p>
         <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-0.04em] text-ink sm:text-5xl">
-          Verifying your access.
+          Restoring your SwiftVote session.
         </h2>
         <p className="mt-4 max-w-xl text-base leading-7 text-ink/64">
-          We&apos;re checking your session and restoring your account if your
-          refresh cookie is still valid.
+          We&apos;re confirming your account before opening event management,
+          contestant tools, or payment records.
         </p>
       </div>
     );

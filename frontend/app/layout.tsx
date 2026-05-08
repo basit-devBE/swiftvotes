@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SwiftVote",
   description:
-    "SwiftVote is a fast, secure, and trustworthy platform for nominations, online voting, and event engagement.",
+    "SwiftVote helps organisers run approved event campaigns with nominations, contestants, paid voting, Paystack verification, and vote reporting.",
   icons: {
     icon: "/swiftvote-logo.png",
     shortcut: "/swiftvote-logo.png",

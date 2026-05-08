@@ -155,9 +155,10 @@ export function MyProfileView() {
           </svg>
         </div>
         <div>
-          <p className="font-semibold text-ink">No contestant profiles yet</p>
+          <p className="font-semibold text-ink">No contestant access has been issued yet</p>
           <p className="mt-1 text-sm text-ink/50">
-            You haven&apos;t been registered as a contestant in any event.
+            When an organiser confirms your nomination and provisions your login,
+            your contestant profile will appear here.
           </p>
         </div>
         <Link href="/events" className="button-secondary mt-2">
@@ -171,12 +172,12 @@ export function MyProfileView() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          My Contestant Profile
+          My contestant profiles
         </h1>
         <p className="mt-2 text-ink/50">
           {profiles.length === 1
-            ? "You're contesting in 1 event. Click the card to see your votes and ranking."
-            : `You're contesting in ${profiles.length} events. Click a card to open it.`}
+            ? "Open your profile to see the event, category, code, and any vote information the organiser has made visible."
+            : `You have contestant access for ${profiles.length} events. Open a card to review its event, category, code, and visibility settings.`}
         </p>
       </div>
 

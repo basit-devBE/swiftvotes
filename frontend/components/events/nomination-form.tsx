@@ -55,7 +55,7 @@ export function StatusBanner({ event }: { event: EventResponse }) {
       color: "border-[#dce4f1] bg-[#f4f6fb] text-ink/60",
       icon: "M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z",
       title: "Nominations have closed",
-      body: "The nomination period for this event has ended. Check back to vote when voting opens.",
+      body: "Nominations are closed for this event. Return during the voting window to support confirmed contestants.",
     },
     VOTING_SCHEDULED: {
       color: "border-primary/18 bg-[#eef4ff] text-primary",

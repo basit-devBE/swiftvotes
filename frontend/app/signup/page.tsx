@@ -11,9 +11,9 @@ export default function SignupPage() {
         <main className="flex-1">
         <AuthShell
           eyebrow="Create account"
-          title="Create your SwiftVote account."
-          description="Start with a clean account flow now so you can move into event creation and team management in the next product phase."
-          footerText="Already created an account?"
+          title="Create an organiser account."
+          description="Use this account to create events, submit them for approval, confirm nominations, and manage voting windows."
+          footerText="Already managing an event?"
           footerLinkLabel="Sign in"
           footerLinkHref="/login"
         >

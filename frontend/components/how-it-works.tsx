@@ -5,23 +5,23 @@ import { StepCard } from "@/components/step-card";
 const steps = [
   {
     step: "01",
-    title: "Nominate or join",
+    title: "Create and submit",
     description:
-      "Start with a featured event, category, or contestant and move into the process without confusion.",
+      "Add the event flyer, categories, prices, nomination dates, and voting window before sending it for admin approval.",
     icon: <CursorIcon />,
   },
   {
     step: "02",
-    title: "Vote securely",
+    title: "Approve contestants",
     description:
-      "Complete your vote through a simple, trusted flow built to protect payments and keep records accurate.",
+      "Review nominations, confirm contestant details, and send login access to contestants who need their profile.",
     icon: <ShieldIcon />,
   },
   {
     step: "03",
-    title: "Track results",
+    title: "Collect verified votes",
     description:
-      "Follow momentum as activity updates in real time and event teams stay informed throughout the campaign.",
+      "Free votes count immediately; paid votes count only after Paystack confirms the matching amount, currency, and reference.",
     icon: <ChartIcon />,
   },
 ];
@@ -34,17 +34,17 @@ export function HowItWorks() {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1fr)] lg:items-end">
             <SectionHeading
               kicker="How it works"
-              title="A clear flow for supporters and organizers alike."
-              description="The experience stays minimal on the surface while handling the important details underneath."
+              title="From draft event to counted vote."
+              description="SwiftVote mirrors the way awards and pageants are run: prepare the campaign, approve the lineup, open voting, then reconcile results and payments."
             />
 
             <div
               id="admin"
               className="rounded-[1.8rem] border border-primary/10 bg-primary-soft/70 p-6"
             >
-              <p className="section-kicker">Admin-ready</p>
+              <p className="section-kicker">For event teams</p>
               <p className="mt-4 font-display text-3xl font-semibold tracking-[-0.03em] text-primary-deep">
-                Schedule windows, moderate visibility, and monitor activity without clutter.
+                Schedule nomination and voting windows, decide leaderboard visibility, and keep payment records ready for review.
               </p>
             </div>
           </div>

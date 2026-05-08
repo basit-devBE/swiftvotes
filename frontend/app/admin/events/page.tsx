@@ -44,7 +44,7 @@ export default function AdminEventsPage() {
       <div className="mb-8 border-b border-line pb-8">
         <p className="section-kicker">Events</p>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.04em] text-ink">
-          Event management
+          Event review queue
         </h1>
       </div>
 
@@ -81,7 +81,7 @@ export default function AdminEventsPage() {
       {tab === "all" && (
         <div className="mt-2">
           {isLoadingAll ? (
-            <p className="mt-6 text-sm text-ink/40">Loading events…</p>
+            <p className="mt-6 text-sm text-ink/40">Loading approved and draft events…</p>
           ) : (
             <AllEventsTable events={allEvents} />
           )}

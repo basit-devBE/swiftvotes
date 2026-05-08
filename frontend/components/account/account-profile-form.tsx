@@ -76,7 +76,7 @@ export function AccountProfileForm() {
       const updatedUser = await updateCurrentUser({ fullName });
       setUser(updatedUser);
       setFullName(updatedUser.fullName);
-      setSuccess("Profile updated successfully.");
+      setSuccess("Your organiser profile has been updated.");
     } catch (submissionError) {
       if (submissionError instanceof ApiClientError) {
         setError(submissionError.message || "Unable to update profile.");
@@ -95,11 +95,11 @@ export function AccountProfileForm() {
         <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <h1 className="font-display text-4xl font-semibold tracking-[-0.045em] text-ink sm:text-5xl lg:text-[4.2rem]">
-              Your SwiftVote profile.
+              Account details for event operations.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
-              Keep your core account details current while the backend handles
-              session restoration through your refresh cookie.
+              This name appears in organiser workflows and helps SwiftVote keep
+              event ownership, approvals, and support activity tied to the right account.
             </p>
           </div>
 
@@ -128,7 +128,7 @@ export function AccountProfileForm() {
         <form onSubmit={handleSubmit} className="max-w-2xl">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ink/42">
-              Profile
+              Public organiser name
             </p>
             <div className="mt-6 space-y-3">
               <label className="block space-y-2">
@@ -147,7 +147,7 @@ export function AccountProfileForm() {
                   className={`form-input ${
                     fieldError ? "form-input-invalid" : ""
                   }`}
-                  placeholder="Your name"
+                  placeholder="Ama Mensah"
                   required
                 />
                 {fieldError ? (
@@ -174,7 +174,7 @@ export function AccountProfileForm() {
               {isSaving ? "Saving..." : "Save changes"}
             </button>
             <Link href="/my-events" className="button-secondary">
-              My events
+              Event workspace
             </Link>
             <button
               type="button"
@@ -190,7 +190,7 @@ export function AccountProfileForm() {
 
         <aside className="border-t border-primary/12 pt-1 lg:border-l lg:border-t-0 lg:pl-10">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ink/42">
-            Identity
+            Account record
           </p>
           <dl className="mt-6 space-y-8">
             <div>

@@ -212,7 +212,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
           setError(
             err instanceof ApiClientError
               ? err.message
-              : "Unable to load this event.",
+              : "We could not open this event page right now.",
           );
         }
       } finally {
@@ -353,11 +353,10 @@ export function PublicEventView({ eventId }: { eventId: string }) {
           {contestantsByCategory.length === 0 || contestants.length === 0 ? (
             <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-10 text-center shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
               <p className="font-display text-xl font-semibold text-ink">
-                No contestants yet
+                Contestants have not been published yet
               </p>
               <p className="mt-2 text-sm text-ink/55">
-                The event is live, but contestants haven&apos;t been added.
-                Check back soon.
+                Voting is open, but the organiser has not published confirmed contestants for this event yet.
               </p>
             </div>
           ) : (

@@ -247,7 +247,7 @@ export default function AdminPaymentsPage() {
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
-              Treasury command
+              Payment reconciliation
             </p>
             <h1 className="mt-2 font-display text-3xl font-semibold text-ink">
               Payments
@@ -509,7 +509,7 @@ function TreasuryPanel({
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(15,76,219,0.42),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(245,161,59,0.24),transparent_38%)]" />
           <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">
-              Settlement picture
+              Gross, fees, and net
             </p>
             <p className="mt-4 font-display text-5xl font-semibold leading-none text-white">
               {loading ? (
@@ -659,7 +659,7 @@ function ChannelPanel({
         {loading ? (
           <EmptyState label="Loading channel data..." />
         ) : rows.length === 0 ? (
-          <EmptyState label="No channel data yet" />
+          <EmptyState label="No successful channel totals in this filter." />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
@@ -733,7 +733,9 @@ function LedgerTable({
         <div>
           <h2 className="font-display text-xl font-semibold text-ink">Transaction ledger</h2>
           <p className="mt-1 text-sm text-ink/45">
-            {data ? `${data.total.toLocaleString()} records match this view.` : "Loading records."}
+            {data
+              ? `${data.total.toLocaleString()} payment records match these filters.`
+              : "Loading payment records."}
           </p>
         </div>
       </div>

@@ -108,7 +108,7 @@ export function SignupForm() {
             className={`form-input ${
               fieldErrors.fullName ? "form-input-invalid" : ""
             }`}
-            placeholder="Swift Vote"
+            placeholder="Ama Mensah"
             required
           />
           {fieldErrors.fullName ? (
