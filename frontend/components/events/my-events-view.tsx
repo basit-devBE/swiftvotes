@@ -6,32 +6,60 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ApiClientError } from "@/lib/api/client";
 import { listMyEvents } from "@/lib/api/events";
-import { EventResponse } from "@/lib/api/types";
+import { EventResponse, EventStatus } from "@/lib/api/types";
 
-function formatStatusLabel(status: EventResponse["status"]) {
-  return status.replaceAll("_", " ");
+const OWNER_STATUS_FILTERS: Array<"all" | EventStatus> = [
+  "all",
+  "DRAFT",
+  "PENDING_APPROVAL",
+  "REJECTED",
+  "NOMINATIONS_OPEN",
+  "VOTING_LIVE",
+  "VOTING_CLOSED",
+];
+
+function formatStatus(status: EventStatus): string {
+  return status
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getStatusBadgeClass(status: EventResponse["status"]) {
-  if (status === "APPROVED" || status === "VOTING_LIVE") {
-    return "border-[#cfe7da] bg-[#eef9f2] text-[#1b6f4b]";
-  }
+function formatDate(value: string | null): string {
+  if (!value) return "Not set";
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
-  if (status === "REJECTED") {
-    return "border-[#f0cfd3] bg-[#fff2f4] text-[#b40f17]";
-  }
+function statusBadgeClass(status: EventStatus): string {
+  if (status === "VOTING_LIVE") return "bg-primary text-white";
+  if (status === "REJECTED") return "bg-accent/8 text-accent";
+  if (status === "PENDING_APPROVAL") return "bg-amber-50 text-amber-700";
+  if (status === "NOMINATIONS_OPEN") return "bg-emerald-50 text-emerald-700";
+  if (status === "DRAFT") return "bg-slate-100 text-slate-600";
+  return "bg-primary/8 text-primary";
+}
 
-  if (status === "PENDING_APPROVAL") {
-    return "border-[#d8e1f5] bg-[#eef4ff] text-[#0f4cdb]";
-  }
+function eventMatches(event: EventResponse, query: string, status: "all" | EventStatus) {
+  const normalized = query.trim().toLowerCase();
+  if (status !== "all" && event.status !== status) return false;
+  if (!normalized) return true;
 
-  return "border-[#dce4f1] bg-white text-[#07111f]/66";
+  return [event.name, event.description, event.status, ...event.categories.map((c) => c.name)]
+    .join(" ")
+    .toLowerCase()
+    .includes(normalized);
 }
 
 export function MyEventsView() {
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | EventStatus>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -39,9 +67,7 @@ export function MyEventsView() {
     async function load() {
       try {
         const result = await listMyEvents();
-        if (!cancelled) {
-          setEvents(result);
-        }
+        if (!cancelled) setEvents(result);
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -51,14 +77,11 @@ export function MyEventsView() {
           );
         }
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     void load();
-
     return () => {
       cancelled = true;
     };
@@ -68,163 +91,283 @@ export function MyEventsView() {
     const pending = events.filter((event) => event.status === "PENDING_APPROVAL").length;
     const live = events.filter((event) => event.status === "VOTING_LIVE").length;
     const drafts = events.filter((event) => event.status === "DRAFT").length;
-
-    return { pending, live, drafts };
+    const rejected = events.filter((event) => event.status === "REJECTED").length;
+    return { pending, live, drafts, rejected };
   }, [events]);
 
+  const filteredEvents = useMemo(
+    () => events.filter((event) => eventMatches(event, query, statusFilter)),
+    [events, query, statusFilter],
+  );
+
+  const leadEvent = filteredEvents[0] ?? events[0] ?? null;
+  const listEvents = leadEvent
+    ? filteredEvents.filter((event) => event.id !== leadEvent.id)
+    : filteredEvents;
+
   return (
-    <div className="mx-auto max-w-6xl pb-16">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(245,249,255,0.97)_58%,rgba(242,246,252,0.95)_100%)] p-6 shadow-[0_28px_70px_-50px_rgba(7,17,31,0.22)] sm:p-8">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(15,76,219,0.16),transparent_42%),radial-gradient(circle_at_top_right,rgba(180,15,23,0.08),transparent_24%)]" />
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary/72">
-              Your events
-            </p>
-            <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-0.05em] text-ink sm:text-5xl lg:text-[4.6rem]">
-              Manage what you have launched.
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
-              Review approvals, keep drafts moving, and jump back into any
-              campaign without digging through a basic list.
-            </p>
+    <div className="mx-auto max-w-[1320px] pb-16">
+      <section className="overflow-hidden rounded-[2rem] border border-line bg-white shadow-[0_24px_60px_rgba(7,17,31,0.06)]">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <div className="relative p-6 sm:p-8 lg:p-10">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,76,219,0.14),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(180,15,23,0.08),transparent_32%)]" />
+            <div className="relative">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                Event workspace
+              </p>
+              <h1 className="mt-4 max-w-3xl font-display text-4xl font-semibold leading-[0.96] text-ink sm:text-5xl lg:text-[4.5rem]">
+                Manage every campaign from one clear board.
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
+                Track drafts, approvals, live voting, and rejected events without digging through a basic list.
+              </p>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-4">
+                <WorkspaceStat label="Total" value={events.length} />
+                <WorkspaceStat label="Drafts" value={stats.drafts} />
+                <WorkspaceStat label="Pending" value={stats.pending} />
+                <WorkspaceStat label="Live" value={stats.live} />
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link href="/events" className="button-secondary">
-              View approved events
-            </Link>
-            <Link href="/events/create" className="button-primary">
-              Create event
-            </Link>
-          </div>
-        </div>
-
-        <div className="relative mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/86 p-5 shadow-[0_18px_45px_-38px_rgba(7,17,31,0.28)]">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/44">
-              Total events
-            </p>
-            <p className="mt-3 font-display text-4xl font-semibold tracking-[-0.05em] text-ink">
-              {events.length}
-            </p>
-          </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/86 p-5 shadow-[0_18px_45px_-38px_rgba(7,17,31,0.28)]">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/44">
-              Pending approval
-            </p>
-            <p className="mt-3 font-display text-4xl font-semibold tracking-[-0.05em] text-ink">
-              {stats.pending}
-            </p>
-          </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/86 p-5 shadow-[0_18px_45px_-38px_rgba(7,17,31,0.28)]">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/44">
-              Drafts and live
-            </p>
-            <p className="mt-3 font-display text-4xl font-semibold tracking-[-0.05em] text-ink">
-              {stats.drafts + stats.live}
-            </p>
+          <div className="border-t border-line bg-[#f8fafc] p-6 xl:border-l xl:border-t-0">
+            <div className="rounded-[1.5rem] bg-ink p-5 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                Next action
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold leading-none text-white">
+                Build the next event.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/60">
+                Start with event details, upload media, add categories, and submit for approval.
+              </p>
+              <Link
+                href="/events/create"
+                className="mt-6 inline-flex rounded-2xl bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-primary hover:text-white"
+              >
+                Create event
+              </Link>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniStat label="Rejected" value={stats.rejected} />
+              <MiniStat label="Reviews" value={stats.pending} />
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="mt-10 flex items-center justify-between gap-4 border-b border-primary/12 pb-5">
-        <div>
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-ink/40">
-            Workspace
-          </p>
-          <h2 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink">
-            Recent campaigns
-          </h2>
+      <section className="mt-5 rounded-[1.5rem] border border-line bg-white p-4 shadow-[0_18px_45px_rgba(7,17,31,0.045)] sm:p-5">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_auto_auto] lg:items-center">
+          <div className="relative">
+            <svg
+              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/32"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="m11 11 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search your events or categories"
+              className="h-11 w-full rounded-xl border border-line bg-[#f8fafc] pl-10 pr-4 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-primary focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <Link
+            href="/events"
+            className="rounded-xl border border-line px-4 py-2.5 text-center text-sm font-semibold text-ink/62 transition hover:border-primary/35 hover:bg-primary/5 hover:text-primary"
+          >
+            Public events
+          </Link>
+          <Link
+            href="/events/create"
+            className="rounded-xl bg-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-primary-deep"
+          >
+            Create event
+          </Link>
         </div>
-        <span className="rounded-full border border-primary/12 bg-white px-4 py-2 text-sm font-semibold text-ink/58">
-          {events.length} total
-        </span>
-      </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-line/70 pt-4">
+          {OWNER_STATUS_FILTERS.map((status) => {
+            const active = statusFilter === status;
+            const count =
+              status === "all"
+                ? events.length
+                : events.filter((event) => event.status === status).length;
+            return (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={[
+                  "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                  active
+                    ? "border-primary bg-primary text-white"
+                    : "border-line bg-white text-ink/58 hover:border-primary/35 hover:text-ink",
+                ].join(" ")}
+              >
+                {status === "all" ? "All" : formatStatus(status)}
+                <span className={active ? "ml-1.5 opacity-75" : "ml-1.5 text-ink/38"}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {error ? (
-        <div className="mt-8 rounded-[1.25rem] border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+        <div className="mt-5 rounded-2xl border border-accent/20 bg-accent/5 px-5 py-4 text-sm font-medium text-accent">
           {error}
         </div>
       ) : null}
 
       {isLoading ? (
-        <p className="mt-10 text-base text-ink/56">Loading your events...</p>
+        <div className="mt-6 rounded-[1.5rem] border border-line bg-white p-8 text-sm text-ink/45">
+          Loading your events...
+        </div>
       ) : null}
 
-      {!isLoading && events.length === 0 ? (
-        <div className="mt-10 rounded-[1.8rem] border border-primary/12 bg-white/70 p-8">
-          <p className="max-w-2xl text-base leading-7 text-ink/62">
-            You have not created any events yet. Start with a flyer, define
-            your categories, and set your nomination and voting dates.
+      {!isLoading && filteredEvents.length === 0 ? (
+        <div className="mt-6 rounded-[1.5rem] border border-dashed border-line bg-white p-10 text-center">
+          <p className="font-display text-2xl font-semibold text-ink">No matching events</p>
+          <p className="mt-2 text-sm text-ink/50">
+            Clear the filters or create a new event to get started.
           </p>
-          <Link href="/events/create" className="button-primary mt-6">
-            Create your first event
+          <Link
+            href="/events/create"
+            className="mt-5 inline-flex rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-deep"
+          >
+            Create event
           </Link>
         </div>
       ) : null}
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-2">
-        {events.map((event) => (
-          <Link
-            key={event.id}
-            href={`/events/${event.id}/manage`}
-            className="group overflow-hidden rounded-[1.9rem] border border-primary/12 bg-white/82 shadow-[0_22px_55px_-42px_rgba(7,17,31,0.26)] transition hover:-translate-y-1 hover:border-primary/24"
-          >
-            <div className="grid min-h-[18rem] lg:grid-cols-[200px_minmax(0,1fr)]">
-              <div className="relative min-h-[14rem] overflow-hidden bg-[#eff3f8]">
-                <Image
-                  src={event.primaryFlyerUrl}
-                  alt={event.name}
-                  fill
-                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
-                  sizes="(max-width: 1024px) 100vw, 200px"
-                />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,31,0.04),rgba(7,17,31,0.34))]" />
-              </div>
-              <div className="flex flex-col p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <span
-                    className={`rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] ${getStatusBadgeClass(event.status)}`}
-                  >
-                    {formatStatusLabel(event.status)}
-                  </span>
-                  <span className="text-sm font-semibold text-ink/48 transition group-hover:text-primary">
-                    Manage →
-                  </span>
-                </div>
-                <h2 className="mt-4 font-display text-[2rem] font-semibold leading-[0.95] tracking-[-0.04em] text-ink">
-                  {event.name}
-                </h2>
-                <p className="mt-3 line-clamp-3 text-base leading-7 text-ink/62">
-                  {event.description}
-                </p>
+      {leadEvent ? <LeadEventCard event={leadEvent} /> : null}
 
-                <div className="mt-auto pt-6">
-                  <div className="grid gap-3 rounded-[1.4rem] bg-[#f7f9fd] p-4 text-sm text-ink/58 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink/38">
-                        Categories
-                      </p>
-                      <p className="mt-2 font-semibold text-ink">
-                        {event.categories.length}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink/38">
-                        Voting starts
-                      </p>
-                      <p className="mt-2 font-semibold text-ink">
-                        {new Date(event.votingStartAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
+      {listEvents.length > 0 ? (
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          {listEvents.map((event) => (
+            <OwnerEventCard key={event.id} event={event} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WorkspaceStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-line/70 bg-white/78 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/38">
+        {label}
+      </p>
+      <p className="mt-2 font-display text-3xl font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/38">
+        {label}
+      </p>
+      <p className="mt-1 font-display text-2xl font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function LeadEventCard({ event }: { event: EventResponse }) {
+  return (
+    <Link
+      href={`/events/${event.id}/manage`}
+      className="group mt-6 grid overflow-hidden rounded-[1.5rem] border border-line bg-white shadow-[0_20px_50px_rgba(7,17,31,0.055)] transition hover:-translate-y-0.5 hover:border-primary/30 lg:grid-cols-[360px_minmax(0,1fr)]"
+    >
+      <div className="relative min-h-[280px] bg-[#eef2f7]">
+        <Image
+          src={event.primaryFlyerUrl}
+          alt={event.name}
+          fill
+          className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          sizes="(max-width: 1024px) 100vw, 360px"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,31,0.02),rgba(7,17,31,0.44))]" />
       </div>
+      <div className="flex flex-col p-6 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(event.status)}`}>
+            {formatStatus(event.status)}
+          </span>
+          <span className="text-sm font-semibold text-primary">Manage event</span>
+        </div>
+        <h2 className="mt-5 max-w-2xl font-display text-4xl font-semibold leading-none text-ink">
+          {event.name}
+        </h2>
+        <p className="mt-4 max-w-2xl line-clamp-3 text-base leading-7 text-ink/60">
+          {event.description}
+        </p>
+        <div className="mt-auto grid gap-3 pt-8 sm:grid-cols-3">
+          <EventDatum label="Categories" value={String(event.categories.length)} />
+          <EventDatum label="Voting starts" value={formatDate(event.votingStartAt)} />
+          <EventDatum label="Voting ends" value={formatDate(event.votingEndAt)} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function OwnerEventCard({ event }: { event: EventResponse }) {
+  return (
+    <Link
+      href={`/events/${event.id}/manage`}
+      className="group grid overflow-hidden rounded-[1.5rem] border border-line bg-white shadow-[0_18px_45px_rgba(7,17,31,0.045)] transition hover:-translate-y-0.5 hover:border-primary/30 sm:grid-cols-[180px_minmax(0,1fr)]"
+    >
+      <div className="relative min-h-[180px] bg-[#eef2f7]">
+        <Image
+          src={event.primaryFlyerUrl}
+          alt={event.name}
+          fill
+          className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          sizes="(max-width: 640px) 100vw, 180px"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,31,0.02),rgba(7,17,31,0.34))]" />
+      </div>
+      <div className="flex min-w-0 flex-col p-5">
+        <div className="flex items-start justify-between gap-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(event.status)}`}>
+            {formatStatus(event.status)}
+          </span>
+          <span className="text-sm font-semibold text-ink/45 transition group-hover:text-primary">
+            Manage
+          </span>
+        </div>
+        <h2 className="mt-4 line-clamp-2 font-display text-3xl font-semibold leading-none text-ink">
+          {event.name}
+        </h2>
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-ink/58">
+          {event.description}
+        </p>
+        <div className="mt-auto grid grid-cols-2 gap-3 pt-5">
+          <EventDatum label="Categories" value={String(event.categories.length)} />
+          <EventDatum label="Voting" value={formatDate(event.votingStartAt)} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function EventDatum({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-[#f8fafc] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink/35">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-semibold text-ink">{value}</p>
     </div>
   );
 }

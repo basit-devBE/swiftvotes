@@ -4,19 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { useAuth } from "@/hooks/use-auth";
 import { SiteLogo } from "@/components/site-logo";
+import { useAuth } from "@/hooks/use-auth";
 
-const marketingLinks = [
-  { href: "/#features", label: "Features" },
-  { href: "/#how-it-works", label: "How it Works" },
-  { href: "/events", label: "Events" },
+const baseLinks = [
+  { href: "/", label: "Home", exact: true },
+  { href: "/events", label: "Events", exact: false },
 ];
 
-const appLinks = [
-  { href: "/", label: "Home" },
-  { href: "/events", label: "Events" },
+const authedLinks = [
+  { href: "/my-events", label: "My Events", exact: false },
+  { href: "/my-profile", label: "My Profile", exact: false },
+  { href: "/account", label: "Account", exact: false },
 ];
+
+function isActive(pathname: string, href: string, exact: boolean): boolean {
+  if (exact) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -25,126 +30,87 @@ export function Navbar() {
   const pathname = usePathname();
   const isAuthenticated = status === "authenticated";
   const isAdmin = isAuthenticated && user?.systemRole === "SUPER_ADMIN";
-  const isHomePage = pathname === "/";
-  const isMyEventsPage = pathname === "/my-events";
-  const isMyProfilePage = pathname === "/my-profile";
-  const navLinks = isHomePage ? marketingLinks : appLinks;
+  const links = isAuthenticated
+    ? [...baseLinks, ...authedLinks.filter((link) => !isAdmin || link.href !== "/my-profile")]
+    : baseLinks;
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 12);
+    const onScroll = () => setIsScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const closeMenu = () => setIsOpen(false);
-    window.addEventListener("resize", closeMenu);
-    return () => window.removeEventListener("resize", closeMenu);
-  }, []);
-
-  const linkClassName = isScrolled
-    ? "text-sm font-medium text-ink/72 transition hover:text-primary"
-    : "text-sm font-medium text-ink/72 transition hover:text-primary";
-
-  const mobileButtonClassName = isScrolled
-    ? "inline-flex h-12 w-12 items-center justify-center rounded-full border border-ink/10 bg-white/80 text-ink transition hover:border-primary/20 hover:text-primary md:hidden"
-    : "inline-flex h-12 w-12 items-center justify-center rounded-full border border-ink/10 bg-white/88 text-ink transition hover:border-primary/20 hover:text-primary md:hidden";
-
-  const mobileMenuClassName = isScrolled
-    ? "border-t border-ink/8 px-4 pb-5 pt-3 md:hidden"
-    : "border-t border-ink/8 bg-white px-4 pb-5 pt-3 md:hidden";
-
-  const mobileLinkClassName = isScrolled
-    ? "rounded-2xl px-4 py-3 text-sm font-medium text-ink/80 transition hover:bg-primary/5 hover:text-primary"
-    : "rounded-2xl px-4 py-3 text-sm font-medium text-ink/80 transition hover:bg-primary/5 hover:text-primary";
-
   return (
     <header
-      className={`sticky top-0 z-50 transition duration-300 ${
+      className={[
+        "sticky top-0 z-50 border-b transition duration-200",
         isScrolled
-          ? "border-b border-ink/8 bg-white/94 shadow-[0_16px_36px_-30px_rgba(7,17,31,0.22)] backdrop-blur"
-          : "bg-transparent"
-      }`}
+          ? "border-line bg-white/92 shadow-[0_16px_36px_-30px_rgba(7,17,31,0.22)] backdrop-blur-xl"
+          : "border-transparent bg-white/72 backdrop-blur-xl",
+      ].join(" ")}
     >
       <div className="page-shell">
-        <div className="flex min-h-[5.25rem] items-center justify-between gap-6 px-1 sm:px-2">
-          <SiteLogo priority imageClassName="h-[4.4rem] sm:h-[5rem]" />
+        <div className="flex min-h-20 items-center justify-between gap-4">
+          <SiteLogo priority imageClassName="h-12 sm:h-14" />
 
-          <nav className="hidden items-center gap-8 md:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`${linkClassName} ${
-                  pathname === link.href ? "text-primary" : ""
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav className="hidden items-center gap-1 rounded-2xl border border-line/80 bg-white/72 p-1 md:flex">
+            {links.map((link) => {
+              const active = isActive(pathname, link.href, link.exact);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={[
+                    "rounded-xl px-3.5 py-2 text-sm font-semibold transition",
+                    active
+                      ? "bg-primary text-white shadow-[0_10px_22px_rgba(15,76,219,0.18)]"
+                      : "text-ink/58 hover:bg-primary/7 hover:text-ink",
+                  ].join(" ")}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-2 md:flex">
             {isAuthenticated ? (
               <>
                 {isAdmin ? (
                   <Link
                     href="/admin"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-ink/85"
+                    className="rounded-2xl border border-ink/10 bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-primary/30 hover:text-primary"
                   >
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
                     Admin
                   </Link>
                 ) : null}
-                {isMyEventsPage ? (
-                  <Link href="/events/create" className="button-primary">
-                    Create Event
-                  </Link>
-                ) : (
-                  <Link href="/my-events" className="button-secondary">
-                    My Events
-                  </Link>
-                )}
-                {!isMyEventsPage ? (
-                  <Link href="/events/create" className="button-secondary">
-                    Create Event
-                  </Link>
-                ) : null}
-                {!isAdmin && (
-                  <Link
-                    href="/my-profile"
-                    className={`button-secondary ${isMyProfilePage ? "text-primary" : ""}`}
-                  >
-                    My Profile
-                  </Link>
-                )}
-                <Link href="/account" className="button-secondary">
-                  Account
+                <Link
+                  href="/events/create"
+                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-deep"
+                >
+                  Create Event
                 </Link>
                 <button
                   type="button"
-                  className="button-primary"
-                  onClick={() => {
-                    void logout();
-                  }}
+                  onClick={() => void logout()}
+                  className="rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink/58 transition hover:border-accent/30 hover:text-accent"
                 >
-                  Logout
+                  Sign out
                 </button>
               </>
             ) : (
               <>
                 <Link
                   href="/login"
-                  className={
-                    isScrolled
-                      ? "inline-flex items-center justify-center rounded-full border border-ink/10 bg-white/80 px-6 py-3 text-sm font-semibold text-ink transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:text-primary"
-                      : "inline-flex items-center justify-center rounded-full border border-ink/10 bg-white/84 px-6 py-3 text-sm font-semibold text-ink transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:text-primary"
-                  }
+                  className="rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink/62 transition hover:border-primary/30 hover:text-primary"
                 >
                   Login
                 </Link>
-                <Link href="/signup" className="button-primary">
+                <Link
+                  href="/signup"
+                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-deep"
+                >
                   Get Started
                 </Link>
               </>
@@ -153,115 +119,99 @@ export function Navbar() {
 
           <button
             type="button"
-            className={mobileButtonClassName}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-white text-ink transition hover:border-primary/30 hover:text-primary md:hidden"
             onClick={() => setIsOpen((open) => !open)}
             aria-expanded={isOpen}
             aria-label="Toggle navigation menu"
           >
-            <span className="sr-only">Toggle menu</span>
-            <div className="flex flex-col gap-1.5">
+            <span className="sr-only">Toggle navigation menu</span>
+            <span className="flex flex-col gap-1.5">
               <span
-                className={`h-0.5 w-5 rounded-full bg-current transition ${
-                  isOpen ? "translate-y-2 rotate-45" : ""
-                }`}
+                className={[
+                  "h-0.5 w-5 rounded-full bg-current transition",
+                  isOpen ? "translate-y-2 rotate-45" : "",
+                ].join(" ")}
               />
               <span
-                className={`h-0.5 w-5 rounded-full bg-current transition ${
-                  isOpen ? "opacity-0" : "opacity-100"
-                }`}
+                className={[
+                  "h-0.5 w-5 rounded-full bg-current transition",
+                  isOpen ? "opacity-0" : "opacity-100",
+                ].join(" ")}
               />
               <span
-                className={`h-0.5 w-5 rounded-full bg-current transition ${
-                  isOpen ? "-translate-y-2 -rotate-45" : ""
-                }`}
+                className={[
+                  "h-0.5 w-5 rounded-full bg-current transition",
+                  isOpen ? "-translate-y-2 -rotate-45" : "",
+                ].join(" ")}
               />
-            </div>
+            </span>
           </button>
         </div>
 
         {isOpen ? (
-          <div className={mobileMenuClassName}>
-            <nav className="flex flex-col gap-2">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`${mobileLinkClassName} ${
-                    pathname === link.href ? "text-primary" : ""
-                  }`}
-                  onClick={() => setIsOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+          <div className="border-t border-line/80 pb-4 pt-3 md:hidden">
+            <nav className="grid gap-2">
+              {links.map((link) => {
+                const active = isActive(pathname, link.href, link.exact);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsOpen(false)}
+                    className={[
+                      "rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                      active
+                        ? "bg-primary text-white"
+                        : "bg-white/70 text-ink/68 hover:bg-primary/7 hover:text-ink",
+                    ].join(" ")}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+
               {isAuthenticated ? (
                 <>
                   {isAdmin ? (
                     <Link
                       href="/admin"
-                      className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
                       onClick={() => setIsOpen(false)}
+                      className="rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink"
                     >
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Admin panel
+                      Admin
                     </Link>
                   ) : null}
                   <Link
-                    href={isMyEventsPage ? "/events/create" : "/my-events"}
-                    className="button-secondary mt-2"
+                    href="/events/create"
                     onClick={() => setIsOpen(false)}
+                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white"
                   >
-                    {isMyEventsPage ? "Create Event" : "My Events"}
-                  </Link>
-                  {!isMyEventsPage ? (
-                    <Link
-                      href="/events/create"
-                      className="button-secondary mt-2"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Create Event
-                    </Link>
-                  ) : null}
-                  {!isAdmin && (
-                    <Link
-                      href="/my-profile"
-                      className="button-secondary mt-2"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      My Profile
-                    </Link>
-                  )}
-                  <Link
-                    href="/account"
-                    className="button-secondary mt-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Account
+                    Create Event
                   </Link>
                   <button
                     type="button"
-                    className="button-primary mt-2"
+                    className="rounded-2xl border border-line bg-white px-4 py-3 text-left text-sm font-semibold text-ink/62"
                     onClick={() => {
                       setIsOpen(false);
                       void logout();
                     }}
                   >
-                    Logout
+                    Sign out
                   </button>
                 </>
               ) : (
                 <>
                   <Link
                     href="/login"
-                    className="button-secondary mt-2"
                     onClick={() => setIsOpen(false)}
+                    className="rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink/68"
                   >
                     Login
                   </Link>
                   <Link
                     href="/signup"
-                    className="button-primary mt-2"
                     onClick={() => setIsOpen(false)}
+                    className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white"
                   >
                     Get Started
                   </Link>

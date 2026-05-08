@@ -92,23 +92,20 @@ export function AdminShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="flex min-h-screen bg-[#f3f6fb]">
       {/* ── Sidebar ── */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col bg-ink">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-white/92 backdrop-blur-xl">
         {/* Logo */}
-        <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-white/8 px-5">
-          <SiteLogo className="h-6 w-6 brightness-0 invert" />
-          <span className="font-display text-base font-semibold tracking-tight text-white">
-            SwiftVote
-          </span>
-          <span className="ml-auto rounded-md bg-primary/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/80">
+        <div className="flex h-20 shrink-0 items-center gap-2.5 border-b border-line px-5">
+          <SiteLogo imageClassName="h-12 sm:h-12" />
+          <span className="ml-auto rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
             Admin
           </span>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
+          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink/35">
             Navigation
           </p>
           {navItems.map((item) => {
@@ -118,13 +115,13 @@ export function AdminShell({
                 key={item.href}
                 href={item.href}
                 className={[
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition-colors",
                   active
-                    ? "bg-primary/25 text-white"
-                    : "text-white/55 hover:bg-white/7 hover:text-white/90",
+                    ? "bg-primary text-white shadow-[0_10px_22px_rgba(15,76,219,0.18)]"
+                    : "text-ink/58 hover:bg-primary/7 hover:text-ink",
                 ].join(" ")}
               >
-                <span className={active ? "text-white" : "text-white/45"}>
+                <span className={active ? "text-white" : "text-ink/38"}>
                   {item.icon}
                 </span>
                 {item.label}
@@ -134,10 +131,10 @@ export function AdminShell({
         </nav>
 
         {/* Footer: user + back link */}
-        <div className="shrink-0 border-t border-white/8 px-3 py-4 space-y-1">
+        <div className="shrink-0 space-y-1 border-t border-line px-3 py-4">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-white/45 transition hover:bg-white/7 hover:text-white/80"
+            className="flex items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-semibold text-ink/50 transition hover:bg-primary/7 hover:text-ink"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M9 11L5 7l4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -145,22 +142,22 @@ export function AdminShell({
             Back to app
           </Link>
 
-          <div className="flex items-center gap-2.5 rounded-xl px-3 py-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/30 text-xs font-bold text-white">
+          <div className="flex items-center gap-2.5 rounded-2xl bg-[#f8fafc] px-3 py-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
               {user.fullName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-white/80">
+              <p className="truncate text-xs font-semibold text-ink">
                 {user.fullName}
               </p>
-              <p className="text-[10px] text-white/35">Super Admin</p>
+              <p className="text-[10px] text-ink/40">Super Admin</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => void logout()}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-white/40 transition hover:bg-white/7 hover:text-white/75"
+            className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-semibold text-ink/45 transition hover:bg-accent/5 hover:text-accent"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M9.5 9.5V11a2 2 0 01-2 2H3a2 2 0 01-2-2V3a2 2 0 012-2h4.5a2 2 0 012 2v1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -172,7 +169,7 @@ export function AdminShell({
       </aside>
 
       {/* ── Content ── */}
-      <div className="ml-56 flex min-h-screen flex-1 flex-col">
+      <div className="ml-64 flex min-h-screen flex-1 flex-col">
         {children}
       </div>
     </div>
