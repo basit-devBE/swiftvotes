@@ -203,7 +203,7 @@ model Contestant {
   categoryId   String
   nominationId String   @unique
   userId       String?  @unique
-  code         String
+  code         String   @unique
   name         String
   email        String?
   phone        String?
@@ -218,7 +218,6 @@ model Contestant {
   user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   votes      Vote[]
 
-  @@unique([eventId, code])
   @@index([eventId, categoryId])
 }
 

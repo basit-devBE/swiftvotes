@@ -50,6 +50,6 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
       useClass: PrismaPaymentsRepository,
     },
   ],
-  exports: [VOTES_REPOSITORY, PAYMENTS_REPOSITORY],
+  exports: [VOTES_REPOSITORY, PAYMENTS_REPOSITORY, PaystackService],
 })
 export class VotesModule {}

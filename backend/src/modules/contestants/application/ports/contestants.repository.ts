@@ -33,7 +33,6 @@ export interface ContestantsRepository {
     eventId: string;
     categoryId: string;
     nominationId: string;
-    codePrefix: string;
     name: string;
     email?: string | null;
     phone?: string | null;

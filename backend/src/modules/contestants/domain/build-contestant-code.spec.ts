@@ -19,7 +19,12 @@ describe("build contestant code", () => {
     expect(extractEventInitials("   ")).toBe("EV");
   });
 
-  it("formats the sequence as four digits", () => {
-    expect(buildContestantCode("ANNBESFEM", 3)).toBe("ANNBESFEM-0003");
+  it("formats the contestant code as four digits", () => {
+    expect(buildContestantCode(3)).toBe("0003");
+  });
+
+  it("rejects sequences outside the four digit range", () => {
+    expect(() => buildContestantCode(0)).toThrow(RangeError);
+    expect(() => buildContestantCode(10000)).toThrow(RangeError);
   });
 });

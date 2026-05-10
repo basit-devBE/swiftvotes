@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Contestant as PrismaContestant, Event as PrismaEvent, EventCategory as PrismaEventCategory } from "@prisma/client";
+import { Contestant as PrismaContestant, Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../../../core/prisma/prisma.service";
 import { EventStatus } from "../../../events/domain/event-status";
@@ -19,36 +19,70 @@ export class PrismaContestantsRepository implements ContestantsRepository {
     eventId: string;
     categoryId: string;
     nominationId: string;
-    codePrefix: string;
     name: string;
     email?: string | null;
     phone?: string | null;
     imageUrl?: string | null;
     imageKey?: string | null;
   }): Promise<Contestant> {
-    const contestant = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.contestant.count({
-        where: { eventId: input.eventId },
-      });
-
-      const code = buildContestantCode(input.codePrefix, count + 1);
-
-      return tx.contestant.create({
-        data: {
-          eventId: input.eventId,
-          categoryId: input.categoryId,
-          nominationId: input.nominationId,
-          code,
-          name: input.name,
-          email: input.email ?? null,
-          phone: input.phone ?? null,
-          imageUrl: input.imageUrl ?? null,
-          imageKey: input.imageKey ?? null,
-        },
-      });
-    });
+    const contestant = await this.createWithNextGlobalCode(input);
 
     return this.toDomain(contestant);
+  }
+
+  private async createWithNextGlobalCode(input: {
+    eventId: string;
+    categoryId: string;
+    nominationId: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    imageUrl?: string | null;
+    imageKey?: string | null;
+  }): Promise<PrismaContestant> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const count = await tx.contestant.count();
+
+          let sequence = count + 1;
+          let code = buildContestantCode(sequence);
+          while (await tx.contestant.findUnique({ where: { code } })) {
+            sequence += 1;
+            code = buildContestantCode(sequence);
+          }
+
+          return tx.contestant.create({
+            data: {
+              eventId: input.eventId,
+              categoryId: input.categoryId,
+              nominationId: input.nominationId,
+              code,
+              name: input.name,
+              email: input.email ?? null,
+              phone: input.phone ?? null,
+              imageUrl: input.imageUrl ?? null,
+              imageKey: input.imageKey ?? null,
+            },
+          });
+        });
+      } catch (error) {
+        if (!this.isContestantCodeConflict(error) || attempt === 4) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error("Unable to generate a unique contestant code.");
+  }
+
+  private isContestantCodeConflict(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002" &&
+      Array.isArray(error.meta?.target) &&
+      error.meta.target.includes("code")
+    );
   }
 
   async findByEvent(eventId: string): Promise<Contestant[]> {
