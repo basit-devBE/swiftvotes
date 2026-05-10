@@ -25,6 +25,23 @@ export type InitializeTransactionResult = {
   accessCode: string;
 };
 
+export type ChargeMobileMoneyInput = {
+  email: string;
+  amountMinor: number;
+  currency: string;
+  reference: string;
+  phone: string;
+  provider: "mtn" | "atl" | "vod";
+  metadata?: Record<string, unknown>;
+};
+
+export type ChargeMobileMoneyResult = {
+  reference: string;
+  status: string;
+  displayText: string | null;
+  raw: Record<string, unknown>;
+};
+
 export type VerifyTransactionStatus = "success" | "failed" | "abandoned" | "pending";
 
 export type VerifyTransactionResult = {
@@ -69,6 +86,16 @@ type PaystackVerifyResponse = {
       last4?: string | null;
       mobile_money_number?: string | null;
     } | null;
+  } & Record<string, unknown>;
+};
+
+type PaystackChargeResponse = {
+  status: boolean;
+  message: string;
+  data?: {
+    reference?: string;
+    status?: string;
+    display_text?: string | null;
   } & Record<string, unknown>;
 };
 
@@ -217,6 +244,91 @@ export class PaystackService {
       mobileNumber: data.authorization?.mobile_money_number ?? null,
       gatewayResponse: data.gateway_response ?? null,
       raw: data as Record<string, unknown>,
+    };
+  }
+
+  async chargeMobileMoney(
+    input: ChargeMobileMoneyInput,
+  ): Promise<ChargeMobileMoneyResult> {
+    this.assertSecretKey();
+
+    const body = {
+      email: input.email,
+      amount: input.amountMinor,
+      currency: input.currency,
+      reference: input.reference,
+      mobile_money: {
+        phone: input.phone,
+        provider: input.provider,
+      },
+      metadata: input.metadata ?? {},
+    };
+
+    const url = `${this.config.baseUrl}/charge`;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.secretKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      this.logger.error(
+        { scope: "paystack", op: "charge_mobile_money", reference: input.reference, err: (err as Error).message },
+        "paystack mobile money charge transport error",
+      );
+      throw new ServiceUnavailableException("Could not reach payment provider.");
+    }
+
+    const json = (await response.json().catch(() => ({}))) as PaystackChargeResponse;
+    const chargeData = json.data;
+    const chargeWasAttempted = json.message?.toLowerCase() === "charge attempted";
+    const chargeHasUsableData =
+      chargeData &&
+      ["pay_offline", "pending", "send_otp", "success", "failed"].includes(
+        String(chargeData.status ?? "").toLowerCase(),
+      );
+
+    if ((!response.ok || !json.status || !chargeData) && !chargeHasUsableData) {
+      this.logger.warn(
+        {
+          scope: "paystack",
+          op: "charge_mobile_money",
+          reference: input.reference,
+          httpStatus: response.status,
+          message: json.message,
+          paystackStatus: chargeData?.status,
+        },
+        "paystack mobile money charge rejected",
+      );
+      throw new InternalServerErrorException(
+        json.message || "Failed to start mobile money payment.",
+      );
+    }
+
+    this.logger.info(
+      {
+        scope: "paystack",
+        op: "charge_mobile_money",
+        reference: input.reference,
+        httpStatus: response.status,
+        paystackStatus: chargeData.status,
+        chargeWasAttempted,
+      },
+      "paystack mobile money charge started",
+    );
+
+    return {
+      reference: chargeData.reference ?? input.reference,
+      status: chargeData.status ?? "pending",
+      displayText:
+        chargeData.display_text ??
+        (typeof chargeData.message === "string" ? chargeData.message : null),
+      raw: chargeData as Record<string, unknown>,
     };
   }
 

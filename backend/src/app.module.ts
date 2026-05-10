@@ -10,6 +10,7 @@ import { databaseConfig } from "./core/config/database.config";
 import { emailConfig } from "./core/config/email.config";
 import { validationSchema } from "./core/config/env.validation";
 import { paystackConfig } from "./core/config/paystack.config";
+import { smsConfig } from "./core/config/sms.config";
 import { storageConfig } from "./core/config/storage.config";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -21,6 +22,7 @@ import { NominationsModule } from "./modules/nominations/nominations.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { SchedulingModule } from "./modules/scheduling/scheduling.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
+import { UssdModule } from "./modules/ussd/ussd.module";
 import { UsersModule } from "./modules/users/users.module";
 import { VotesModule } from "./modules/votes/votes.module";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
@@ -30,7 +32,15 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [appConfig, authConfig, databaseConfig, emailConfig, paystackConfig, storageConfig],
+      load: [
+        appConfig,
+        authConfig,
+        databaseConfig,
+        emailConfig,
+        paystackConfig,
+        smsConfig,
+        storageConfig,
+      ],
       validationSchema,
       envFilePath: [
         `.env.${process.env.NODE_ENV}.local`,
@@ -51,6 +61,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     EventsModule,
     NominationsModule,
     UploadsModule,
+    UssdModule,
     VotesModule,
     SchedulingModule,
     HealthModule,

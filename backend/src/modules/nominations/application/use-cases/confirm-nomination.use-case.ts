@@ -10,7 +10,6 @@ import { EventsRepository } from "../../../events/application/ports/events.repos
 import { CONTESTANTS_REPOSITORY } from "../../../contestants/application/contestants.tokens";
 import { ContestantsRepository } from "../../../contestants/application/ports/contestants.repository";
 import { ProvisionContestantAccountUseCase } from "../../../contestants/application/use-cases/provision-contestant-account.use-case";
-import { extractEventInitials } from "../../../contestants/domain/build-contestant-code";
 import { Nomination } from "../../domain/nomination";
 import { NominationStatus } from "../../domain/nomination-status";
 import { NOMINATIONS_REPOSITORY } from "../nominations.tokens";
@@ -74,7 +73,6 @@ export class ConfirmNominationUseCase {
       eventId: nomination.eventId,
       categoryId: nomination.categoryId,
       nominationId: nomination.id,
-      codePrefix: extractEventInitials(event.name),
       name: nomination.nomineeName,
       email: nomineeEmail,
       phone: nomination.nomineePhone,
