@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const whatsappUrl = "https://wa.me/233556860946";
+
 export function CallToAction() {
   return (
     <section id="get-started" className="section-space pt-10">
@@ -22,6 +24,14 @@ export function CallToAction() {
               <Link href="/signup" className="button-primary">
                 Create organiser account
               </Link>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/5"
+              >
+                Chat on WhatsApp
+              </a>
               <Link
                 href="/#features"
                 className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/5"

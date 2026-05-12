@@ -9,6 +9,9 @@ const footerLinks = [
   { href: "/signup", label: "Create event" },
 ];
 
+const whatsappUrl = "https://wa.me/233556860946";
+const supportEmail = "swiftvotes403@gmail.com";
+
 export function Footer() {
   return (
     <footer className="mt-16 bg-[#04070e] pb-10 pt-14 text-white">
@@ -20,6 +23,22 @@ export function Footer() {
               SwiftVote helps organisers run reviewed campaigns with nominations,
               contestant profiles, paid vote verification, and payment records.
             </p>
+            <div className="mt-6 flex flex-col gap-3 text-sm text-white/68 sm:flex-row sm:flex-wrap">
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/12 px-4 font-semibold transition hover:border-white/28 hover:bg-white/7 hover:text-white"
+              >
+                WhatsApp: +233 55 686 0946
+              </a>
+              <a
+                href={`mailto:${supportEmail}`}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/12 px-4 font-semibold transition hover:border-white/28 hover:bg-white/7 hover:text-white"
+              >
+                {supportEmail}
+              </a>
+            </div>
           </div>
 
           <nav className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:justify-end sm:gap-6">
