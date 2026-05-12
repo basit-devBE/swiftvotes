@@ -469,7 +469,7 @@ export function EventEditor({
     setIsSaving(true);
 
     try {
-      const payload = {
+      const eventPayload = {
         name,
         description,
         primaryFlyerUrl,
@@ -483,6 +483,10 @@ export function EventEditor({
         contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard,
         publicCanViewLeaderboard,
+      };
+
+      const createPayload = {
+        ...eventPayload,
         categories: categories.map((c, i) => ({
           name: c.name,
           description: c.description,
@@ -493,12 +497,12 @@ export function EventEditor({
       };
 
       if (isUpdate && initialEvent) {
-        const updated = await updateEvent(initialEvent.id, payload);
+        const updated = await updateEvent(initialEvent.id, eventPayload);
         setSuccess("Event updated successfully.");
         router.replace(afterSaveHref ?? `/events/${updated.id}`);
         router.refresh();
       } else {
-        const created = await createEvent(payload);
+        const created = await createEvent(createPayload);
         // Stay on the page so the user can either submit for approval or keep editing.
         setSavedDraft(created);
         setStepIndex(STEPS.length - 1);
