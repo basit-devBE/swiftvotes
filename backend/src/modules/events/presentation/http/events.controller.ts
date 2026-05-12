@@ -165,10 +165,12 @@ export class EventsController {
   @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
   async updateEvent(
     @Param("eventId") eventId: string,
+    @CurrentUser() currentUser: AuthenticatedRequestUser,
     @Body() body: UpdateEventDto,
   ): Promise<EventResponseDto> {
     const event = await this.updateEventUseCase.execute({
       eventId,
+      actorSystemRole: currentUser.systemRole,
       name: body.name,
       description: body.description,
       primaryFlyerUrl: body.primaryFlyerUrl,

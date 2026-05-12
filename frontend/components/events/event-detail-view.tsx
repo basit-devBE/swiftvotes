@@ -7,7 +7,15 @@ import { getEvent } from "@/lib/api/events";
 import { EventResponse } from "@/lib/api/types";
 import { EventEditor } from "./event-editor";
 
-export function EventDetailView({ eventId }: { eventId: string }) {
+export function EventDetailView({
+  eventId,
+  adminMode = false,
+  afterSaveHref,
+}: {
+  eventId: string;
+  adminMode?: boolean;
+  afterSaveHref?: string;
+}) {
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,5 +71,12 @@ export function EventDetailView({ eventId }: { eventId: string }) {
     );
   }
 
-  return <EventEditor mode="update" initialEvent={event} />;
+  return (
+    <EventEditor
+      mode="update"
+      initialEvent={event}
+      adminMode={adminMode}
+      afterSaveHref={afterSaveHref}
+    />
+  );
 }

@@ -9,6 +9,7 @@ import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
+import { SystemRole } from "../../../users/domain/system-role";
 import { validateUpdateEventInput } from "./event-validation";
 
 export type UpdateEventInput = {
@@ -26,6 +27,7 @@ export type UpdateEventInput = {
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;
+  actorSystemRole?: SystemRole;
 };
 
 @Injectable()
@@ -42,7 +44,12 @@ export class UpdateEventUseCase {
       throw new NotFoundException("Event was not found.");
     }
 
-    if (![EventStatus.DRAFT, EventStatus.REJECTED].includes(event.status)) {
+    const isSuperAdmin = input.actorSystemRole === SystemRole.SUPER_ADMIN;
+
+    if (
+      !isSuperAdmin &&
+      ![EventStatus.DRAFT, EventStatus.REJECTED].includes(event.status)
+    ) {
       throw new BadRequestException(
         "Only draft or rejected events can be edited.",
       );

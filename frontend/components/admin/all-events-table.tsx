@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { EventResponse, EventStatus } from "@/lib/api/types";
 
 const STATUS_STYLES: Record<EventStatus, string> = {
@@ -49,6 +51,7 @@ export function AllEventsTable({ events }: { events: EventResponse[] }) {
             <th className="px-5 py-3.5">Voting start</th>
             <th className="px-5 py-3.5">Submitted</th>
             <th className="px-5 py-3.5">Created</th>
+            <th className="px-5 py-3.5 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -81,6 +84,22 @@ export function AllEventsTable({ events }: { events: EventResponse[] }) {
               </td>
               <td className="px-5 py-4 text-ink/65">
                 {formatDate(event.createdAt)}
+              </td>
+              <td className="px-5 py-4">
+                <div className="flex justify-end gap-2">
+                  <Link
+                    href={`/events/${event.id}`}
+                    className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink/58 transition hover:border-primary/25 hover:text-primary"
+                  >
+                    View
+                  </Link>
+                  <Link
+                    href={`/admin/events/${event.id}/edit`}
+                    className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary"
+                  >
+                    Edit
+                  </Link>
+                </div>
               </td>
             </tr>
           ))}
