@@ -54,4 +54,9 @@ export class UpdateEventDto {
   @IsOptional()
   @IsBoolean()
   publicCanViewLeaderboard?: boolean;
+
+  // Older event-editor payloads included categories on update. Keep accepting
+  // the key so strict validation does not block event media/details updates.
+  @IsOptional()
+  categories?: unknown;
 }
