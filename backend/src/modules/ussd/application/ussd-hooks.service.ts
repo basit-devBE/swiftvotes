@@ -224,7 +224,7 @@ export class UssdHooksService {
 
       return {
         payment_message:
-          "This mobile money request needs Paystack checkout input and cannot be completed in USSD. Please use web voting or try another mobile money option.",
+          "This MoMo option cannot complete in USSD. Please vote on the web or try another network.",
         payment_reference: charge.reference,
         payment_status: PaymentStatus.FAILED,
       };
@@ -247,7 +247,7 @@ export class UssdHooksService {
 
       return {
         payment_message:
-          "This mobile money request could not be started over USSD. Please try again or use web voting.",
+          "MoMo payment could not start in USSD. Please vote on the web or try another network.",
         payment_reference: charge.reference,
         payment_status: PaymentStatus.FAILED,
       };
@@ -290,7 +290,7 @@ export class UssdHooksService {
     });
 
     return {
-      payment_message: `Payment request sent to ${phone}. Approve the MoMo prompt on your phone. Do not enter your MoMo PIN in this USSD session. Votes count after payment is confirmed.`,
+      payment_message: `Request sent to ${phone}. Approve the MoMo prompt on your phone. Do not enter your PIN here.`,
       payment_reference: charge.reference,
       payment_status: PaymentStatus.PENDING,
     };

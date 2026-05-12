@@ -33,6 +33,8 @@ type EditableCategory = {
 type EventEditorProps = {
   mode: "create" | "update";
   initialEvent?: EventResponse;
+  adminMode?: boolean;
+  afterSaveHref?: string;
 };
 
 type StepKey = "basics" | "schedule" | "media" | "categories" | "review";
@@ -238,11 +240,18 @@ const stepIcons: Record<StepKey, (p: { className?: string }) => React.JSX.Elemen
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function EventEditor({ mode, initialEvent }: EventEditorProps) {
+export function EventEditor({
+  mode,
+  initialEvent,
+  adminMode = false,
+  afterSaveHref,
+}: EventEditorProps) {
   const router = useRouter();
   const isUpdate = mode === "update" && initialEvent;
   const isEditable =
-    !isUpdate || ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
+    adminMode ||
+    !isUpdate ||
+    ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
 
   // Form state
   const [name, setName] = useState(initialEvent?.name ?? "");
@@ -296,11 +305,13 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
 
   const pageHeading = useMemo(() => {
     if (!isUpdate) return "Create Event";
+    if (adminMode) return "Edit Event";
     return initialEvent?.status === "REJECTED" ? "Revise Event" : "Manage Event";
-  }, [initialEvent?.status, isUpdate]);
+  }, [adminMode, initialEvent?.status, isUpdate]);
 
   const effectiveEvent = savedDraft ?? initialEvent ?? null;
   const canSubmitForApproval =
+    !adminMode &&
     Boolean(effectiveEvent) &&
     ["DRAFT", "REJECTED"].includes(effectiveEvent?.status ?? "DRAFT") &&
     !isSaving;
@@ -422,12 +433,12 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       return;
     }
 
-    if (votingStartDate < now) {
+    if (!adminMode && votingStartDate < now) {
       setError("Voting open date cannot be in the past.");
       return;
     }
 
-    if (votingEndDate < now) {
+    if (!adminMode && votingEndDate < now) {
       setError("Voting close date cannot be in the past.");
       return;
     }
@@ -484,7 +495,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       if (isUpdate && initialEvent) {
         const updated = await updateEvent(initialEvent.id, payload);
         setSuccess("Event updated successfully.");
-        router.replace(`/events/${updated.id}`);
+        router.replace(afterSaveHref ?? `/events/${updated.id}`);
         router.refresh();
       } else {
         const created = await createEvent(payload);
@@ -536,20 +547,22 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-[#0f4cdb]">
-            {isUpdate ? "Event workspace" : "New event"}
+            {adminMode ? "Admin event editor" : isUpdate ? "Event workspace" : "New event"}
           </p>
           <h1 className="mt-2 font-display text-[2.35rem] font-semibold tracking-[-0.04em] text-[#07111f] sm:text-[2.8rem]">
             {pageHeading}
           </h1>
           <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#07111f]/62">
-            Add the public details, media, schedules, categories, and vote pricing that admins will review before approval.
+            {adminMode
+              ? "Update public event details, scheduling, visibility, and media for this event regardless of its current status."
+              : "Add the public details, media, schedules, categories, and vote pricing that admins will review before approval."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
               5-step setup
             </span>
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
-              Approval-ready preview
+              {adminMode ? "Admin override" : "Approval-ready preview"}
             </span>
           </div>
         </div>
@@ -811,7 +824,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                       type="datetime-local"
                       className={inputCls}
                       value={votingStartAt}
-                      min={minVotingDateTime}
+                      min={adminMode ? undefined : minVotingDateTime}
                       onChange={(e) => setVotingStartAt(e.target.value)}
                       disabled={!isEditable}
                     />
@@ -821,7 +834,7 @@ export function EventEditor({ mode, initialEvent }: EventEditorProps) {
                       type="datetime-local"
                       className={inputCls}
                       value={votingEndAt}
-                      min={votingStartAt || minVotingDateTime}
+                      min={adminMode ? undefined : votingStartAt || minVotingDateTime}
                       onChange={(e) => setVotingEndAt(e.target.value)}
                       disabled={!isEditable}
                     />

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -110,6 +111,12 @@ export function PendingEventsReview() {
             </div>
 
             <div className="flex flex-col gap-3 lg:min-w-[13rem]">
+              <Link
+                href={`/admin/events/${event.id}/edit`}
+                className="button-secondary text-center"
+              >
+                Edit
+              </Link>
               <button
                 type="button"
                 className="button-primary"
@@ -185,4 +192,3 @@ export function PendingEventsReview() {
     </div>
   );
 }
-
