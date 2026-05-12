@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { FloatingWhatsAppButton } from "@/components/floating-whatsapp-button";
 import { AuthProvider } from "@/components/providers/auth-provider";
 
 import "./globals.css";
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className="bg-canvas font-body text-ink antialiased">
         <AuthProvider>{children}</AuthProvider>
+        <FloatingWhatsAppButton />
       </body>
     </html>
   );
