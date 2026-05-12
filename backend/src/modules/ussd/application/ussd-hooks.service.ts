@@ -19,6 +19,21 @@ import { VotesRepository } from "../../votes/application/ports/votes.repository"
 type UssdPayload = Record<string, unknown>;
 type MomoProvider = "mtn" | "vod" | "atl";
 
+const USSD_CONTINUABLE_CHARGE_STATUSES = new Set([
+  "pay_offline",
+  "pending",
+  "ongoing",
+  "success",
+]);
+
+const PAYSTACK_INPUT_REQUIRED_STATUSES = new Set([
+  "send_address",
+  "send_birthday",
+  "send_otp",
+  "send_phone",
+  "send_pin",
+]);
+
 type ResolvedContestant = {
   contestant: {
     id: string;
@@ -165,41 +180,74 @@ export class UssdHooksService {
       displayText: charge.displayText,
       raw: charge.raw as Prisma.InputJsonValue,
     };
+    const chargeStatus = charge.status.toLowerCase();
 
-    if (charge.status.toLowerCase() === "failed") {
-      await this.prisma.$transaction(async (tx) => {
-        await this.paymentsRepository.createPending(
-          {
-            reference: charge.reference,
-            amountMinor,
-            currency: resolved.category.currency,
-            voterEmail,
-            voterName,
-            eventId: resolved.event.id,
-            categoryId: resolved.category.id,
-            contestantId: resolved.contestant.id,
-            rawInitResponse,
-            metadata: metadata as Prisma.InputJsonValue,
-          },
-          tx,
-        );
-
-        await this.paymentsRepository.markFailed(
-          {
-            reference: charge.reference,
-            failureReason:
-              charge.displayText ?? "Paystack could not start the mobile money charge.",
-            failedAt: new Date(),
-            rawVerifyResponse: rawInitResponse,
-          },
-          tx,
-        );
+    if (chargeStatus === "failed" || chargeStatus === "timeout") {
+      await this.recordFailedPayment({
+        reference: charge.reference,
+        amountMinor,
+        currency: resolved.category.currency,
+        voterEmail,
+        voterName,
+        eventId: resolved.event.id,
+        categoryId: resolved.category.id,
+        contestantId: resolved.contestant.id,
+        rawInitResponse,
+        metadata: metadata as Prisma.InputJsonValue,
+        failureReason:
+          charge.displayText ?? "Paystack could not start the mobile money charge.",
       });
 
       return {
         payment_message:
           charge.displayText ??
           "Payment could not be started. Check the MoMo number and network, then try again.",
+        payment_reference: charge.reference,
+        payment_status: PaymentStatus.FAILED,
+      };
+    }
+
+    if (PAYSTACK_INPUT_REQUIRED_STATUSES.has(chargeStatus)) {
+      await this.recordFailedPayment({
+        reference: charge.reference,
+        amountMinor,
+        currency: resolved.category.currency,
+        voterEmail,
+        voterName,
+        eventId: resolved.event.id,
+        categoryId: resolved.category.id,
+        contestantId: resolved.contestant.id,
+        rawInitResponse,
+        metadata: metadata as Prisma.InputJsonValue,
+        failureReason: `paystack:${chargeStatus}:unsupported-in-ussd`,
+      });
+
+      return {
+        payment_message:
+          "This mobile money request needs Paystack checkout input and cannot be completed in USSD. Please use web voting or try another mobile money option.",
+        payment_reference: charge.reference,
+        payment_status: PaymentStatus.FAILED,
+      };
+    }
+
+    if (!USSD_CONTINUABLE_CHARGE_STATUSES.has(chargeStatus)) {
+      await this.recordFailedPayment({
+        reference: charge.reference,
+        amountMinor,
+        currency: resolved.category.currency,
+        voterEmail,
+        voterName,
+        eventId: resolved.event.id,
+        categoryId: resolved.category.id,
+        contestantId: resolved.contestant.id,
+        rawInitResponse,
+        metadata: metadata as Prisma.InputJsonValue,
+        failureReason: `paystack:${chargeStatus}:unsupported-status`,
+      });
+
+      return {
+        payment_message:
+          "This mobile money request could not be started over USSD. Please try again or use web voting.",
         payment_reference: charge.reference,
         payment_status: PaymentStatus.FAILED,
       };
@@ -242,9 +290,7 @@ export class UssdHooksService {
     });
 
     return {
-      payment_message:
-        charge.displayText ??
-        `Payment request sent to ${phone}. Approve the MoMo prompt with your PIN. Votes count after payment is confirmed.`,
+      payment_message: `Payment request sent to ${phone}. Approve the MoMo prompt on your phone. Do not enter your MoMo PIN in this USSD session. Votes count after payment is confirmed.`,
       payment_reference: charge.reference,
       payment_status: PaymentStatus.PENDING,
     };
@@ -378,6 +424,48 @@ export class UssdHooksService {
   private requiredString(value: string | null, message: string): string {
     if (!value) throw new BadRequestException(message);
     return value;
+  }
+
+  private async recordFailedPayment(input: {
+    reference: string;
+    amountMinor: number;
+    currency: string;
+    voterEmail: string;
+    voterName: string;
+    eventId: string;
+    categoryId: string;
+    contestantId: string;
+    rawInitResponse: Prisma.InputJsonValue;
+    metadata: Prisma.InputJsonValue;
+    failureReason: string;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.paymentsRepository.createPending(
+        {
+          reference: input.reference,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+          voterEmail: input.voterEmail,
+          voterName: input.voterName,
+          eventId: input.eventId,
+          categoryId: input.categoryId,
+          contestantId: input.contestantId,
+          rawInitResponse: input.rawInitResponse,
+          metadata: input.metadata,
+        },
+        tx,
+      );
+
+      await this.paymentsRepository.markFailed(
+        {
+          reference: input.reference,
+          failureReason: input.failureReason,
+          failedAt: new Date(),
+          rawVerifyResponse: input.rawInitResponse,
+        },
+        tx,
+      );
+    });
   }
 
   private parseQuantity(value: string): number {
