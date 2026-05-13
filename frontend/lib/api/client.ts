@@ -12,6 +12,7 @@ type ApiRequestOptions = {
   accessToken?: string | null;
   headers?: HeadersInit;
   skipAuthRetry?: boolean;
+  cache?: RequestCache;
 };
 
 const apiClientConfig: ApiClientConfig = {
@@ -71,6 +72,7 @@ export async function apiRequest<T>(
     method: options.method ?? "GET",
     headers,
     credentials: "include",
+    cache: options.cache ?? "no-store",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
