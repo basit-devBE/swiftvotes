@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
 import { getEvent, listContestants } from "@/lib/api/events";
@@ -227,9 +228,10 @@ export function PublicEventView({ eventId }: { eventId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-base text-ink/50">Loading event…</p>
-      </div>
+      <AppLoadingState
+        label="Loading event"
+        detail="Fetching contestants, categories, and voting details."
+      />
     );
   }
 

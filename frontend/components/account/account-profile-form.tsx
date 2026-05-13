@@ -109,7 +109,7 @@ export function AccountProfileForm() {
                 Status
               </p>
               <p className="mt-2 font-display text-3xl font-semibold tracking-[-0.03em] text-ink">
-                {user?.status ?? (isHydratingProfile ? "Loading" : "Unknown")}
+                {user?.status ?? (isHydratingProfile ? "Checking..." : "Unknown")}
               </p>
             </div>
             <div>
@@ -196,13 +196,13 @@ export function AccountProfileForm() {
             <div>
               <dt className="text-sm font-medium text-ink/48">Email</dt>
               <dd className="mt-2 text-base font-semibold text-ink/82">
-                {user?.email ?? "Loading..."}
+                {user?.email ?? "Checking..."}
               </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-ink/48">User ID</dt>
               <dd className="mt-2 break-all text-sm leading-6 text-ink/64">
-                {user?.id ?? "Loading..."}
+                {user?.id ?? "Checking..."}
               </dd>
             </div>
             <div>
@@ -210,7 +210,7 @@ export function AccountProfileForm() {
               <dd className="mt-2 text-sm leading-6 text-ink/64">
                 {user?.updatedAt
                   ? new Date(user.updatedAt).toLocaleString()
-                  : "Loading..."}
+                  : "Checking..."}
               </dd>
             </div>
           </dl>

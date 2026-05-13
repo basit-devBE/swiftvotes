@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
 import {
@@ -67,7 +68,13 @@ export function PendingEventsReview() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-ink/40">Loading pending events…</p>;
+    return (
+      <AppLoadingState
+        compact
+        label="Loading pending events"
+        detail="Checking events waiting for review."
+      />
+    );
   }
 
   if (events.length === 0) {

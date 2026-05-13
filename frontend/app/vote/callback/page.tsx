@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { Navbar } from "@/components/navbar";
 import { VoteCallbackView } from "@/components/votes/vote-callback-view";
 
@@ -13,9 +14,10 @@ export default function VoteCallbackPage() {
       <main className="page-shell pb-16 pt-10 sm:pb-20 sm:pt-14">
         <Suspense
           fallback={
-            <div className="mx-auto flex min-h-[60vh] max-w-xl items-center justify-center">
-              <p className="text-sm text-ink/50">Loading…</p>
-            </div>
+            <AppLoadingState
+              label="Loading payment check"
+              detail="Preparing vote confirmation."
+            />
           }
         >
           <VoteCallbackView />

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { listApprovedEvents } from "@/lib/api/events";
 import { EventResponse, EventStatus } from "@/lib/api/types";
@@ -235,8 +236,12 @@ export function PublicEventsView() {
       ) : null}
 
       {isLoading ? (
-        <div className="mt-6 rounded-[1.5rem] border border-line bg-white p-8 text-sm text-ink/45">
-          Loading approved events...
+        <div className="mt-6">
+          <AppLoadingState
+            compact
+            label="Loading approved events"
+            detail="Fetching public campaigns and voting windows."
+          />
         </div>
       ) : null}
 

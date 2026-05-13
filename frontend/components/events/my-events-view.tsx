@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { listMyEvents } from "@/lib/api/events";
 import { EventResponse, EventStatus } from "@/lib/api/types";
@@ -228,8 +229,12 @@ export function MyEventsView() {
       ) : null}
 
       {isLoading ? (
-        <div className="mt-6 rounded-[1.5rem] border border-line bg-white p-8 text-sm text-ink/45">
-          Loading your events...
+        <div className="mt-6">
+          <AppLoadingState
+            compact
+            label="Loading your events"
+            detail="Fetching drafts, reviews, and live campaigns."
+          />
         </div>
       ) : null}
 

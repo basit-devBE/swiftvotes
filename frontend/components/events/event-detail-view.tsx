@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { getEvent } from "@/lib/api/events";
 import { EventResponse } from "@/lib/api/types";
@@ -52,7 +53,12 @@ export function EventDetailView({
   }, [eventId]);
 
   if (isLoading) {
-    return <p className="text-base text-ink/56">Loading event...</p>;
+    return (
+      <AppLoadingState
+        label="Loading event"
+        detail="Opening the event editor and media details."
+      />
+    );
   }
 
   if (error) {

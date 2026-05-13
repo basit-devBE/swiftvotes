@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { getLeaderboard } from "@/lib/api/votes";
 import { LeaderboardCategory } from "@/lib/api/types";
@@ -54,17 +55,11 @@ export function PublicLeaderboard({ eventId, refreshKey = 0 }: Props) {
 
   if (isLoading) {
     return (
-      <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
-          Leaderboard
-        </p>
-        <div className="mt-6 flex justify-center">
-          <svg className="h-6 w-6 animate-spin text-primary/40" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z" />
-          </svg>
-        </div>
-      </div>
+      <AppLoadingState
+        compact
+        label="Loading leaderboard"
+        detail="Calculating current contestant positions."
+      />
     );
   }
 

@@ -29,6 +29,7 @@ import {
   PaymentStatus,
   PaymentSummaryResponse,
 } from "@/lib/api/types";
+import { AppLoadingState } from "@/components/app-loading-state";
 import { getEventPayment } from "@/lib/api/votes";
 
 const PAGE_SIZE = 20;
@@ -657,7 +658,7 @@ function ChannelPanel({
 
       <div className="mt-4 h-[292px]">
         {loading ? (
-          <EmptyState label="Loading channel data..." />
+          <EmptyState label="Loading channel data..." loading />
         ) : rows.length === 0 ? (
           <EmptyState label="No successful channel totals in this filter." />
         ) : (
@@ -702,10 +703,23 @@ function ChannelPanel({
   );
 }
 
-function EmptyState({ label }: { label: string }) {
+function EmptyState({
+  label,
+  loading = false,
+}: {
+  label: string;
+  loading?: boolean;
+}) {
   return (
-    <div className="flex h-full min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-line bg-[#f8fafc] text-sm font-medium text-ink/40">
-      {label}
+    <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line bg-[#f8fafc] text-sm font-medium text-ink/40">
+      {loading ? (
+        <span className="relative flex h-10 w-10 items-center justify-center">
+          <span className="absolute inset-0 rounded-full border-4 border-primary/10" />
+          <span className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary" />
+          <span className="h-2 w-2 rounded-full bg-accent" />
+        </span>
+      ) : null}
+      <span>{label}</span>
     </div>
   );
 }
@@ -758,8 +772,12 @@ function LedgerTable({
           <tbody>
             {isLoading && !data ? (
               <tr>
-                <td colSpan={9} className="px-5 py-16 text-center text-ink/42">
-                  Loading payments...
+                <td colSpan={9} className="px-5 py-10">
+                  <AppLoadingState
+                    compact
+                    label="Loading payments"
+                    detail="Fetching ledger rows for this filter."
+                  />
                 </td>
               </tr>
             ) : null}

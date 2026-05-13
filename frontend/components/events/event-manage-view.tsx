@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import {
   confirmNomination,
@@ -816,7 +817,13 @@ function NominationsTab({
     eventStatus === "APPROVED";
 
   if (isLoading) {
-    return <p className="text-base text-ink/56">Loading nominations…</p>;
+    return (
+      <AppLoadingState
+        compact
+        label="Loading nominations"
+        detail="Fetching submissions and review status."
+      />
+    );
   }
 
   if (error) {
@@ -1221,7 +1228,11 @@ function ContestantDrawer({
 
           <div className="border-t border-primary/8 px-6 py-5 space-y-5">
             {loadingCreds ? (
-              <p className="text-sm text-ink/44">Loading login info…</p>
+              <AppLoadingState
+                compact
+                label="Loading login info"
+                detail="Checking contestant account access."
+              />
             ) : !creds?.hasAccount ? (
               <div className="rounded-xl border border-[#dce4f1] bg-[#f7f9fc] p-4 text-center">
                 <p className="text-sm font-semibold text-ink/60">No account</p>
@@ -1350,7 +1361,15 @@ function ContestantsTab({
     return () => { cancelled = true; };
   }, [eventId]);
 
-  if (isLoading) return <p className="text-base text-ink/56">Loading contestants…</p>;
+  if (isLoading) {
+    return (
+      <AppLoadingState
+        compact
+        label="Loading contestants"
+        detail="Fetching confirmed contestant profiles."
+      />
+    );
+  }
 
   if (error) {
     return (
@@ -1832,8 +1851,12 @@ function VotesTab({ eventId }: { eventId: string }) {
             <tbody className="divide-y divide-primary/8">
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-ink/44">
-                    Loading payment records...
+                  <td colSpan={8} className="px-5 py-10">
+                    <AppLoadingState
+                      compact
+                      label="Loading payment records"
+                      detail="Fetching this event's ledger."
+                    />
                   </td>
                 </tr>
               )}
@@ -2042,9 +2065,11 @@ function LeaderboardTab({ eventId }: { eventId: string }) {
       )}
 
       {isLoading && !error && (
-        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-10 text-center text-sm text-ink/44 shadow-[0_12px_38px_-24px_rgba(7,17,31,0.2)]">
-          Loading leaderboard...
-        </div>
+        <AppLoadingState
+          compact
+          label="Loading leaderboard"
+          detail="Fetching current vote standings."
+        />
       )}
 
       {!isLoading && !error && populated.length === 0 && (
@@ -2294,7 +2319,12 @@ export function EventManageView({ eventId }: { eventId: string }) {
   }, [eventId]);
 
   if (isLoading) {
-    return <p className="text-base text-ink/56">Loading event…</p>;
+    return (
+      <AppLoadingState
+        label="Loading event manager"
+        detail="Opening event settings, nominations, contestants, and payments."
+      />
+    );
   }
 
   if (error) {
