@@ -14,10 +14,9 @@ export default function AdminEventsPage() {
   const [tab, setTab] = useState<Tab>("pending");
   const [allEvents, setAllEvents] = useState<EventResponse[]>([]);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
-  const [loadedAll, setLoadedAll] = useState(false);
 
   useEffect(() => {
-    if (tab === "all" && !loadedAll) {
+    if (tab === "all") {
       let cancelled = false;
 
       async function loadAllEvents() {
@@ -26,7 +25,6 @@ export default function AdminEventsPage() {
           const events = await listAllAdminEvents();
           if (cancelled) return;
           setAllEvents(events);
-          setLoadedAll(true);
         } finally {
           if (!cancelled) setIsLoadingAll(false);
         }
@@ -37,7 +35,7 @@ export default function AdminEventsPage() {
         cancelled = true;
       };
     }
-  }, [tab, loadedAll]);
+  }, [tab]);
 
   return (
     <div className="px-8 py-10">

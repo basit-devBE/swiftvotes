@@ -499,7 +499,10 @@ export function EventEditor({
       if (isUpdate && initialEvent) {
         const updated = await updateEvent(initialEvent.id, eventPayload);
         setSuccess("Event updated successfully.");
-        router.replace(afterSaveHref ?? `/events/${updated.id}`);
+        const targetHref = afterSaveHref
+          ? `${afterSaveHref}${afterSaveHref.includes("?") ? "&" : "?"}updated=${Date.now()}`
+          : `/events/${updated.id}`;
+        router.replace(targetHref);
         router.refresh();
       } else {
         const created = await createEvent(createPayload);
