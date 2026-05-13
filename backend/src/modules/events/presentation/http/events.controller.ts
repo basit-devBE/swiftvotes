@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -20,6 +21,7 @@ import { CreateEventUseCase } from "../../application/use-cases/create-event.use
 import { ListAllEventsUseCase } from "../../application/use-cases/list-all-events.use-case";
 import { ListApprovedEventsUseCase } from "../../application/use-cases/list-approved-events.use-case";
 import { DeleteCategoryUseCase } from "../../application/use-cases/delete-category.use-case";
+import { DeleteEventUseCase } from "../../application/use-cases/delete-event.use-case";
 import { GetEventDetailsUseCase } from "../../application/use-cases/get-event-details.use-case";
 import { ListMyEventsUseCase } from "../../application/use-cases/list-my-events.use-case";
 import { Public } from "../../../auth/presentation/http/decorators/public.decorator";
@@ -56,6 +58,7 @@ export class EventsController {
     private readonly listPendingEventsUseCase: ListPendingEventsUseCase,
     private readonly approveEventUseCase: ApproveEventUseCase,
     private readonly rejectEventUseCase: RejectEventUseCase,
+    private readonly deleteEventUseCase: DeleteEventUseCase,
     private readonly createCategoryUseCase: CreateCategoryUseCase,
     private readonly updateCategoryUseCase: UpdateCategoryUseCase,
     private readonly deleteCategoryUseCase: DeleteCategoryUseCase,
@@ -152,6 +155,13 @@ export class EventsController {
     });
 
     return EventResponseDto.fromDomain(event);
+  }
+
+  @Delete("admin/:eventId")
+  @HttpCode(204)
+  @SystemRoles(SystemRole.SUPER_ADMIN)
+  async deleteEvent(@Param("eventId") eventId: string): Promise<void> {
+    await this.deleteEventUseCase.execute(eventId);
   }
 
   @Public()

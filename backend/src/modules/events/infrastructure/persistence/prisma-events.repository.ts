@@ -282,6 +282,12 @@ export class PrismaEventsRepository implements EventsRepository {
     });
   }
 
+  async deleteEvent(eventId: string): Promise<void> {
+    await this.prisma.event.delete({
+      where: { id: eventId },
+    });
+  }
+
   async findCategoryById(categoryId: string): Promise<EventCategory | null> {
     const category = await this.prisma.eventCategory.findUnique({
       where: { id: categoryId },

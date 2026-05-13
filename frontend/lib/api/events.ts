@@ -103,6 +103,12 @@ export function rejectEvent(
   });
 }
 
+export function deleteAdminEvent(eventId: string): Promise<void> {
+  return apiRequest<void>(`/events/admin/${eventId}`, {
+    method: "DELETE",
+  });
+}
+
 export function submitNomination(
   eventId: string,
   input: SubmitNominationInput,

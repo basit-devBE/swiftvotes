@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
+import { ApiClientError } from "@/lib/api/client";
+import { deleteAdminEvent } from "@/lib/api/events";
 import { EventResponse, EventStatus } from "@/lib/api/types";
 
 const STATUS_STYLES: Record<EventStatus, string> = {
@@ -33,78 +36,151 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function AllEventsTable({ events }: { events: EventResponse[] }) {
+export function AllEventsTable({
+  events,
+  onDeleted,
+}: {
+  events: EventResponse[];
+  onDeleted?: (eventId: string) => void;
+}) {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   if (events.length === 0) {
     return (
       <p className="mt-10 text-sm text-ink/45">No events found.</p>
     );
   }
 
+  async function handleDelete(event: EventResponse) {
+    if (confirmingId !== event.id) {
+      setConfirmingId(event.id);
+      setError(null);
+      return;
+    }
+
+    setDeletingId(event.id);
+    setError(null);
+
+    try {
+      await deleteAdminEvent(event.id);
+      onDeleted?.(event.id);
+      setConfirmingId(null);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof ApiClientError
+          ? deleteError.message
+          : "Unable to delete this event.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
-    <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-line bg-canvas text-left text-xs font-semibold uppercase tracking-[0.12em] text-ink/45">
-            <th className="px-5 py-3.5">Event</th>
-            <th className="px-5 py-3.5">Status</th>
-            <th className="px-5 py-3.5">Categories</th>
-            <th className="px-5 py-3.5">Voting start</th>
-            <th className="px-5 py-3.5">Submitted</th>
-            <th className="px-5 py-3.5">Created</th>
-            <th className="px-5 py-3.5 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {events.map((event) => (
-            <tr key={event.id} className="transition hover:bg-primary/3">
-              <td className="px-5 py-4">
-                <p className="font-medium text-ink">{event.name}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-ink/35">
-                  {event.id}
-                </p>
-              </td>
-              <td className="px-5 py-4">
-                <span
-                  className={[
-                    "inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                    STATUS_STYLES[event.status],
-                  ].join(" ")}
-                >
-                  {statusLabel(event.status)}
-                </span>
-              </td>
-              <td className="px-5 py-4 text-ink/65">
-                {event.categories.length}
-              </td>
-              <td className="px-5 py-4 text-ink/65">
-                {formatDate(event.votingStartAt)}
-              </td>
-              <td className="px-5 py-4 text-ink/65">
-                {formatDate(event.submittedAt)}
-              </td>
-              <td className="px-5 py-4 text-ink/65">
-                {formatDate(event.createdAt)}
-              </td>
-              <td className="px-5 py-4">
-                <div className="flex justify-end gap-2">
-                  <Link
-                    href={`/events/${event.id}`}
-                    className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink/58 transition hover:border-primary/25 hover:text-primary"
-                  >
-                    View
-                  </Link>
-                  <Link
-                    href={`/admin/events/${event.id}/edit`}
-                    className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </td>
+    <div className="mt-6 space-y-3">
+      {error ? (
+        <div className="rounded-2xl border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+          {error}
+        </div>
+      ) : null}
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-canvas text-left text-xs font-semibold uppercase tracking-[0.12em] text-ink/45">
+              <th className="px-5 py-3.5">Event</th>
+              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-3.5">Categories</th>
+              <th className="px-5 py-3.5">Voting start</th>
+              <th className="px-5 py-3.5">Submitted</th>
+              <th className="px-5 py-3.5">Created</th>
+              <th className="px-5 py-3.5 text-right">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {events.map((event) => (
+              <tr key={event.id} className="transition hover:bg-primary/3">
+                <td className="px-5 py-4">
+                  <p className="font-medium text-ink">{event.name}</p>
+                  <p className="mt-0.5 font-mono text-[10px] text-ink/35">
+                    {event.id}
+                  </p>
+                  {confirmingId === event.id ? (
+                    <p className="mt-2 max-w-sm text-xs leading-5 text-accent">
+                      This permanently deletes its contestants, votes, and payment records.
+                    </p>
+                  ) : null}
+                </td>
+                <td className="px-5 py-4">
+                  <span
+                    className={[
+                      "inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                      STATUS_STYLES[event.status],
+                    ].join(" ")}
+                  >
+                    {statusLabel(event.status)}
+                  </span>
+                </td>
+                <td className="px-5 py-4 text-ink/65">
+                  {event.categories.length}
+                </td>
+                <td className="px-5 py-4 text-ink/65">
+                  {formatDate(event.votingStartAt)}
+                </td>
+                <td className="px-5 py-4 text-ink/65">
+                  {formatDate(event.submittedAt)}
+                </td>
+                <td className="px-5 py-4 text-ink/65">
+                  {formatDate(event.createdAt)}
+                </td>
+                <td className="px-5 py-4">
+                  <div className="flex justify-end gap-2">
+                    <Link
+                      href={`/events/${event.id}`}
+                      className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink/58 transition hover:border-primary/25 hover:text-primary"
+                    >
+                      View
+                    </Link>
+                    <Link
+                      href={`/admin/events/${event.id}/edit`}
+                      className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(event)}
+                      disabled={deletingId === event.id}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                        confirmingId === event.id
+                          ? "bg-accent text-white hover:bg-[#960d14]"
+                          : "border border-accent/20 bg-white text-accent hover:bg-accent/5",
+                      ].join(" ")}
+                    >
+                      {deletingId === event.id
+                        ? "Deleting..."
+                        : confirmingId === event.id
+                          ? "Confirm delete"
+                          : "Delete"}
+                    </button>
+                    {confirmingId === event.id ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingId(null)}
+                        className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink/50 transition hover:text-ink"
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
