@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { verifyVote } from "@/lib/api/votes";
 import { VerifyVoteResponse } from "@/lib/api/types";
@@ -16,20 +17,6 @@ type State =
 
 function formatAmount(minor: number, currency: string): string {
   return `${currency} ${(minor / 100).toFixed(2)}`;
-}
-
-function Spinner({ size = 36 }: { size?: number }) {
-  return (
-    <svg
-      className="animate-spin text-primary/60"
-      style={{ width: size, height: size }}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z" />
-    </svg>
-  );
 }
 
 export function VoteCallbackView() {
@@ -89,15 +76,10 @@ export function VoteCallbackView() {
 
   if (state.kind === "loading") {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-4 text-center">
-        <Spinner size={40} />
-        <p className="font-display text-2xl font-semibold tracking-tight text-ink">
-          Confirming your payment…
-        </p>
-        <p className="text-sm text-ink/55">
-          This usually takes just a few seconds. Don&apos;t close this page.
-        </p>
-      </div>
+      <AppLoadingState
+        label="Confirming payment"
+        detail="This usually takes a few seconds. Do not close this page."
+      />
     );
   }
 

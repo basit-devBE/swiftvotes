@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { AllEventsTable } from "@/components/admin/all-events-table";
 import { PendingEventsReview } from "@/components/admin/pending-events-review";
 import { listAllAdminEvents } from "@/lib/api/events";
@@ -81,7 +82,13 @@ export default function AdminEventsPage() {
       {tab === "all" && (
         <div className="mt-2">
           {isLoadingAll ? (
-            <p className="mt-6 text-sm text-ink/40">Loading approved and draft events…</p>
+            <div className="mt-6">
+              <AppLoadingState
+                compact
+                label="Loading events"
+                detail="Fetching approved, draft, and archived campaigns."
+              />
+            </div>
           ) : (
             <AllEventsTable
               events={allEvents}

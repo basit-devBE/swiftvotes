@@ -4,13 +4,35 @@ type AppLoadingStateProps = {
   label?: string;
   detail?: string;
   fullScreen?: boolean;
+  compact?: boolean;
 };
 
 export function AppLoadingState({
   label = "Loading SwiftVote",
   detail = "Preparing your workspace.",
   fullScreen = false,
+  compact = false,
 }: AppLoadingStateProps) {
+  if (compact) {
+    return (
+      <div
+        className="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-line bg-white/84 px-4 py-8 text-center shadow-[0_18px_45px_-36px_rgba(7,17,31,0.32)]"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="relative flex h-10 w-10 items-center justify-center">
+          <span className="absolute inset-0 rounded-full border-4 border-primary/10" />
+          <span className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary" />
+          <span className="h-2 w-2 rounded-full bg-accent" />
+        </span>
+        <span className="text-sm font-semibold text-ink/64">{label}</span>
+        {detail ? (
+          <span className="max-w-sm text-xs leading-5 text-ink/42">{detail}</span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={[

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { UsersTable } from "@/components/admin/users-table";
 import { listUsers } from "@/lib/api/users";
 import { UserResponse } from "@/lib/api/types";
@@ -54,7 +55,11 @@ export default function AdminUsersPage() {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-ink/40">Loading organiser and voter accounts…</p>
+        <AppLoadingState
+          compact
+          label="Loading accounts"
+          detail="Fetching organiser and voter access records."
+        />
       ) : (
         <UsersTable initialUsers={users} />
       )}

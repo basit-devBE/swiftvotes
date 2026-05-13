@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { EventCard } from "@/components/event-card";
 import { ApiClientError } from "@/lib/api/client";
 import { listApprovedEvents } from "@/lib/api/events";
@@ -179,13 +180,12 @@ export function EventsPreview() {
         ) : null}
 
         {isLoading ? (
-          <div className="mx-auto mt-14 grid max-w-5xl gap-6 md:grid-cols-3">
-            {[0, 1, 2].map((item) => (
-              <div
-                key={item}
-                className="h-[34rem] animate-pulse rounded-[2.4rem] bg-[#eef2f7]"
-              />
-            ))}
+          <div className="mx-auto mt-14 max-w-5xl">
+            <AppLoadingState
+              compact
+              label="Loading featured campaigns"
+              detail="Pulling approved events from the live directory."
+            />
           </div>
         ) : null}
 

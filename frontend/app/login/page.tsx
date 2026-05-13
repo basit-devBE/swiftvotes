@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { AppLoadingState } from "@/components/app-loading-state";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
 import { Navbar } from "@/components/navbar";
@@ -19,7 +20,15 @@ export default function LoginPage() {
           footerLinkLabel="Create an organiser account"
           footerLinkHref="/signup"
         >
-          <Suspense fallback={<div className="text-sm text-ink/54">Loading sign-in form...</div>}>
+          <Suspense
+            fallback={
+              <AppLoadingState
+                compact
+                label="Loading sign-in"
+                detail="Preparing the secure sign-in form."
+              />
+            }
+          >
             <LoginForm />
           </Suspense>
         </AuthShell>
