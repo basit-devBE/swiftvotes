@@ -30,6 +30,7 @@ import {
   TopCategoryEntry,
   TopEventEntry,
 } from "@/lib/api/admin-metrics";
+import { AppLoadingState } from "@/components/app-loading-state";
 import { listPendingEvents } from "@/lib/api/events";
 import { EventResponse, EventStatus } from "@/lib/api/types";
 
@@ -332,9 +333,10 @@ export default function AdminDashboardPage() {
         )}
 
         {isLoading && !overview ? (
-          <div className="rounded-[1.5rem] border border-line bg-white p-8 text-sm text-ink/45">
-            Loading votes, revenue, and event metrics...
-          </div>
+          <AppLoadingState
+            label="Loading dashboard"
+            detail="Fetching votes, revenue, and event metrics."
+          />
         ) : overview ? (
           <>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -394,7 +396,7 @@ export default function AdminDashboardPage() {
 
               <div className="mt-4 h-[360px]">
                 {seriesLoading && !series ? (
-                  <EmptyPanel label="Loading chart..." />
+                  <EmptyPanel label="Loading chart..." loading />
                 ) : chartData.length === 0 ? (
                   <EmptyPanel label="No chart data for this period" />
                 ) : (
@@ -625,10 +627,23 @@ function DashboardTooltip({
   );
 }
 
-function EmptyPanel({ label }: { label: string }) {
+function EmptyPanel({
+  label,
+  loading = false,
+}: {
+  label: string;
+  loading?: boolean;
+}) {
   return (
-    <div className="flex h-full min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-line bg-[#f8fafc] text-sm font-medium text-ink/40">
-      {label}
+    <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line bg-[#f8fafc] text-sm font-medium text-ink/40">
+      {loading ? (
+        <span className="relative flex h-10 w-10 items-center justify-center">
+          <span className="absolute inset-0 rounded-full border-4 border-primary/10" />
+          <span className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary" />
+          <span className="h-2 w-2 rounded-full bg-accent" />
+        </span>
+      ) : null}
+      <span>{label}</span>
     </div>
   );
 }
@@ -654,7 +669,7 @@ function TopEventsPanel({
       <PanelHeader title="Top events" by={by} setBy={setBy} />
       <div className="mt-4 h-[312px]">
         {loading && rows.length === 0 ? (
-          <EmptyPanel label="Loading events..." />
+          <EmptyPanel label="Loading events..." loading />
         ) : rows.length === 0 ? (
           <EmptyPanel label="No event activity for this period" />
         ) : (
@@ -742,7 +757,7 @@ function CategoryDonutPanel({
       <div className="mt-4 grid min-h-[312px] gap-4 lg:grid-cols-[1fr_1.1fr]">
         {loading && rows.length === 0 ? (
           <div className="lg:col-span-2">
-            <EmptyPanel label="Loading categories..." />
+            <EmptyPanel label="Loading categories..." loading />
           </div>
         ) : rows.length === 0 ? (
           <div className="lg:col-span-2">
