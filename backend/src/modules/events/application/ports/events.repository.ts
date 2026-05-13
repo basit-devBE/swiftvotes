@@ -72,6 +72,7 @@ export interface EventsRepository {
     rejectedByUserId?: string | null;
     rejectionReason?: string | null;
   }): Promise<Event>;
+  deleteEvent(eventId: string): Promise<void>;
   createCategory(eventId: string, input: EventCategoryRecord): Promise<EventCategory>;
   updateCategory(
     categoryId: string,

@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
-import { approveEvent, listPendingEvents, rejectEvent } from "@/lib/api/events";
+import {
+  approveEvent,
+  deleteAdminEvent,
+  listPendingEvents,
+  rejectEvent,
+} from "@/lib/api/events";
 import { EventResponse } from "@/lib/api/types";
 
 export function PendingEventsReview() {
@@ -14,6 +19,8 @@ export function PendingEventsReview() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeRejectId, setActiveRejectId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
@@ -71,6 +78,31 @@ export function PendingEventsReview() {
         </p>
       </div>
     );
+  }
+
+  async function handleDelete(event: EventResponse) {
+    if (confirmingDeleteId !== event.id) {
+      setConfirmingDeleteId(event.id);
+      setActiveRejectId(null);
+      return;
+    }
+
+    setDeletingId(event.id);
+    setError(null);
+
+    try {
+      await deleteAdminEvent(event.id);
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setConfirmingDeleteId(null);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof ApiClientError
+          ? deleteError.message
+          : "Unable to delete this event.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -140,8 +172,40 @@ export function PendingEventsReview() {
               >
                 Reject
               </button>
+              <button
+                type="button"
+                className={[
+                  "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition duration-300 disabled:cursor-not-allowed disabled:opacity-60",
+                  confirmingDeleteId === event.id
+                    ? "bg-accent text-white hover:bg-[#960d14]"
+                    : "border border-accent/20 bg-white text-accent hover:bg-accent/5",
+                ].join(" ")}
+                disabled={deletingId === event.id}
+                onClick={() => void handleDelete(event)}
+              >
+                {deletingId === event.id
+                  ? "Deleting..."
+                  : confirmingDeleteId === event.id
+                    ? "Confirm delete"
+                    : "Delete"}
+              </button>
+              {confirmingDeleteId === event.id ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setConfirmingDeleteId(null)}
+                >
+                  Cancel delete
+                </button>
+              ) : null}
             </div>
           </div>
+
+          {confirmingDeleteId === event.id ? (
+            <div className="mt-6 rounded-2xl border border-accent/18 bg-accent/5 px-4 py-3 text-sm font-medium leading-6 text-accent">
+              This permanently deletes the event, contestants, votes, and payment records.
+            </div>
+          ) : null}
 
           {activeRejectId === event.id ? (
             <div className="mt-6 border-t border-primary/10 pt-6">

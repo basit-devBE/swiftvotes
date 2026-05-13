@@ -83,7 +83,14 @@ export default function AdminEventsPage() {
           {isLoadingAll ? (
             <p className="mt-6 text-sm text-ink/40">Loading approved and draft events…</p>
           ) : (
-            <AllEventsTable events={allEvents} />
+            <AllEventsTable
+              events={allEvents}
+              onDeleted={(eventId) => {
+                setAllEvents((current) =>
+                  current.filter((event) => event.id !== eventId),
+                );
+              }}
+            />
           )}
         </div>
       )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/use-auth";
+import { AppLoadingState } from "@/components/app-loading-state";
 import { SiteLogo } from "@/components/site-logo";
 
 const navItems = [
@@ -81,9 +82,11 @@ export function AdminShell({
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
-        <p className="text-sm text-ink/50">Loading admin panel…</p>
-      </div>
+      <AppLoadingState
+        fullScreen
+        label="Loading admin"
+        detail="Checking your SwiftVote admin session."
+      />
     );
   }
 
