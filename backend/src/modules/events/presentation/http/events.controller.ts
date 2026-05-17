@@ -81,6 +81,7 @@ export class EventsController {
       creatorUserId: currentUser.id,
       name: body.name,
       description: body.description,
+      eventType: body.eventType,
       primaryFlyerUrl: body.primaryFlyerUrl,
       primaryFlyerKey: body.primaryFlyerKey,
       bannerUrl: body.bannerUrl,
@@ -93,10 +94,20 @@ export class EventsController {
         : null,
       votingStartAt: new Date(body.votingStartAt),
       votingEndAt: new Date(body.votingEndAt),
+      eventStartAt: body.eventStartAt ? new Date(body.eventStartAt) : null,
+      eventEndAt: body.eventEndAt ? new Date(body.eventEndAt) : null,
+      venueName: body.venueName,
+      venueAddress: body.venueAddress,
+      ticketSalesStartAt: body.ticketSalesStartAt
+        ? new Date(body.ticketSalesStartAt)
+        : null,
+      ticketSalesEndAt: body.ticketSalesEndAt
+        ? new Date(body.ticketSalesEndAt)
+        : null,
       contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes ?? false,
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard ?? false,
       publicCanViewLeaderboard: body.publicCanViewLeaderboard ?? true,
-      categories: body.categories.map((category) => ({
+      categories: body.categories?.map((category) => ({
         ...category,
         currency: category.currency.trim().toUpperCase(),
       })),
@@ -183,6 +194,7 @@ export class EventsController {
       actorSystemRole: currentUser.systemRole,
       name: body.name,
       description: body.description,
+      eventType: body.eventType,
       primaryFlyerUrl: body.primaryFlyerUrl,
       primaryFlyerKey: body.primaryFlyerKey,
       bannerUrl: body.bannerUrl,
@@ -201,6 +213,28 @@ export class EventsController {
         ? new Date(body.votingStartAt)
         : undefined,
       votingEndAt: body.votingEndAt ? new Date(body.votingEndAt) : undefined,
+      eventStartAt: body.eventStartAt
+        ? new Date(body.eventStartAt)
+        : body.eventStartAt === null
+          ? null
+          : undefined,
+      eventEndAt: body.eventEndAt
+        ? new Date(body.eventEndAt)
+        : body.eventEndAt === null
+          ? null
+          : undefined,
+      venueName: body.venueName,
+      venueAddress: body.venueAddress,
+      ticketSalesStartAt: body.ticketSalesStartAt
+        ? new Date(body.ticketSalesStartAt)
+        : body.ticketSalesStartAt === null
+          ? null
+          : undefined,
+      ticketSalesEndAt: body.ticketSalesEndAt
+        ? new Date(body.ticketSalesEndAt)
+        : body.ticketSalesEndAt === null
+          ? null
+          : undefined,
       contestantsCanViewOwnVotes: body.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
       publicCanViewLeaderboard: body.publicCanViewLeaderboard,

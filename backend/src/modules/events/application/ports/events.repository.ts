@@ -1,6 +1,7 @@
 import { Event } from "../../domain/event";
 import { EventCategory } from "../../domain/event-category";
 import { EventStatus } from "../../domain/event-status";
+import { EventType } from "../../domain/event-type";
 
 export type EventCategoryRecord = {
   name: string;
@@ -17,6 +18,7 @@ export type CreateDraftEventRecord = {
   name: string;
   slug: string;
   description: string;
+  eventType?: EventType;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl?: string | null;
@@ -25,15 +27,22 @@ export type CreateDraftEventRecord = {
   nominationEndAt?: Date | null;
   votingStartAt: Date;
   votingEndAt: Date;
+  eventStartAt?: Date | null;
+  eventEndAt?: Date | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  ticketSalesStartAt?: Date | null;
+  ticketSalesEndAt?: Date | null;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;
-  categories: EventCategoryRecord[];
+  categories?: EventCategoryRecord[];
 };
 
 export type UpdateDraftEventRecord = {
   name?: string;
   description?: string;
+  eventType?: EventType;
   primaryFlyerUrl?: string;
   primaryFlyerKey?: string;
   bannerUrl?: string | null;
@@ -42,6 +51,12 @@ export type UpdateDraftEventRecord = {
   nominationEndAt?: Date | null;
   votingStartAt?: Date;
   votingEndAt?: Date;
+  eventStartAt?: Date | null;
+  eventEndAt?: Date | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  ticketSalesStartAt?: Date | null;
+  ticketSalesEndAt?: Date | null;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;
@@ -56,6 +71,7 @@ export interface EventsRepository {
   findApproved(): Promise<Event[]>;
   findPendingApproval(): Promise<Event[]>;
   findLifecycleCandidates(): Promise<Event[]>;
+  countActiveTicketTypes(eventId: string): Promise<number>;
   updateDraft(eventId: string, input: UpdateDraftEventRecord): Promise<Event>;
   updateVisibility(eventId: string, input: {
     contestantsCanViewOwnVotes?: boolean;

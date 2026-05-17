@@ -1,5 +1,6 @@
 import { EventCategory } from "./event-category";
 import { EventStatus } from "./event-status";
+import { EventType } from "./event-type";
 
 export type Event = {
   id: string;
@@ -8,6 +9,7 @@ export type Event = {
   slug: string;
   description: string;
   status: EventStatus;
+  eventType: EventType;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl: string | null;
@@ -16,6 +18,12 @@ export type Event = {
   nominationEndAt: Date | null;
   votingStartAt: Date;
   votingEndAt: Date;
+  eventStartAt: Date | null;
+  eventEndAt: Date | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  ticketSalesStartAt: Date | null;
+  ticketSalesEndAt: Date | null;
   contestantsCanViewOwnVotes: boolean;
   contestantsCanViewLeaderboard: boolean;
   publicCanViewLeaderboard: boolean;

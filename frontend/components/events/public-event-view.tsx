@@ -2,16 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AppLoadingState } from "@/components/app-loading-state";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
-import { getEvent, listContestants } from "@/lib/api/events";
+import { createTicketOrder, getEvent, listContestants, listTicketTypes } from "@/lib/api/events";
 import {
   ContestantResponse,
   EventCategoryResponse,
   EventResponse,
+  TicketTypeResponse,
 } from "@/lib/api/types";
 import { PublicLeaderboard } from "@/components/votes/public-leaderboard";
 import { VoteModal } from "@/components/votes/vote-modal";
@@ -23,6 +24,17 @@ function formatDate(date: string | null): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+  });
+}
+
+function formatDateTime(date: string | null): string {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -46,6 +58,42 @@ function daysUntil(iso: string): string {
   const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
   if (days === 1) return "1 day left";
   return `${days} days left`;
+}
+
+function getTicketSalesState(event: EventResponse): {
+  isOpen: boolean;
+  message: string;
+} {
+  if (event.status !== "APPROVED") {
+    return {
+      isOpen: false,
+      message: "Ticket sales will open after this event is approved.",
+    };
+  }
+
+  const now = Date.now();
+  const salesStart = event.ticketSalesStartAt
+    ? new Date(event.ticketSalesStartAt).getTime()
+    : null;
+  const salesEnd = event.ticketSalesEndAt
+    ? new Date(event.ticketSalesEndAt).getTime()
+    : null;
+
+  if (salesStart && salesStart > now) {
+    return {
+      isOpen: false,
+      message: `Ticket sales open on ${formatDateTime(event.ticketSalesStartAt)}.`,
+    };
+  }
+
+  if (salesEnd && salesEnd < now) {
+    return {
+      isOpen: false,
+      message: "Ticket sales are closed for this event.",
+    };
+  }
+
+  return { isOpen: true, message: "Ticket sales are open." };
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +230,232 @@ function EventDetails({ event }: { event: EventResponse }) {
   );
 }
 
+function TicketCheckoutPanel({
+  event,
+  ticketTypes,
+}: {
+  event: EventResponse;
+  ticketTypes: TicketTypeResponse[];
+}) {
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerEmail, setBuyerEmail] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const salesState = getTicketSalesState(event);
+  const availableTicketTypes = ticketTypes.filter((ticketType) => {
+    if (!ticketType.isActive) return false;
+    if (ticketType.quantityAvailable === null) return true;
+    return ticketType.quantitySold < ticketType.quantityAvailable;
+  });
+
+  const selectedItems = useMemo(
+    () =>
+      availableTicketTypes
+        .map((ticketType) => ({
+          ticketType,
+          quantity: quantities[ticketType.id] ?? 0,
+        }))
+        .filter((item) => item.quantity > 0),
+    [availableTicketTypes, quantities],
+  );
+  const totalAmountMinor = selectedItems.reduce(
+    (sum, item) => sum + item.ticketType.priceMinor * item.quantity,
+    0,
+  );
+  const currency = selectedItems[0]?.ticketType.currency ?? ticketTypes[0]?.currency ?? "GHS";
+  const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  function setQuantity(ticketType: TicketTypeResponse, nextQuantity: number) {
+    const remaining =
+      ticketType.quantityAvailable === null
+        ? 99
+        : Math.max(ticketType.quantityAvailable - ticketType.quantitySold, 0);
+    const clamped = Math.max(0, Math.min(nextQuantity, remaining));
+    setQuantities((current) => ({ ...current, [ticketType.id]: clamped }));
+  }
+
+  async function handleSubmit(eventSubmit: FormEvent<HTMLFormElement>) {
+    eventSubmit.preventDefault();
+    setError(null);
+
+    if (!salesState.isOpen) {
+      setError(salesState.message);
+      return;
+    }
+    if (selectedItems.length === 0) {
+      setError("Select at least one ticket.");
+      return;
+    }
+    if (!buyerName.trim()) {
+      setError("Enter your name.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim())) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await createTicketOrder(event.id, {
+        items: selectedItems.map((item) => ({
+          ticketTypeId: item.ticketType.id,
+          quantity: item.quantity,
+        })),
+        buyerName: buyerName.trim(),
+        buyerEmail: buyerEmail.trim(),
+        buyerPhone: buyerPhone.trim() || undefined,
+        callbackOrigin: window.location.origin,
+      });
+      window.location.href = result.paymentUrl;
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof ApiClientError
+          ? checkoutError.message
+          : "Unable to start checkout. Please try again.",
+      );
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(eventSubmit) => void handleSubmit(eventSubmit)}
+      className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-7 shadow-[0_16px_48px_-24px_rgba(7,17,31,0.18)]"
+    >
+      <p className="font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
+        Buy tickets
+      </p>
+      <p className="mt-1.5 text-sm leading-6 text-ink/54">
+        Select your ticket types. The total is calculated before you pay.
+      </p>
+
+      <div className="mt-5 rounded-xl border border-primary/10 bg-[#f7f9fc] px-4 py-3 text-sm font-medium text-ink/62">
+        {salesState.message}
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {availableTicketTypes.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-primary/16 bg-[#f7f9fc] p-4 text-sm text-ink/52">
+            No tickets are currently available.
+          </p>
+        ) : (
+          availableTicketTypes.map((ticketType) => {
+            const quantity = quantities[ticketType.id] ?? 0;
+            const remaining =
+              ticketType.quantityAvailable === null
+                ? null
+                : Math.max(ticketType.quantityAvailable - ticketType.quantitySold, 0);
+            return (
+              <div
+                key={ticketType.id}
+                className="rounded-2xl border border-primary/10 bg-[#fbfcff] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{ticketType.name}</p>
+                    <p className="mt-1 text-xs text-ink/48">
+                      {formatCurrency(ticketType.priceMinor, ticketType.currency)}
+                      {remaining === null ? " · unlimited" : ` · ${remaining} left`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(ticketType, quantity - 1)}
+                      disabled={!salesState.isOpen || quantity === 0}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/16 text-sm font-bold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label={`Reduce ${ticketType.name}`}
+                    >
+                      -
+                    </button>
+                    <span className="w-6 text-center text-sm font-semibold text-ink">
+                      {quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(ticketType, quantity + 1)}
+                      disabled={!salesState.isOpen || remaining === 0}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-ink/12 disabled:text-ink/35"
+                      aria-label={`Add ${ticketType.name}`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        <label className="block">
+          <span className="text-xs font-semibold text-ink/60">Full name</span>
+          <input
+            className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+            value={buyerName}
+            onChange={(inputEvent) => setBuyerName(inputEvent.target.value)}
+            disabled={!salesState.isOpen || isSubmitting}
+            placeholder="Your name"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-ink/60">Email</span>
+          <input
+            type="email"
+            className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+            value={buyerEmail}
+            onChange={(inputEvent) => setBuyerEmail(inputEvent.target.value)}
+            disabled={!salesState.isOpen || isSubmitting}
+            placeholder="you@example.com"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-ink/60">Phone</span>
+          <input
+            className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+            value={buyerPhone}
+            onChange={(inputEvent) => setBuyerPhone(inputEvent.target.value)}
+            disabled={!salesState.isOpen || isSubmitting}
+            placeholder="Optional"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5 rounded-2xl bg-[#07111f] p-4 text-white">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-white/62">Selected</span>
+          <span className="font-semibold">{totalQuantity} ticket{totalQuantity === 1 ? "" : "s"}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-sm text-white/62">Total</span>
+          <span className="font-display text-2xl font-semibold">
+            {formatCurrency(totalAmountMinor, currency)}
+          </span>
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-4 rounded-xl border border-accent/16 bg-accent/5 px-3 py-2 text-sm font-medium text-accent">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={!salesState.isOpen || isSubmitting || selectedItems.length === 0}
+        className="mt-5 flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-ink/12 disabled:text-ink/40"
+      >
+        {isSubmitting ? "Opening checkout..." : "Pay with Paystack"}
+      </button>
+    </form>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
@@ -189,6 +463,7 @@ function EventDetails({ event }: { event: EventResponse }) {
 export function PublicEventView({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [contestants, setContestants] = useState<ContestantResponse[]>([]);
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [votingContestant, setVotingContestant] =
@@ -200,13 +475,15 @@ export function PublicEventView({ eventId }: { eventId: string }) {
     let cancelled = false;
     async function load() {
       try {
-        const [result, contestantList] = await Promise.all([
-          getEvent(eventId),
-          listContestants(eventId),
-        ]);
+        const result = await getEvent(eventId);
+        const [contestantList, ticketTypeList] =
+          result.eventType === "TICKETING"
+            ? [[], await listTicketTypes(eventId)]
+            : [await listContestants(eventId), []];
         if (!cancelled) {
           setEvent(result);
           setContestants(contestantList);
+          setTicketTypes(ticketTypeList);
         }
       } catch (err) {
         if (!cancelled) {
@@ -340,6 +617,102 @@ export function PublicEventView({ eventId }: { eventId: string }) {
       </div>
     </div>
   );
+
+  if (event.eventType === "TICKETING") {
+    const hasTicketTypes = ticketTypes.length > 0;
+
+    return (
+      <article className="mx-auto max-w-6xl pb-20">
+        {Hero}
+        {OwnerControls}
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="space-y-8">
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                About this event
+              </p>
+              <p className="mt-4 text-base leading-7 text-ink/72">
+                {event.description}
+              </p>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                Tickets
+              </p>
+              {hasTicketTypes ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {ticketTypes.map((ticketType) => {
+                    const remaining =
+                      ticketType.quantityAvailable === null
+                        ? null
+                        : Math.max(ticketType.quantityAvailable - ticketType.quantitySold, 0);
+                    return (
+                      <div
+                        key={ticketType.id}
+                        className="rounded-[1.25rem] border border-[#edf0f6] bg-[#f7f9fc] p-5"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+                              {ticketType.name}
+                            </p>
+                            {ticketType.description && (
+                              <p className="mt-1 text-sm leading-6 text-ink/50">
+                                {ticketType.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full border border-primary/16 bg-white px-3 py-1 text-xs font-semibold text-primary">
+                            {formatCurrency(ticketType.priceMinor, ticketType.currency)}
+                          </span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-ink/52">
+                          <span>{ticketType.quantitySold} sold</span>
+                          <span>/</span>
+                          <span>{remaining === null ? "Unlimited" : `${remaining} left`}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-primary/16 bg-[#f7f9fc] p-6 text-sm text-ink/52">
+                  Ticket types are being prepared by the organiser.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className="space-y-6 lg:sticky lg:top-8 lg:self-start">
+            <TicketCheckoutPanel event={event} ticketTypes={ticketTypes} />
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-7 shadow-[0_16px_48px_-24px_rgba(7,17,31,0.18)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                Venue
+              </p>
+              <p className="mt-3 font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+                {event.venueName || "Venue not set"}
+              </p>
+              {event.venueAddress && (
+                <p className="mt-1 text-sm leading-6 text-ink/54">
+                  {event.venueAddress}
+                </p>
+              )}
+              <div className="mt-5 rounded-xl bg-[#f7f9fc] px-4 py-3">
+                <p className="text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-ink/36">
+                  Event date
+                </p>
+                <p className="mt-1 text-sm font-semibold text-ink">
+                  {formatDateTime(event.eventStartAt)}
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </article>
+    );
+  }
 
   // ────────────────────────────────────────────────────────────────────────
   // VOTING-LIVE LAYOUT — contestants front and center

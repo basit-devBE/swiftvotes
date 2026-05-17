@@ -5,6 +5,9 @@ import {
   ConfirmNominationInput,
   CreateEventCategoryInput,
   CreateEventInput,
+  CreateTicketOrderInput,
+  CreateTicketOrderResponse,
+  CreateTicketTypeInput,
   EventCategoryResponse,
   EventResponse,
   NominationResponse,
@@ -12,6 +15,9 @@ import {
   SubmitNominationInput,
   UpdateContestantInput,
   UpdateEventInput,
+  UpdateTicketTypeInput,
+  TicketTypeResponse,
+  TicketOrderResponse,
 } from "./types";
 
 export function createEvent(input: CreateEventInput): Promise<EventResponse> {
@@ -77,6 +83,63 @@ export function createCategory(
     method: "POST",
     body: input,
   });
+}
+
+export function listTicketTypes(eventId: string): Promise<TicketTypeResponse[]> {
+  return apiRequest<TicketTypeResponse[]>(`/events/${eventId}/ticket-types`);
+}
+
+export function createTicketType(
+  eventId: string,
+  input: CreateTicketTypeInput,
+): Promise<TicketTypeResponse> {
+  return apiRequest<TicketTypeResponse>(`/events/${eventId}/ticket-types`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function updateTicketType(
+  eventId: string,
+  ticketTypeId: string,
+  input: UpdateTicketTypeInput,
+): Promise<TicketTypeResponse> {
+  return apiRequest<TicketTypeResponse>(
+    `/events/${eventId}/ticket-types/${ticketTypeId}`,
+    {
+      method: "PATCH",
+      body: input,
+    },
+  );
+}
+
+export function disableTicketType(
+  eventId: string,
+  ticketTypeId: string,
+): Promise<void> {
+  return apiRequest<void>(`/events/${eventId}/ticket-types/${ticketTypeId}`, {
+    method: "DELETE",
+  });
+}
+
+export function createTicketOrder(
+  eventId: string,
+  input: CreateTicketOrderInput,
+): Promise<CreateTicketOrderResponse> {
+  return apiRequest<CreateTicketOrderResponse>(`/events/${eventId}/ticket-orders`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function verifyTicketOrder(
+  eventId: string,
+  reference: string,
+): Promise<TicketOrderResponse> {
+  const qs = new URLSearchParams({ reference }).toString();
+  return apiRequest<TicketOrderResponse>(
+    `/events/${eventId}/ticket-orders/verify?${qs}`,
+  );
 }
 
 export function listPendingEvents(): Promise<EventResponse[]> {

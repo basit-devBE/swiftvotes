@@ -49,6 +49,8 @@ export type EventStatus =
   | "VOTING_CLOSED"
   | "ARCHIVED";
 
+export type EventType = "VOTING" | "TICKETING";
+
 export type EventCategoryResponse = {
   id: string;
   eventId: string;
@@ -70,6 +72,7 @@ export type EventResponse = {
   slug: string;
   description: string;
   status: EventStatus;
+  eventType: EventType;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl: string | null;
@@ -78,6 +81,12 @@ export type EventResponse = {
   nominationEndAt: string | null;
   votingStartAt: string;
   votingEndAt: string;
+  eventStartAt: string | null;
+  eventEndAt: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  ticketSalesStartAt: string | null;
+  ticketSalesEndAt: string | null;
   contestantsCanViewOwnVotes: boolean;
   contestantsCanViewLeaderboard: boolean;
   publicCanViewLeaderboard: boolean;
@@ -105,6 +114,7 @@ export type CreateEventCategoryInput = {
 export type CreateEventInput = {
   name: string;
   description: string;
+  eventType?: EventType;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl?: string;
@@ -113,16 +123,140 @@ export type CreateEventInput = {
   nominationEndAt?: string;
   votingStartAt: string;
   votingEndAt: string;
+  eventStartAt?: string;
+  eventEndAt?: string;
+  venueName?: string;
+  venueAddress?: string;
+  ticketSalesStartAt?: string;
+  ticketSalesEndAt?: string;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;
-  categories: CreateEventCategoryInput[];
+  categories?: CreateEventCategoryInput[];
 };
 
 export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">> & {
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;
+};
+
+export type TicketTypeResponse = {
+  id: string;
+  eventId: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  currency: string;
+  quantityAvailable: number | null;
+  quantitySold: number;
+  salesStartAt: string | null;
+  salesEndAt: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateTicketTypeInput = {
+  name: string;
+  description?: string;
+  priceMinor: number;
+  currency: string;
+  quantityAvailable?: number | null;
+  salesStartAt?: string | null;
+  salesEndAt?: string | null;
+  sortOrder?: number;
+};
+
+export type UpdateTicketTypeInput = Partial<CreateTicketTypeInput> & {
+  isActive?: boolean;
+};
+
+export type CreateTicketOrderInput = {
+  items: Array<{
+    ticketTypeId: string;
+    quantity: number;
+  }>;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone?: string;
+  callbackOrigin?: string;
+};
+
+export type TicketOrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED";
+
+export type TicketOrderItemResponse = {
+  id: string;
+  orderId: string;
+  ticketTypeId: string;
+  ticketTypeName: string | null;
+  quantity: number;
+  unitPriceMinor: number;
+  totalAmountMinor: number;
+  createdAt: string;
+};
+
+export type IssuedTicketResponse = {
+  id: string;
+  eventId: string;
+  orderId: string;
+  orderItemId: string;
+  ticketTypeId: string;
+  code: string;
+  status: string;
+  checkedInAt: string | null;
+  checkedInById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketPaymentResponse = {
+  id: string;
+  orderId: string;
+  reference: string;
+  providerRef: string | null;
+  provider: string;
+  amountMinor: number;
+  amountPaidMinor: number | null;
+  feeMinor: number | null;
+  currency: string;
+  status: PaymentStatus;
+  initializedAt: string;
+  paidAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  buyerEmail: string;
+  buyerName: string | null;
+  buyerPhone: string | null;
+  channel: string | null;
+  cardLast4: string | null;
+  mobileNumber: string | null;
+  customerIp: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketOrderResponse = {
+  id: string;
+  eventId: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string | null;
+  status: TicketOrderStatus;
+  totalAmountMinor: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  items: TicketOrderItemResponse[];
+  payment: TicketPaymentResponse | null;
+  issuedTickets: IssuedTicketResponse[];
+};
+
+export type CreateTicketOrderResponse = {
+  order: TicketOrderResponse;
+  reference: string;
+  paymentUrl: string;
 };
 
 export type NominationStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";

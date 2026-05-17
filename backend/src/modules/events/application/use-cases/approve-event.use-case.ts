@@ -12,6 +12,7 @@ import { NotificationsService } from "../../../notifications/application/ports/n
 import { Event } from "../../domain/event";
 import { determineEventStatusForTimestamp } from "../../domain/event-lifecycle";
 import { EventStatus } from "../../domain/event-status";
+import { EventType } from "../../domain/event-type";
 import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 
@@ -42,10 +43,22 @@ export class ApproveEventUseCase {
       );
     }
 
+    if (event.eventType === EventType.TICKETING) {
+      const ticketTypeCount = await this.eventsRepository.countActiveTicketTypes(
+        input.eventId,
+      );
+      if (ticketTypeCount === 0) {
+        throw new BadRequestException(
+          "Ticketing event must contain at least one ticket type before approval.",
+        );
+      }
+    }
+
     const approvedAt = new Date();
     const nextStatus = determineEventStatusForTimestamp(
       {
         approvedAt,
+        eventType: event.eventType,
         nominationStartAt: event.nominationStartAt,
         nominationEndAt: event.nominationEndAt,
         votingStartAt: event.votingStartAt,

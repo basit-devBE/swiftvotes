@@ -11,10 +11,10 @@ import { EventResponse, EventStatus } from "@/lib/api/types";
 
 const STATUS_OPTIONS: Array<"all" | EventStatus> = [
   "all",
+  "APPROVED",
   "VOTING_LIVE",
   "VOTING_SCHEDULED",
   "NOMINATIONS_OPEN",
-  "APPROVED",
   "VOTING_CLOSED",
 ];
 
@@ -52,6 +52,9 @@ function eventMatches(event: EventResponse, query: string, status: "all" | Event
     event.name,
     event.description,
     event.status,
+    event.eventType,
+    event.venueName ?? "",
+    event.venueAddress ?? "",
     ...event.categories.map((category) => category.name),
   ]
     .join(" ")
@@ -101,8 +104,8 @@ export function PublicEventsView() {
   const remaining = featured
     ? filteredEvents.filter((event) => event.id !== featured.id)
     : filteredEvents;
-  const liveCount = events.filter((event) => event.status === "VOTING_LIVE").length;
-  const nominationCount = events.filter((event) => event.status === "NOMINATIONS_OPEN").length;
+  const ticketingCount = events.filter((event) => event.eventType === "TICKETING").length;
+  const votingCount = events.filter((event) => event.eventType === "VOTING").length;
 
   return (
     <div className="mx-auto max-w-[1320px] pb-16">
@@ -118,14 +121,13 @@ export function PublicEventsView() {
                 Browse approved event campaigns.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-ink/62 sm:text-lg">
-                These events have passed platform review. Some are collecting nominations,
-                some are scheduled, and live campaigns can accept votes immediately.
+                These events have passed platform review. Browse voting campaigns and ticketed events from one directory.
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 <DirectoryStat label="Approved" value={events.length} />
-                <DirectoryStat label="Voting live" value={liveCount} />
-                <DirectoryStat label="Nominations" value={nominationCount} />
+                <DirectoryStat label="Voting" value={votingCount} />
+                <DirectoryStat label="Ticketing" value={ticketingCount} />
               </div>
             </div>
           </div>
@@ -150,9 +152,13 @@ export function PublicEventsView() {
                     {featured.name}
                   </h2>
                   <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-white/72">
-                    <span>{featured.categories.length} categories</span>
+                    <span>{featured.eventType === "TICKETING" ? "Ticketing event" : `${featured.categories.length} categories`}</span>
                     <span>/</span>
-                    <span>Voting ends {formatDate(featured.votingEndAt)}</span>
+                    <span>
+                      {featured.eventType === "TICKETING"
+                        ? `Sales close ${formatDate(featured.ticketSalesEndAt)}`
+                        : `Voting ends ${formatDate(featured.votingEndAt)}`}
+                    </span>
                   </div>
                   <Link
                     href={`/events/${featured.id}`}
@@ -187,7 +193,7 @@ export function PublicEventsView() {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search events, descriptions, categories"
+              placeholder="Search events, descriptions, venues, categories"
               className="h-11 w-full rounded-xl border border-line bg-[#f8fafc] pl-10 pr-4 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-primary focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -277,6 +283,8 @@ function DirectoryStat({ label, value }: { label: string; value: number }) {
 }
 
 function PublicEventCard({ event }: { event: EventResponse }) {
+  const isTicketing = event.eventType === "TICKETING";
+
   return (
     <Link
       href={`/events/${event.id}`}
@@ -306,12 +314,20 @@ function PublicEventCard({ event }: { event: EventResponse }) {
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[#f8fafc] p-3 text-xs">
           <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">Categories</p>
-            <p className="mt-1 font-semibold text-ink">{event.categories.length}</p>
+            <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">
+              {isTicketing ? "Type" : "Categories"}
+            </p>
+            <p className="mt-1 font-semibold text-ink">
+              {isTicketing ? "Ticketing" : event.categories.length}
+            </p>
           </div>
           <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">Voting ends</p>
-            <p className="mt-1 font-semibold text-ink">{formatDate(event.votingEndAt)}</p>
+            <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">
+              {isTicketing ? "Sales close" : "Voting ends"}
+            </p>
+            <p className="mt-1 font-semibold text-ink">
+              {formatDate(isTicketing ? event.ticketSalesEndAt : event.votingEndAt)}
+            </p>
           </div>
         </div>
       </div>

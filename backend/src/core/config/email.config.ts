@@ -7,6 +7,8 @@ export const emailConfig = registerAs("email", () => ({
   user: process.env.SMTP_USER ?? "",
   pass: process.env.SMTP_PASS ?? "",
   from: process.env.EMAIL_FROM ?? "SwiftVote <no-reply@swiftvote.app>",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFrom: process.env.RESEND_FROM ?? process.env.EMAIL_FROM ?? "SwiftVote <no-reply@swiftvote.app>",
   adminEmail: process.env.SUPER_ADMIN_EMAIL ?? "",
 }));
 
@@ -17,5 +19,7 @@ export type EmailConfig = {
   user: string;
   pass: string;
   from: string;
+  resendApiKey: string;
+  resendFrom: string;
   adminEmail: string;
 };

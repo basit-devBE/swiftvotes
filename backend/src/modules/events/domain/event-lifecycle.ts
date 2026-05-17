@@ -1,5 +1,6 @@
 import { Event } from "./event";
 import { EventStatus } from "./event-status";
+import { EventType } from "./event-type";
 
 export function determineEventStatusForTimestamp(
   event: Pick<
@@ -9,9 +10,14 @@ export function determineEventStatusForTimestamp(
     | "nominationEndAt"
     | "votingStartAt"
     | "votingEndAt"
+    | "eventType"
   >,
   now: Date,
 ): EventStatus {
+  if (event.eventType === EventType.TICKETING) {
+    return EventStatus.APPROVED;
+  }
+
   if (event.votingEndAt <= now) {
     return EventStatus.VOTING_CLOSED;
   }

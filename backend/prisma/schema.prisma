@@ -31,6 +31,11 @@ enum EventStatus {
   ARCHIVED
 }
 
+enum EventType {
+  VOTING
+  TICKETING
+}
+
 enum EventRole {
   EVENT_OWNER
   EVENT_ADMIN
@@ -64,6 +69,28 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum TicketOrderStatus {
+  PENDING
+  PAID
+  FAILED
+  ABANDONED
+  CANCELLED
+}
+
+enum IssuedTicketStatus {
+  VALID
+  CHECKED_IN
+  CANCELLED
+}
+
+enum TicketPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+  REFUNDED
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -83,6 +110,7 @@ model User {
   reviewedNominations  Nomination[]      @relation("NominationReviewer")
   contestantProfile    Contestant?
   magicLinkTokens      MagicLinkToken[]
+  checkedInTickets     IssuedTicket[]    @relation("TicketCheckedInBy")
 }
 
 model Event {
@@ -92,6 +120,7 @@ model Event {
   slug                          String      @unique
   description                   String
   status                        EventStatus @default(DRAFT)
+  eventType                     EventType   @default(VOTING)
   primaryFlyerUrl               String
   primaryFlyerKey               String
   bannerUrl                     String?
@@ -100,6 +129,12 @@ model Event {
   nominationEndAt               DateTime?
   votingStartAt                 DateTime
   votingEndAt                   DateTime
+  eventStartAt                  DateTime?
+  eventEndAt                    DateTime?
+  venueName                     String?
+  venueAddress                  String?
+  ticketSalesStartAt            DateTime?
+  ticketSalesEndAt              DateTime?
   contestantsCanViewOwnVotes    Boolean     @default(false)
   contestantsCanViewLeaderboard Boolean     @default(false)
   publicCanViewLeaderboard      Boolean     @default(true)
@@ -112,18 +147,22 @@ model Event {
   createdAt                     DateTime    @default(now())
   updatedAt                     DateTime    @updatedAt
 
-  creator     User              @relation("EventCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
-  approvedBy  User?             @relation("EventApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
-  rejectedBy  User?             @relation("EventRejector", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
-  categories  EventCategory[]
-  memberships EventMembership[]
-  nominations Nomination[]
-  contestants Contestant[]
-  votes       Vote[]
-  payments    Payment[]
+  creator       User              @relation("EventCreator", fields: [creatorUserId], references: [id], onDelete: Cascade)
+  approvedBy    User?             @relation("EventApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy    User?             @relation("EventRejector", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  categories    EventCategory[]
+  memberships   EventMembership[]
+  nominations   Nomination[]
+  contestants   Contestant[]
+  votes         Vote[]
+  payments      Payment[]
+  ticketTypes   TicketType[]
+  ticketOrders  TicketOrder[]
+  issuedTickets IssuedTicket[]
 
   @@index([creatorUserId, createdAt])
   @@index([status, submittedAt])
+  @@index([eventType, status])
 }
 
 model EventCategory {
@@ -320,6 +359,154 @@ model PaymentWebhookEvent {
   processedAt    DateTime?
 
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([reference])
+  @@index([receivedAt])
+}
+
+model TicketType {
+  id                String    @id @default(cuid())
+  eventId           String
+  name              String
+  description       String?
+  priceMinor        Int
+  currency          String
+  quantityAvailable Int?
+  quantitySold      Int       @default(0)
+  salesStartAt      DateTime?
+  salesEndAt        DateTime?
+  isActive          Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  event         Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  orderItems    TicketOrderItem[]
+  issuedTickets IssuedTicket[]
+
+  @@unique([eventId, name])
+  @@index([eventId, sortOrder])
+  @@index([eventId, isActive])
+}
+
+model TicketOrder {
+  id               String            @id @default(cuid())
+  eventId          String
+  buyerName        String
+  buyerEmail       String
+  buyerPhone       String?
+  status           TicketOrderStatus @default(PENDING)
+  totalAmountMinor Int
+  currency         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  event         Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items         TicketOrderItem[]
+  payment       TicketPayment?
+  issuedTickets IssuedTicket[]
+
+  @@index([eventId, status, createdAt])
+  @@index([buyerEmail, createdAt])
+}
+
+model TicketOrderItem {
+  id               String   @id @default(cuid())
+  orderId          String
+  ticketTypeId     String
+  quantity         Int
+  unitPriceMinor   Int
+  totalAmountMinor Int
+  createdAt        DateTime @default(now())
+
+  order         TicketOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType    TicketType     @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  issuedTickets IssuedTicket[]
+
+  @@index([orderId])
+  @@index([ticketTypeId])
+}
+
+model IssuedTicket {
+  id            String             @id @default(cuid())
+  eventId       String
+  orderId       String
+  orderItemId   String
+  ticketTypeId  String
+  code          String             @unique
+  status        IssuedTicketStatus @default(VALID)
+  checkedInAt   DateTime?
+  checkedInById String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  event       Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  order       TicketOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem   TicketOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  ticketType  TicketType      @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  checkedInBy User?           @relation("TicketCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+
+  @@index([eventId, status])
+  @@index([orderId])
+  @@index([ticketTypeId])
+}
+
+model TicketPayment {
+  id String @id @default(cuid())
+
+  orderId String @unique
+
+  reference   String  @unique
+  providerRef String?
+  provider    String  @default("paystack")
+
+  amountMinor     Int
+  amountPaidMinor Int?
+  feeMinor        Int?
+  currency        String
+
+  status        TicketPaymentStatus @default(PENDING)
+  initializedAt DateTime            @default(now())
+  paidAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+
+  buyerEmail   String
+  buyerName    String?
+  buyerPhone   String?
+  channel      String?
+  cardLast4    String?
+  mobileNumber String?
+  customerIp   String?
+
+  rawInitResponse   Json?
+  rawVerifyResponse Json?
+  metadata          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order         TicketOrder                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  webhookEvents TicketPaymentWebhookEvent[]
+
+  @@index([status, createdAt])
+  @@index([buyerEmail, createdAt])
+  @@index([providerRef])
+}
+
+model TicketPaymentWebhookEvent {
+  id              String    @id @default(cuid())
+  ticketPaymentId String?
+  provider        String    @default("paystack")
+  eventType       String
+  reference       String
+  signatureValid  Boolean
+  rawPayload      Json
+  receivedAt      DateTime  @default(now())
+  processed       Boolean   @default(false)
+  processedAt     DateTime?
+
+  ticketPayment TicketPayment? @relation(fields: [ticketPaymentId], references: [id], onDelete: SetNull)
 
   @@index([reference])
   @@index([receivedAt])

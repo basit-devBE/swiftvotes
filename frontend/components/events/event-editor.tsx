@@ -6,12 +6,13 @@ import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 
 import { ApiClientError } from "@/lib/api/client";
 import {
+  createTicketType,
   createEvent,
   resubmitEvent,
   submitEvent,
   updateEvent,
 } from "@/lib/api/events";
-import { EventResponse } from "@/lib/api/types";
+import { EventResponse, EventType } from "@/lib/api/types";
 import {
   createEventBannerUploadIntent,
   createEventFlyerUploadIntent,
@@ -30,6 +31,15 @@ type EditableCategory = {
   sortOrder: number;
 };
 
+type EditableTicketType = {
+  name: string;
+  description: string;
+  price: string;
+  currency: string;
+  quantityAvailable: string;
+  sortOrder: number;
+};
+
 type EventEditorProps = {
   mode: "create" | "update";
   initialEvent?: EventResponse;
@@ -38,10 +48,17 @@ type EventEditorProps = {
 };
 
 type StepKey = "basics" | "schedule" | "media" | "categories" | "review";
+type StepDefinition = {
+  key: StepKey;
+  title: string;
+  subtitle: string;
+  description: string;
+};
 
 const MIN_PAID_VOTE_PRICE_MINOR = 50;
+const MIN_TICKET_PRICE_MINOR = 50;
 
-const STEPS: { key: StepKey; title: string; subtitle: string; description: string }[] = [
+const VOTING_STEPS: StepDefinition[] = [
   {
     key: "basics",
     title: "Basic info",
@@ -71,6 +88,39 @@ const STEPS: { key: StepKey; title: string; subtitle: string; description: strin
     title: "Review",
     subtitle: "Confirm & submit",
     description: "Check readiness, save the draft, and send for approval.",
+  },
+];
+
+const TICKETING_STEPS: StepDefinition[] = [
+  {
+    key: "basics",
+    title: "Event details",
+    subtitle: "Name & description",
+    description: "Set the event identity buyers will see before choosing tickets.",
+  },
+  {
+    key: "schedule",
+    title: "Ticket schedule",
+    subtitle: "Event & sales dates",
+    description: "Set when the event happens and when paid ticket sales should open and close.",
+  },
+  {
+    key: "media",
+    title: "Event media",
+    subtitle: "Flyer & banner",
+    description: "Upload the artwork that will sell the event on public pages.",
+  },
+  {
+    key: "categories",
+    title: "Ticket setup",
+    subtitle: "Ticket tiers",
+    description: "Save the event first, then add Regular, VIP, Early Bird, or any other paid ticket types.",
+  },
+  {
+    key: "review",
+    title: "Review",
+    subtitle: "Confirm & submit",
+    description: "Check the ticketing event setup, save the draft, and submit it for approval.",
   },
 ];
 
@@ -119,6 +169,15 @@ function formatPreviewDate(value: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function getFallbackFutureDateTime(daysFromNow: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  date.setMinutes(0, 0, 0);
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 function getCurrentDateTimeLocalValue(): string {
@@ -254,6 +313,9 @@ export function EventEditor({
     ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
 
   // Form state
+  const [eventType, setEventType] = useState<EventType>(
+    initialEvent?.eventType ?? "VOTING",
+  );
   const [name, setName] = useState(initialEvent?.name ?? "");
   const [description, setDescription] = useState(initialEvent?.description ?? "");
   const [primaryFlyerUrl, setPrimaryFlyerUrl] = useState(initialEvent?.primaryFlyerUrl ?? "");
@@ -264,6 +326,16 @@ export function EventEditor({
   const [nominationEndAt, setNominationEndAt] = useState(toDateTimeLocalValue(initialEvent?.nominationEndAt));
   const [votingStartAt, setVotingStartAt] = useState(toDateTimeLocalValue(initialEvent?.votingStartAt));
   const [votingEndAt, setVotingEndAt] = useState(toDateTimeLocalValue(initialEvent?.votingEndAt));
+  const [eventStartAt, setEventStartAt] = useState(toDateTimeLocalValue(initialEvent?.eventStartAt));
+  const [eventEndAt, setEventEndAt] = useState(toDateTimeLocalValue(initialEvent?.eventEndAt));
+  const [venueName, setVenueName] = useState(initialEvent?.venueName ?? "");
+  const [venueAddress, setVenueAddress] = useState(initialEvent?.venueAddress ?? "");
+  const [ticketSalesStartAt, setTicketSalesStartAt] = useState(
+    toDateTimeLocalValue(initialEvent?.ticketSalesStartAt),
+  );
+  const [ticketSalesEndAt, setTicketSalesEndAt] = useState(
+    toDateTimeLocalValue(initialEvent?.ticketSalesEndAt),
+  );
   const [contestantsCanViewOwnVotes, setContestantsCanViewOwnVotes] = useState(
     initialEvent?.contestantsCanViewOwnVotes ?? false,
   );
@@ -285,6 +357,16 @@ export function EventEditor({
         }))
       : [{ name: "", description: "", votePrice: "0", currency: "GHS", sortOrder: 0 }],
   );
+  const [ticketTypes, setTicketTypes] = useState<EditableTicketType[]>([
+    {
+      name: "",
+      description: "",
+      price: "",
+      currency: "GHS",
+      quantityAvailable: "",
+      sortOrder: 0,
+    },
+  ]);
 
   // UI state
   const [stepIndex, setStepIndex] = useState(0);
@@ -296,10 +378,15 @@ export function EventEditor({
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [savedDraft, setSavedDraft] = useState<EventResponse | null>(null);
 
-  const currentStep = STEPS[stepIndex];
-  const isLastStep = stepIndex === STEPS.length - 1;
+  const isTicketing = eventType === "TICKETING";
+  const steps = useMemo(
+    () => (isTicketing ? TICKETING_STEPS : VOTING_STEPS),
+    [isTicketing],
+  );
+  const currentStep = steps[stepIndex] ?? steps[0];
+  const isLastStep = stepIndex === steps.length - 1;
   const isFirstStep = stepIndex === 0;
-  const progressPercent = ((stepIndex + 1) / STEPS.length) * 100;
+  const progressPercent = ((stepIndex + 1) / steps.length) * 100;
   const CurrentStepIcon = stepIcons[currentStep.key];
   const minVotingDateTime = getCurrentDateTimeLocalValue();
 
@@ -316,12 +403,25 @@ export function EventEditor({
     ["DRAFT", "REJECTED"].includes(effectiveEvent?.status ?? "DRAFT") &&
     !isSaving;
 
+  const hasValidTicketType = ticketTypes.some((ticketType) => {
+    const priceMinor = toVotePriceMinor(ticketType.price);
+    return (
+      ticketType.name.trim() &&
+      Number.isFinite(priceMinor) &&
+      priceMinor >= MIN_TICKET_PRICE_MINOR
+    );
+  });
+
   const completedStepCount = useMemo(() => {
     let count = 0;
     if (name.trim() && description.trim()) count += 1;
-    if (votingStartAt && votingEndAt) count += 1;
+    if (isTicketing && !isUpdate) {
+      if (eventStartAt && ticketSalesStartAt && ticketSalesEndAt) count += 1;
+    } else if (votingStartAt && votingEndAt) count += 1;
     if (primaryFlyerUrl && primaryFlyerKey) count += 1;
-    if (
+    if (isTicketing) {
+      if (hasValidTicketType) count += 1;
+    } else if (
       categories.length > 0 &&
       categories.every((category) => category.name.trim() && category.description.trim())
     ) {
@@ -330,30 +430,40 @@ export function EventEditor({
     if (
       name.trim() &&
       description.trim() &&
-      votingStartAt &&
-      votingEndAt &&
+      (isTicketing ? eventStartAt && ticketSalesStartAt && ticketSalesEndAt : votingStartAt && votingEndAt) &&
       primaryFlyerUrl &&
       primaryFlyerKey &&
-      categories.length > 0
+      (isTicketing ? hasValidTicketType : categories.length > 0)
     ) {
       count += 1;
     }
     return count;
-  }, [categories, description, name, primaryFlyerKey, primaryFlyerUrl, votingEndAt, votingStartAt]);
+  }, [categories, description, eventStartAt, hasValidTicketType, isTicketing, name, primaryFlyerKey, primaryFlyerUrl, ticketSalesEndAt, ticketSalesStartAt, votingEndAt, votingStartAt]);
 
   const previewChecks = [
     { label: "Event identity", done: Boolean(name.trim() && description.trim()) },
-    { label: "Voting schedule", done: Boolean(votingStartAt && votingEndAt) },
+    {
+      label: isTicketing ? "Ticketing schedule" : "Voting schedule",
+      done: isTicketing
+        ? Boolean(eventStartAt && ticketSalesStartAt && ticketSalesEndAt)
+        : Boolean(votingStartAt && votingEndAt),
+    },
     { label: "Primary flyer", done: Boolean(primaryFlyerUrl && primaryFlyerKey) },
     {
-      label: "At least one category",
-      done: categories.length > 0 && categories.some((category) => category.name.trim()),
+      label: isTicketing ? "At least one ticket type" : "At least one category",
+      done: isTicketing
+        ? hasValidTicketType
+        : (categories.length > 0 && categories.some((category) => category.name.trim())),
     },
   ];
 
   const categoryPreview = categories
     .map((category, index) => category.name.trim() || `Category ${index + 1}`)
     .slice(0, 3);
+  const ticketPreview = ticketTypes
+    .map((ticketType, index) => ticketType.name.trim() || `Ticket type ${index + 1}`)
+    .slice(0, 3);
+  const configuredTicketTypeCount = ticketTypes.filter((ticketType) => ticketType.name.trim()).length;
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -414,6 +524,40 @@ export function EventEditor({
     );
   }
 
+  function updateTicketTypeField(
+    index: number,
+    field: keyof EditableTicketType,
+    value: string | number,
+  ) {
+    setTicketTypes((current) =>
+      current.map((ticketType, i) =>
+        i === index ? { ...ticketType, [field]: value } : ticketType,
+      ),
+    );
+  }
+
+  function addTicketType() {
+    setTicketTypes((current) => [
+      ...current,
+      {
+        name: "",
+        description: "",
+        price: "",
+        currency: current[0]?.currency ?? "GHS",
+        quantityAvailable: "",
+        sortOrder: current.length,
+      },
+    ]);
+  }
+
+  function removeTicketType(index: number) {
+    setTicketTypes((current) =>
+      current
+        .filter((_, i) => i !== index)
+        .map((ticketType, i) => ({ ...ticketType, sortOrder: i })),
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -426,29 +570,106 @@ export function EventEditor({
 
     const votingStartDate = toValidDate(votingStartAt);
     const votingEndDate = toValidDate(votingEndAt);
+    const ticketEventStartDate = toValidDate(eventStartAt);
+    const ticketEventEndDate = toValidDate(eventEndAt);
+    const ticketSalesStartDate = toValidDate(ticketSalesStartAt);
+    const ticketSalesEndDate = toValidDate(ticketSalesEndAt);
     const now = new Date();
 
-    if (!votingStartDate || !votingEndDate) {
+    if (isTicketing) {
+      if (!ticketEventStartDate || !ticketSalesStartDate || !ticketSalesEndDate) {
+        setError("Event date, ticket sales open date, and ticket sales close date are required.");
+        return;
+      }
+
+      if (!adminMode && ticketEventStartDate < now) {
+        setError("Event date cannot be in the past.");
+        return;
+      }
+
+      if (!adminMode && ticketSalesEndDate < now) {
+        setError("Ticket sales close date cannot be in the past.");
+        return;
+      }
+
+      if (ticketEventEndDate && ticketEventEndDate <= ticketEventStartDate) {
+        setError("Event end date must be after the event start date.");
+        return;
+      }
+
+      if (ticketSalesEndDate <= ticketSalesStartDate) {
+        setError("Ticket sales close date must be after ticket sales open date.");
+        return;
+      }
+
+      if (ticketSalesStartDate > ticketEventStartDate) {
+        setError("Ticket sales open date cannot be after the event starts.");
+        return;
+      }
+
+      if (ticketSalesEndDate > ticketEventStartDate) {
+        setError("Ticket sales close date cannot be after the event starts.");
+        return;
+      }
+    } else if (!votingStartDate || !votingEndDate) {
       setError("Voting open and close dates are required.");
       return;
     }
 
-    if (!adminMode && votingStartDate < now) {
+    if (!isTicketing && !adminMode && votingStartDate! < now) {
       setError("Voting open date cannot be in the past.");
       return;
     }
 
-    if (!adminMode && votingEndDate < now) {
+    if (!isTicketing && !adminMode && votingEndDate! < now) {
       setError("Voting close date cannot be in the past.");
       return;
     }
 
-    if (votingEndDate <= votingStartDate) {
+    if (!isTicketing && votingEndDate! <= votingStartDate!) {
       setError("Voting close date must be after the voting open date.");
       return;
     }
 
-    const invalidPriceCategory = categories.find((category) => {
+    const normalizedTicketTypes = ticketTypes
+      .map((ticketType, index) => ({
+        ...ticketType,
+        index,
+        priceMinor: toVotePriceMinor(ticketType.price),
+        quantity:
+          ticketType.quantityAvailable.trim()
+            ? Number.parseInt(ticketType.quantityAvailable, 10)
+            : null,
+      }))
+      .filter((ticketType) => ticketType.name.trim() || ticketType.description.trim() || ticketType.price.trim());
+
+    if (isTicketing) {
+      if (normalizedTicketTypes.length === 0) {
+        setError("Add at least one ticket type before saving this ticketing event.");
+        setStepIndex(steps.findIndex((step) => step.key === "categories"));
+        return;
+      }
+
+      const invalidTicketType = normalizedTicketTypes.find((ticketType) => {
+        return (
+          !ticketType.name.trim() ||
+          !Number.isFinite(ticketType.priceMinor) ||
+          ticketType.priceMinor < MIN_TICKET_PRICE_MINOR ||
+          (ticketType.quantity !== null &&
+            (!Number.isInteger(ticketType.quantity) || ticketType.quantity < 1))
+        );
+      });
+
+      if (invalidTicketType) {
+        setError(
+          `Ticket type ${invalidTicketType.index + 1}: enter a name, a price of at least GHS 0.50, and a valid quantity if capacity is limited.`,
+        );
+        setStepIndex(steps.findIndex((step) => step.key === "categories"));
+        return;
+      }
+    }
+
+    const invalidPriceCategory = isTicketing ? undefined : categories.find((category) => {
       const minor = toVotePriceMinor(category.votePrice);
       return (
         !Number.isFinite(minor) ||
@@ -462,7 +683,7 @@ export function EventEditor({
       setError(
         `${label}: use 0 for free voting, or at least GHS 0.50 for paid voting. GHS 0.50 is 50 pesewas.`,
       );
-      setStepIndex(STEPS.findIndex((step) => step.key === "categories"));
+      setStepIndex(steps.findIndex((step) => step.key === "categories"));
       return;
     }
 
@@ -472,28 +693,41 @@ export function EventEditor({
       const eventPayload = {
         name,
         description,
+        eventType,
         primaryFlyerUrl,
         primaryFlyerKey,
         bannerUrl: bannerUrl || undefined,
         bannerKey: bannerKey || undefined,
-        nominationStartAt: toIsoOrUndefined(nominationStartAt),
-        nominationEndAt: toIsoOrUndefined(nominationEndAt),
-        votingStartAt: votingStartDate.toISOString(),
-        votingEndAt: votingEndDate.toISOString(),
-        contestantsCanViewOwnVotes,
-        contestantsCanViewLeaderboard,
-        publicCanViewLeaderboard,
+        nominationStartAt: isTicketing ? undefined : toIsoOrUndefined(nominationStartAt),
+        nominationEndAt: isTicketing ? undefined : toIsoOrUndefined(nominationEndAt),
+        votingStartAt: isTicketing
+          ? (ticketSalesStartDate ?? new Date(getFallbackFutureDateTime(1))).toISOString()
+          : votingStartDate!.toISOString(),
+        votingEndAt: isTicketing
+          ? (ticketSalesEndDate ?? new Date(getFallbackFutureDateTime(2))).toISOString()
+          : votingEndDate!.toISOString(),
+        eventStartAt: ticketEventStartDate?.toISOString(),
+        eventEndAt: ticketEventEndDate?.toISOString(),
+        venueName: venueName.trim() || undefined,
+        venueAddress: venueAddress.trim() || undefined,
+        ticketSalesStartAt: ticketSalesStartDate?.toISOString(),
+        ticketSalesEndAt: ticketSalesEndDate?.toISOString(),
+        contestantsCanViewOwnVotes: isTicketing ? false : contestantsCanViewOwnVotes,
+        contestantsCanViewLeaderboard: isTicketing ? false : contestantsCanViewLeaderboard,
+        publicCanViewLeaderboard: isTicketing ? false : publicCanViewLeaderboard,
       };
 
       const createPayload = {
         ...eventPayload,
-        categories: categories.map((c, i) => ({
-          name: c.name,
-          description: c.description,
-          votePriceMinor: toVotePriceMinor(c.votePrice),
-          currency: c.currency.trim().toUpperCase(),
-          sortOrder: i,
-        })),
+        categories: isTicketing
+          ? undefined
+          : categories.map((c, i) => ({
+              name: c.name,
+              description: c.description,
+              votePriceMinor: toVotePriceMinor(c.votePrice),
+              currency: c.currency.trim().toUpperCase(),
+              sortOrder: i,
+            })),
       };
 
       if (isUpdate && initialEvent) {
@@ -506,9 +740,23 @@ export function EventEditor({
         router.refresh();
       } else {
         const created = await createEvent(createPayload);
+        if (isTicketing) {
+          await Promise.all(
+            normalizedTicketTypes.map((ticketType, index) =>
+              createTicketType(created.id, {
+                name: ticketType.name.trim(),
+                description: ticketType.description.trim() || undefined,
+                priceMinor: ticketType.priceMinor,
+                currency: ticketType.currency.trim().toUpperCase(),
+                quantityAvailable: ticketType.quantity,
+                sortOrder: index,
+              }),
+            ),
+          );
+        }
         // Stay on the page so the user can either submit for approval or keep editing.
         setSavedDraft(created);
-        setStepIndex(STEPS.length - 1);
+        setStepIndex(steps.length - 1);
         setSuccess("Saved as draft.");
       }
     } catch (submissionError) {
@@ -562,11 +810,13 @@ export function EventEditor({
           <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#07111f]/62">
             {adminMode
               ? "Update public event details, scheduling, visibility, and media for this event regardless of its current status."
-              : "Add the public details, media, schedules, categories, and vote pricing that admins will review before approval."}
+              : isTicketing
+                ? "Add the public details, sales dates, venue information, and media that admins will review before ticket sales go live."
+                : "Add the public details, media, schedules, categories, and vote pricing that admins will review before approval."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
-              5-step setup
+              {isTicketing ? "Ticketing setup" : "5-step setup"}
             </span>
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
               {adminMode ? "Admin override" : "Approval-ready preview"}
@@ -619,7 +869,7 @@ export function EventEditor({
                   </p>
                   <p className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-[#07111f]">
                     {completedStepCount}
-                    <span className="text-[15px] text-[#07111f]/38">/{STEPS.length}</span>
+                    <span className="text-[15px] text-[#07111f]/38">/{steps.length}</span>
                   </p>
                 </div>
                 <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-[#0f4cdb]">
@@ -629,13 +879,13 @@ export function EventEditor({
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf1f7]">
                 <div
                   className="h-full rounded-full bg-[linear-gradient(90deg,#0f4cdb_0%,#2e6ef0_100%)] transition-all duration-300"
-                  style={{ width: `${(completedStepCount / STEPS.length) * 100}%` }}
+                  style={{ width: `${(completedStepCount / steps.length) * 100}%` }}
                 />
               </div>
             </div>
 
             <ol className="mt-4 space-y-2.5">
-            {STEPS.map((s, i) => {
+            {steps.map((s, i) => {
               const Icon = stepIcons[s.key];
               const isActive = i === stepIndex;
               const isDone = i < stepIndex;
@@ -700,7 +950,7 @@ export function EventEditor({
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="inline-flex items-center gap-2 rounded-full bg-[#eef4ff] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f4cdb]">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#0f4cdb]" />
-                        Step {stepIndex + 1} / {STEPS.length}
+                        Step {stepIndex + 1} / {steps.length}
                       </span>
                       <span className="rounded-full border border-[#e8eef7] bg-[#fbfcff] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/52">
                         {currentStep.subtitle}
@@ -742,30 +992,69 @@ export function EventEditor({
                       Identity
                     </p>
                     <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                      Use the event name people already know, then explain who can nominate, who can vote, and what the categories represent.
+                      {isTicketing
+                        ? "Use the event name people already know, then describe the experience buyers are paying to attend."
+                        : "Use the event name people already know, then explain who can nominate, who can vote, and what the categories represent."}
                     </p>
                   </div>
                 </div>
                 <div className="space-y-5">
+                    {!isUpdate && (
+                      <Field label="Event type" required>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {[
+                            {
+                              key: "VOTING" as const,
+                              title: "Voting Event",
+                              text: "Pageantry, awards, contestants, categories, and votes.",
+                            },
+                            {
+                              key: "TICKETING" as const,
+                              title: "Ticketing Event",
+                              text: "Public event page with paid ticket tiers and sales tracking.",
+                            },
+                          ].map((option) => (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => setEventType(option.key)}
+                              disabled={!isEditable}
+                              className={`min-h-[112px] rounded-[20px] border p-4 text-left transition ${
+                                eventType === option.key
+                                  ? "border-[#0f4cdb]/40 bg-[#eef4ff] shadow-[0_14px_28px_-24px_rgba(15,76,219,0.6)]"
+                                  : "border-[#e4eaf4] bg-white hover:border-[#0f4cdb]/24"
+                              }`}
+                            >
+                              <span className="text-[13px] font-semibold text-[#07111f]">
+                                {option.title}
+                              </span>
+                              <span className="mt-2 block text-[12px] leading-5 text-[#07111f]/56">
+                                {option.text}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </Field>
+                    )}
                     <Field label="Event name" required>
                       <input
                         className={inputCls}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Campus Choice Awards 2026"
+                        placeholder={isTicketing ? "Afro Night Live 2026" : "Campus Choice Awards 2026"}
                         disabled={!isEditable}
                       />
                     </Field>
                     <Field
                       label="Description"
                       required
-                      hint="Describe the purpose, audience, and how voting will work."
+                      hint={isTicketing ? "Describe the event, venue experience, and who should attend." : "Describe the purpose, audience, and how voting will work."}
                     >
                       <textarea
                         className={textareaCls}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Example: Campus Choice Awards celebrates student leaders across fashion, talent, impact, and entertainment categories. Public voting opens after nominations are confirmed."
+                        placeholder={isTicketing ? "Example: A live campus concert with regular and VIP ticket access." : "Example: Campus Choice Awards celebrates student leaders across fashion, talent, impact, and entertainment categories. Public voting opens after nominations are confirmed."}
                         disabled={!isEditable}
                       />
                     </Field>
@@ -783,9 +1072,82 @@ export function EventEditor({
                     Timing
                   </p>
                   <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                    Nominations are optional. Voting dates are required and should reflect the exact public window.
+                    {isTicketing
+                      ? "Set when the event happens and when paid ticket sales should be open."
+                      : "Nominations are optional. Voting dates are required and should reflect the exact public window."}
                   </p>
                 </div>
+                {isTicketing ? (
+                  <div className="space-y-6">
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Field label="Event starts" required>
+                        <input
+                          type="datetime-local"
+                          className={inputCls}
+                          value={eventStartAt}
+                          min={adminMode ? undefined : minVotingDateTime}
+                          onChange={(e) => setEventStartAt(e.target.value)}
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                      <Field label="Event ends" optional>
+                        <input
+                          type="datetime-local"
+                          className={inputCls}
+                          value={eventEndAt}
+                          min={adminMode ? undefined : eventStartAt || minVotingDateTime}
+                          onChange={(e) => setEventEndAt(e.target.value)}
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                    </div>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Field label="Ticket sales open" required>
+                        <input
+                          type="datetime-local"
+                          className={inputCls}
+                          value={ticketSalesStartAt}
+                          min={adminMode ? undefined : minVotingDateTime}
+                          max={eventStartAt || undefined}
+                          onChange={(e) => setTicketSalesStartAt(e.target.value)}
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                      <Field label="Ticket sales close" required>
+                        <input
+                          type="datetime-local"
+                          className={inputCls}
+                          value={ticketSalesEndAt}
+                          min={adminMode ? undefined : ticketSalesStartAt || minVotingDateTime}
+                          max={eventStartAt || undefined}
+                          onChange={(e) => setTicketSalesEndAt(e.target.value)}
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                    </div>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Field label="Venue name" optional>
+                        <input
+                          className={inputCls}
+                          value={venueName}
+                          onChange={(e) => setVenueName(e.target.value)}
+                          placeholder="National Theatre"
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                      <Field label="Venue address" optional>
+                        <input
+                          className={inputCls}
+                          value={venueAddress}
+                          onChange={(e) => setVenueAddress(e.target.value)}
+                          placeholder="Accra, Ghana"
+                          disabled={!isEditable}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 <div className="mb-6 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-[#e8eef7] bg-white p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
@@ -912,6 +1274,8 @@ export function EventEditor({
                     </label>
                   </div>
                 </div>
+                </>
+                )}
               </div>
             )}
 
@@ -922,7 +1286,9 @@ export function EventEditor({
                     Visual assets
                   </p>
                   <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                    The flyer appears in event listings and voting pages. Add a banner when you have landscape artwork for the public event header.
+                    {isTicketing
+                      ? "The flyer appears in event listings and ticket pages. Add a banner when you have landscape artwork for the public event header."
+                      : "The flyer appears in event listings and voting pages. Add a banner when you have landscape artwork for the public event header."}
                   </p>
                 </div>
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -1037,6 +1403,136 @@ export function EventEditor({
 
             {currentStep.key === "categories" && (
               <div className="rounded-[26px] border border-[#edf2f8] bg-[linear-gradient(180deg,#fbfcff_0%,#ffffff_100%)] p-5 sm:p-6">
+                {isTicketing ? (
+                  <>
+                    <div className="mb-6">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0f4cdb]">
+                        Ticket pricing
+                      </p>
+                      <p className="mt-2 max-w-2xl text-[14px] leading-6 text-[#07111f]/58">
+                        Add every paid ticket type buyers can choose from. These prices are saved with the event before it can be submitted for approval.
+                      </p>
+                    </div>
+
+                    {isUpdate && effectiveEvent && (
+                      <div className="mb-5 rounded-[20px] border border-[#dce6f7] bg-[#f7faff] p-5">
+                        <p className="text-[13px] leading-6 text-[#07111f]/60">
+                          Existing ticket types are managed from the event workspace so sold inventory and pricing changes stay in one place.
+                        </p>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/events/${effectiveEvent.id}/manage`)}
+                          className="mt-4 rounded-full bg-[#0f4cdb] px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#0d3fb7]"
+                      >
+                          Open ticket workspace
+                      </button>
+                      </div>
+                    )}
+
+                    {!isUpdate && (
+                      <>
+                        <div className="space-y-3">
+                          {ticketTypes.map((ticketType, index) => (
+                            <div
+                              key={`${index}-${ticketType.sortOrder}`}
+                              className="overflow-hidden rounded-[24px] border border-[#e1e6ef] bg-white shadow-[0_18px_40px_-36px_rgba(7,17,31,0.28)]"
+                            >
+                              <div className="flex items-center justify-between gap-3 border-b border-[#eef1f6] bg-[#fafcff] px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#0f4cdb]/10 text-[11px] font-bold text-[#0f4cdb]">
+                                    {index + 1}
+                                  </span>
+                                  <p className="text-[13px] font-semibold text-[#07111f]">
+                                    {ticketType.name || `Ticket type ${index + 1}`}
+                                  </p>
+                                </div>
+                                {ticketTypes.length > 1 && isEditable && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTicketType(index)}
+                                    className="text-[12px] font-semibold text-[#9aa4b6] transition hover:text-[#b40f17]"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="grid gap-4 p-4">
+                                <Field label="Name" required>
+                                  <input
+                                    className={inputCls}
+                                    value={ticketType.name}
+                                    onChange={(e) => updateTicketTypeField(index, "name", e.target.value)}
+                                    placeholder="Regular"
+                                    disabled={!isEditable}
+                                  />
+                                </Field>
+                                <Field label="Description" optional>
+                                  <textarea
+                                    className={textareaCls}
+                                    value={ticketType.description}
+                                    onChange={(e) => updateTicketTypeField(index, "description", e.target.value)}
+                                    placeholder="Standard access ticket"
+                                    disabled={!isEditable}
+                                  />
+                                </Field>
+                                <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
+                                  <Field label="Price" required hint="Tickets are paid only. Minimum is GHS 0.50.">
+                                    <input
+                                      type="number"
+                                      min="0.5"
+                                      step="0.01"
+                                      inputMode="decimal"
+                                      className={inputCls}
+                                      value={ticketType.price}
+                                      onChange={(e) => updateTicketTypeField(index, "price", e.target.value)}
+                                      placeholder="50"
+                                      disabled={!isEditable}
+                                    />
+                                  </Field>
+                                  <Field label="Currency" required>
+                                    <input
+                                      className={`${inputCls} uppercase`}
+                                      value={ticketType.currency}
+                                      onChange={(e) => updateTicketTypeField(index, "currency", e.target.value)}
+                                      placeholder="GHS"
+                                      disabled={!isEditable}
+                                    />
+                                  </Field>
+                                </div>
+                                <Field label="Quantity available" optional hint="Leave blank for unlimited tickets.">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    className={inputCls}
+                                    value={ticketType.quantityAvailable}
+                                    onChange={(e) => updateTicketTypeField(index, "quantityAvailable", e.target.value)}
+                                    placeholder="Leave blank for unlimited"
+                                    disabled={!isEditable}
+                                  />
+                                </Field>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {isEditable && (
+                          <button
+                            type="button"
+                            onClick={addTicketType}
+                            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[22px] border border-dashed border-[#d6deeb] bg-[#fafbfd] px-4 py-3.5 text-[13px] font-semibold text-[#0f4cdb] transition hover:border-[#0f4cdb]/40 hover:bg-[#f0f5ff]"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                            </svg>
+                            Add another ticket type
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
                 <div className="mb-6">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0f4cdb]">
                     Ballot structure
@@ -1135,6 +1631,8 @@ export function EventEditor({
                     Add another category
                   </button>
                 )}
+                  </>
+                )}
               </div>
             )}
 
@@ -1196,40 +1694,69 @@ export function EventEditor({
 
                 <ReviewRow label="Event name" value={name || "—"} />
                 <ReviewRow label="Description" value={description || "—"} />
-                <ReviewRow
-                  label="Nominations"
-                  value={
-                    nominationStartAt && nominationEndAt
-                      ? `${new Date(nominationStartAt).toLocaleString()} → ${new Date(nominationEndAt).toLocaleString()}`
-                      : "Not set"
-                  }
-                />
-                <ReviewRow
-                  label="Voting"
-                  value={
-                    votingStartAt && votingEndAt
-                      ? `${new Date(votingStartAt).toLocaleString()} → ${new Date(votingEndAt).toLocaleString()}`
-                      : "—"
-                  }
-                />
+                {isTicketing ? (
+                  <>
+                    <ReviewRow
+                      label="Event date"
+                      value={
+                        eventStartAt
+                          ? `${new Date(eventStartAt).toLocaleString()}${eventEndAt ? ` → ${new Date(eventEndAt).toLocaleString()}` : ""}`
+                          : "Not set"
+                      }
+                    />
+                    <ReviewRow
+                      label="Ticket sales"
+                      value={
+                        ticketSalesStartAt && ticketSalesEndAt
+                          ? `${new Date(ticketSalesStartAt).toLocaleString()} → ${new Date(ticketSalesEndAt).toLocaleString()}`
+                          : "Not set"
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <ReviewRow
+                      label="Nominations"
+                      value={
+                        nominationStartAt && nominationEndAt
+                          ? `${new Date(nominationStartAt).toLocaleString()} → ${new Date(nominationEndAt).toLocaleString()}`
+                          : "Not set"
+                      }
+                    />
+                    <ReviewRow
+                      label="Voting"
+                      value={
+                        votingStartAt && votingEndAt
+                          ? `${new Date(votingStartAt).toLocaleString()} → ${new Date(votingEndAt).toLocaleString()}`
+                          : "—"
+                      }
+                    />
+                  </>
+                )}
                 <ReviewRow label="Primary flyer" value={primaryFlyerUrl ? "Uploaded" : "Missing"} valueTone={primaryFlyerUrl ? "default" : "warn"} />
                 <ReviewRow label="Banner" value={bannerUrl ? "Uploaded" : "Not set"} />
                 <div className="rounded-lg border border-[#eef1f6] bg-[#fafbfd] p-4">
                   <p className="text-[12px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
-                    Categories ({categories.length})
+                    {isTicketing ? "Ticket setup" : `Categories (${categories.length})`}
                   </p>
-                  <ul className="mt-3 space-y-2">
-                    {categories.map((c, i) => (
-                      <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
-                        <span className="truncate text-[#07111f]">
-                          {c.name || `Category ${i + 1}`}
-                        </span>
-                        <span className="shrink-0 rounded-full bg-[#0f4cdb]/8 px-2 py-0.5 text-[11px] font-semibold text-[#0f4cdb]">
-                          {formatPriceLabel(c.votePrice, c.currency)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  {isTicketing ? (
+                    <p className="mt-3 text-[13px] leading-5 text-[#07111f]/65">
+                      {configuredTicketTypeCount} ticket type{configuredTicketTypeCount === 1 ? "" : "s"} configured before submission.
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {categories.map((c, i) => (
+                        <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
+                          <span className="truncate text-[#07111f]">
+                            {c.name || `Category ${i + 1}`}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-[#0f4cdb]/8 px-2 py-0.5 text-[11px] font-semibold text-[#0f4cdb]">
+                            {formatPriceLabel(c.votePrice, c.currency)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
               </div>
@@ -1267,7 +1794,7 @@ export function EventEditor({
             {!isLastStep ? (
               <button
                 type="button"
-                onClick={() => setStepIndex((s) => Math.min(s + 1, STEPS.length - 1))}
+                onClick={() => setStepIndex((s) => Math.min(s + 1, steps.length - 1))}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#0f4cdb_0%,#215de4_100%)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_18px_34px_-20px_rgba(15,76,219,0.9)] transition hover:-translate-y-px"
               >
                 Continue
@@ -1326,18 +1853,18 @@ export function EventEditor({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-[20px] bg-[#f7f9fd] px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
-                      Categories
+                      {isTicketing ? "Type" : "Categories"}
                     </p>
                     <p className="mt-2 text-[1.35rem] font-semibold tracking-[-0.03em] text-[#07111f]">
-                      {categories.length}
+                      {isTicketing ? "Ticketing" : categories.length}
                     </p>
                   </div>
                   <div className="rounded-[20px] bg-[#f7f9fd] px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
-                      Voting opens
+                      {isTicketing ? "Sales open" : "Voting opens"}
                     </p>
                     <p className="mt-2 text-[13px] font-semibold leading-5 text-[#07111f]">
-                      {formatPreviewDate(votingStartAt)}
+                      {formatPreviewDate(isTicketing ? ticketSalesStartAt : votingStartAt)}
                     </p>
                   </div>
                 </div>
@@ -1393,17 +1920,25 @@ export function EventEditor({
 
                   <div className="mt-4 grid gap-3 rounded-[20px] bg-[#f7f9fd] p-4 text-[12px]">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-[#9aa4b6]">Voting opens</span>
-                      <span className="font-semibold text-[#07111f]">{formatPreviewDate(votingStartAt)}</span>
+                      <span className="font-medium text-[#9aa4b6]">
+                        {isTicketing ? "Sales open" : "Voting opens"}
+                      </span>
+                      <span className="font-semibold text-[#07111f]">
+                        {formatPreviewDate(isTicketing ? ticketSalesStartAt : votingStartAt)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-[#9aa4b6]">Voting closes</span>
-                      <span className="font-semibold text-[#07111f]">{formatPreviewDate(votingEndAt)}</span>
+                      <span className="font-medium text-[#9aa4b6]">
+                        {isTicketing ? "Event date" : "Voting closes"}
+                      </span>
+                      <span className="font-semibold text-[#07111f]">
+                        {formatPreviewDate(isTicketing ? eventStartAt : votingEndAt)}
+                      </span>
                     </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {categoryPreview.map((category) => (
+                    {(isTicketing ? ticketPreview : categoryPreview).map((category) => (
                       <span
                         key={category}
                         className="rounded-full border border-[#dbe5f5] bg-white px-3 py-1 text-[11px] font-semibold text-[#07111f]/66"
@@ -1411,7 +1946,7 @@ export function EventEditor({
                         {category}
                       </span>
                     ))}
-                    {categories.length > 3 && (
+                    {!isTicketing && categories.length > 3 && (
                       <span className="rounded-full border border-[#dbe5f5] bg-white px-3 py-1 text-[11px] font-semibold text-[#0f4cdb]">
                         +{categories.length - 3} more
                       </span>
