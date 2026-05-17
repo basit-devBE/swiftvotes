@@ -11,6 +11,7 @@ import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifi
 import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
+import { EventType } from "../../domain/event-type";
 import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 
@@ -38,10 +39,19 @@ export class SubmitEventUseCase {
       );
     }
 
-    if (event.categories.length === 0) {
+    if (event.eventType === EventType.VOTING && event.categories.length === 0) {
       throw new BadRequestException(
         "Event must contain at least one category before submission.",
       );
+    }
+
+    if (event.eventType === EventType.TICKETING) {
+      const ticketTypeCount = await this.eventsRepository.countActiveTicketTypes(eventId);
+      if (ticketTypeCount === 0) {
+        throw new BadRequestException(
+          "Ticketing event must contain at least one ticket type before submission.",
+        );
+      }
     }
 
     const updated = await this.eventsRepository.updateStatus({

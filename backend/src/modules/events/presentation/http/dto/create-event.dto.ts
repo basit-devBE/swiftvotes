@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsOptional,
   IsString,
   IsUrl,
@@ -12,6 +13,7 @@ import {
 } from "class-validator";
 
 import { CreateEventCategoryDto } from "./create-event-category.dto";
+import { EventType } from "../../../domain/event-type";
 
 export class CreateEventDto {
   @IsString()
@@ -21,6 +23,10 @@ export class CreateEventDto {
   @IsString()
   @MaxLength(4000)
   description!: string;
+
+  @IsOptional()
+  @IsEnum(EventType)
+  eventType?: EventType;
 
   @IsUrl()
   primaryFlyerUrl!: string;
@@ -51,6 +57,32 @@ export class CreateEventDto {
   votingEndAt!: string;
 
   @IsOptional()
+  @IsDateString()
+  eventStartAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  eventEndAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  venueName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  venueAddress?: string;
+
+  @IsOptional()
+  @IsDateString()
+  ticketSalesStartAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  ticketSalesEndAt?: string;
+
+  @IsOptional()
   @IsBoolean()
   contestantsCanViewOwnVotes?: boolean;
 
@@ -62,9 +94,10 @@ export class CreateEventDto {
   @IsBoolean()
   publicCanViewLeaderboard?: boolean;
 
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateEventCategoryDto)
-  categories!: CreateEventCategoryDto[];
+  categories?: CreateEventCategoryDto[];
 }

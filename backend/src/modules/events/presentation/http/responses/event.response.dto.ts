@@ -8,6 +8,7 @@ export class EventResponseDto {
   slug!: string;
   description!: string;
   status!: string;
+  eventType!: string;
   primaryFlyerUrl!: string;
   primaryFlyerKey!: string;
   bannerUrl!: string | null;
@@ -16,6 +17,12 @@ export class EventResponseDto {
   nominationEndAt!: Date | null;
   votingStartAt!: Date;
   votingEndAt!: Date;
+  eventStartAt!: Date | null;
+  eventEndAt!: Date | null;
+  venueName!: string | null;
+  venueAddress!: string | null;
+  ticketSalesStartAt!: Date | null;
+  ticketSalesEndAt!: Date | null;
   contestantsCanViewOwnVotes!: boolean;
   contestantsCanViewLeaderboard!: boolean;
   publicCanViewLeaderboard!: boolean;
@@ -37,6 +44,7 @@ export class EventResponseDto {
       slug: event.slug,
       description: event.description,
       status: event.status,
+      eventType: event.eventType,
       primaryFlyerUrl: event.primaryFlyerUrl,
       primaryFlyerKey: event.primaryFlyerKey,
       bannerUrl: event.bannerUrl,
@@ -45,6 +53,12 @@ export class EventResponseDto {
       nominationEndAt: event.nominationEndAt,
       votingStartAt: event.votingStartAt,
       votingEndAt: event.votingEndAt,
+      eventStartAt: event.eventStartAt,
+      eventEndAt: event.eventEndAt,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+      ticketSalesStartAt: event.ticketSalesStartAt,
+      ticketSalesEndAt: event.ticketSalesEndAt,
       contestantsCanViewOwnVotes: event.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: event.contestantsCanViewLeaderboard,
       publicCanViewLeaderboard: event.publicCanViewLeaderboard,

@@ -4,6 +4,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigType } from "@nestjs/config";
 import * as ejs from "ejs";
 import * as nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 import { appConfig } from "../../../../core/config/app.config";
 import { emailConfig } from "../../../../core/config/email.config";
@@ -29,6 +30,7 @@ const LOGO_ATTACHMENT = {
 @Injectable()
 export class NodemailerNotificationsService implements NotificationsService {
   private readonly transporter: nodemailer.Transporter;
+  private readonly resend: Resend | null;
 
   constructor(
     @Inject(emailConfig.KEY)
@@ -37,6 +39,7 @@ export class NodemailerNotificationsService implements NotificationsService {
     private readonly app: ConfigType<typeof appConfig>,
     private readonly logger: AppLogger,
   ) {
+    this.resend = email.resendApiKey ? new Resend(email.resendApiKey) : null;
     this.transporter = nodemailer.createTransport({
       host: email.host,
       port: email.port,
@@ -68,9 +71,37 @@ export class NodemailerNotificationsService implements NotificationsService {
   }
 
   private async send(to: string, subject: string, html: string): Promise<void> {
+    if (this.resend) {
+      try {
+        const { error } = await this.resend.emails.send({
+          from: this.email.resendFrom,
+          to,
+          subject,
+          html,
+        });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        this.logger.log(
+          `Email sent via Resend to ${to}: "${subject}"`,
+          "Notifications",
+        );
+        return;
+      } catch (err) {
+        this.logger.error(
+          `Failed to send Resend email to ${to}: ${(err as Error).message}`,
+          (err as Error).stack,
+          "Notifications",
+        );
+        return;
+      }
+    }
+
     if (!this.email.host || !this.email.user) {
       this.logger.warn(
-        `SMTP not configured — skipping email to ${to}: "${subject}"`,
+        `Resend and SMTP not configured — skipping email to ${to}: "${subject}"`,
         "Notifications",
       );
       return;

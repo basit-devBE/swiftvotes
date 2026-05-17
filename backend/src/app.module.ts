@@ -21,6 +21,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { NominationsModule } from "./modules/nominations/nominations.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { SchedulingModule } from "./modules/scheduling/scheduling.module";
+import { TicketingModule } from "./modules/ticketing/ticketing.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
 import { UssdModule } from "./modules/ussd/ussd.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -63,6 +64,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     UploadsModule,
     UssdModule,
     VotesModule,
+    TicketingModule,
     SchedulingModule,
     HealthModule,
     AdminModule,

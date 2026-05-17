@@ -4,6 +4,7 @@ import {
   EventCategory as PrismaEventCategory,
   EventRole as PrismaEventRole,
   EventStatus as PrismaEventStatus,
+  EventType as PrismaEventType,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../../core/prisma/prisma.service";
@@ -17,6 +18,7 @@ import {
 import { EventCategory } from "../../domain/event-category";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
+import { EventType } from "../../domain/event-type";
 
 const EVENT_INCLUDE = {
   categories: {
@@ -40,6 +42,7 @@ export class PrismaEventsRepository implements EventsRepository {
           name: input.name,
           slug: input.slug,
           description: input.description,
+          eventType: input.eventType ?? PrismaEventType.VOTING,
           primaryFlyerUrl: input.primaryFlyerUrl,
           primaryFlyerKey: input.primaryFlyerKey,
           bannerUrl: input.bannerUrl ?? null,
@@ -48,20 +51,28 @@ export class PrismaEventsRepository implements EventsRepository {
           nominationEndAt: input.nominationEndAt ?? null,
           votingStartAt: input.votingStartAt,
           votingEndAt: input.votingEndAt,
+          eventStartAt: input.eventStartAt ?? null,
+          eventEndAt: input.eventEndAt ?? null,
+          venueName: input.venueName ?? null,
+          venueAddress: input.venueAddress ?? null,
+          ticketSalesStartAt: input.ticketSalesStartAt ?? null,
+          ticketSalesEndAt: input.ticketSalesEndAt ?? null,
           contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes ?? false,
           contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard ?? false,
           publicCanViewLeaderboard: input.publicCanViewLeaderboard ?? true,
-          categories: {
-            create: input.categories.map((category) => ({
-              name: category.name,
-              description: category.description,
-              votePriceMinor: category.votePriceMinor,
-              currency: category.currency.trim().toUpperCase(),
-              imageUrl: category.imageUrl ?? null,
-              imageKey: category.imageKey ?? null,
-              sortOrder: category.sortOrder,
-            })),
-          },
+          categories: input.categories?.length
+            ? {
+                create: input.categories.map((category) => ({
+                  name: category.name,
+                  description: category.description,
+                  votePriceMinor: category.votePriceMinor,
+                  currency: category.currency.trim().toUpperCase(),
+                  imageUrl: category.imageUrl ?? null,
+                  imageKey: category.imageKey ?? null,
+                  sortOrder: category.sortOrder,
+                })),
+              }
+            : undefined,
         },
         include: EVENT_INCLUDE,
       });
@@ -152,6 +163,7 @@ export class PrismaEventsRepository implements EventsRepository {
   async findLifecycleCandidates(): Promise<Event[]> {
     const events = await this.prisma.event.findMany({
       where: {
+        eventType: PrismaEventType.VOTING,
         status: {
           in: [
             PrismaEventStatus.APPROVED,
@@ -168,12 +180,22 @@ export class PrismaEventsRepository implements EventsRepository {
     return events.map((event) => this.toDomainEvent(event));
   }
 
+  async countActiveTicketTypes(eventId: string): Promise<number> {
+    return this.prisma.ticketType.count({
+      where: {
+        eventId,
+        isActive: true,
+      },
+    });
+  }
+
   async updateDraft(eventId: string, input: UpdateDraftEventRecord): Promise<Event> {
     const event = await this.prisma.event.update({
       where: { id: eventId },
       data: {
         name: input.name,
         description: input.description,
+        eventType: input.eventType,
         primaryFlyerUrl: input.primaryFlyerUrl,
         primaryFlyerKey: input.primaryFlyerKey,
         bannerUrl: input.bannerUrl,
@@ -182,6 +204,12 @@ export class PrismaEventsRepository implements EventsRepository {
         nominationEndAt: input.nominationEndAt,
         votingStartAt: input.votingStartAt,
         votingEndAt: input.votingEndAt,
+        eventStartAt: input.eventStartAt,
+        eventEndAt: input.eventEndAt,
+        venueName: input.venueName,
+        venueAddress: input.venueAddress,
+        ticketSalesStartAt: input.ticketSalesStartAt,
+        ticketSalesEndAt: input.ticketSalesEndAt,
         contestantsCanViewOwnVotes: input.contestantsCanViewOwnVotes,
         contestantsCanViewLeaderboard: input.contestantsCanViewLeaderboard,
         publicCanViewLeaderboard: input.publicCanViewLeaderboard,
@@ -304,6 +332,7 @@ export class PrismaEventsRepository implements EventsRepository {
       slug: event.slug,
       description: event.description,
       status: event.status as EventStatus,
+      eventType: event.eventType as EventType,
       primaryFlyerUrl: event.primaryFlyerUrl,
       primaryFlyerKey: event.primaryFlyerKey,
       bannerUrl: event.bannerUrl,
@@ -312,6 +341,12 @@ export class PrismaEventsRepository implements EventsRepository {
       nominationEndAt: event.nominationEndAt,
       votingStartAt: event.votingStartAt,
       votingEndAt: event.votingEndAt,
+      eventStartAt: event.eventStartAt,
+      eventEndAt: event.eventEndAt,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+      ticketSalesStartAt: event.ticketSalesStartAt,
+      ticketSalesEndAt: event.ticketSalesEndAt,
       contestantsCanViewOwnVotes: event.contestantsCanViewOwnVotes,
       contestantsCanViewLeaderboard: event.contestantsCanViewLeaderboard,
       publicCanViewLeaderboard: event.publicCanViewLeaderboard,

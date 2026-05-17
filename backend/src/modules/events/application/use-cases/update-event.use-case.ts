@@ -9,6 +9,7 @@ import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
+import { EventType } from "../../domain/event-type";
 import { SystemRole } from "../../../users/domain/system-role";
 import { validateUpdateEventInput } from "./event-validation";
 
@@ -16,6 +17,7 @@ export type UpdateEventInput = {
   eventId: string;
   name?: string;
   description?: string;
+  eventType?: EventType;
   primaryFlyerUrl?: string;
   primaryFlyerKey?: string;
   bannerUrl?: string | null;
@@ -24,6 +26,12 @@ export type UpdateEventInput = {
   nominationEndAt?: Date | null;
   votingStartAt?: Date;
   votingEndAt?: Date;
+  eventStartAt?: Date | null;
+  eventEndAt?: Date | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  ticketSalesStartAt?: Date | null;
+  ticketSalesEndAt?: Date | null;
   contestantsCanViewOwnVotes?: boolean;
   contestantsCanViewLeaderboard?: boolean;
   publicCanViewLeaderboard?: boolean;

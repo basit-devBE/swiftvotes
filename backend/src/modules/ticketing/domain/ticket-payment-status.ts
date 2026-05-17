@@ -1,0 +1,7 @@
+export enum TicketPaymentStatus {
+  PENDING = "PENDING",
+  SUCCEEDED = "SUCCEEDED",
+  FAILED = "FAILED",
+  ABANDONED = "ABANDONED",
+  REFUNDED = "REFUNDED",
+}

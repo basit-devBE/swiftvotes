@@ -8,12 +8,16 @@ import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import {
   confirmNomination,
+  createTicketType,
+  disableTicketType,
   getContestantCredentials,
   getEvent,
   listContestants,
   listNominations,
+  listTicketTypes,
   regenerateMagicLink,
   rejectNomination,
+  updateTicketType,
   updateContestant,
   updateEventVisibility,
 } from "@/lib/api/events";
@@ -41,6 +45,7 @@ import {
   PaymentStatus,
   NominationResponse,
   NominationStatus,
+  TicketTypeResponse,
   UpdateContestantInput,
 } from "@/lib/api/types";
 import {
@@ -58,7 +63,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "overview" | "nominations" | "contestants" | "votes" | "leaderboard";
+type Tab = "overview" | "nominations" | "contestants" | "votes" | "leaderboard" | "tickets";
 type NomFilter = "all" | NominationStatus;
 type PaymentStatusFilter = "all" | PaymentStatus;
 
@@ -198,6 +203,73 @@ const LIFECYCLE_STEPS: EventResponse["status"][] = [
 ];
 
 type StepState = "done" | "current" | "upcoming";
+
+type TicketLifecycleStep =
+  | "DRAFT"
+  | "PENDING_APPROVAL"
+  | "REJECTED"
+  | "APPROVED"
+  | "SALES_SCHEDULED"
+  | "SALES_OPEN"
+  | "SALES_CLOSED"
+  | "EVENT_DAY"
+  | "ARCHIVED";
+
+const TICKET_LIFECYCLE_STEPS: TicketLifecycleStep[] = [
+  "DRAFT",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "SALES_SCHEDULED",
+  "SALES_OPEN",
+  "SALES_CLOSED",
+  "EVENT_DAY",
+  "ARCHIVED",
+];
+
+function formatTicketLifecycleStep(step: TicketLifecycleStep): string {
+  const map: Record<TicketLifecycleStep, string> = {
+    DRAFT: "Draft",
+    PENDING_APPROVAL: "Pending Approval",
+    REJECTED: "Rejected",
+    APPROVED: "Approved",
+    SALES_SCHEDULED: "Sales Scheduled",
+    SALES_OPEN: "Sales Open",
+    SALES_CLOSED: "Sales Closed",
+    EVENT_DAY: "Event Day",
+    ARCHIVED: "Archived",
+  };
+  return map[step];
+}
+
+function getCurrentTicketLifecycleStep(event: EventResponse): TicketLifecycleStep {
+  if (event.status === "DRAFT") return "DRAFT";
+  if (event.status === "PENDING_APPROVAL") return "PENDING_APPROVAL";
+  if (event.status === "REJECTED") return "REJECTED";
+  if (event.status === "ARCHIVED") return "ARCHIVED";
+
+  const now = new Date();
+  const salesStart = event.ticketSalesStartAt ? new Date(event.ticketSalesStartAt) : null;
+  const salesEnd = event.ticketSalesEndAt ? new Date(event.ticketSalesEndAt) : null;
+  const eventStart = event.eventStartAt ? new Date(event.eventStartAt) : null;
+
+  if (eventStart && now >= eventStart) return "EVENT_DAY";
+  if (salesEnd && now > salesEnd) return "SALES_CLOSED";
+  if (salesStart && now < salesStart) return "SALES_SCHEDULED";
+  if (salesStart && (!salesEnd || now <= salesEnd)) return "SALES_OPEN";
+  return "APPROVED";
+}
+
+function getTicketStepState(
+  step: TicketLifecycleStep,
+  currentStep: TicketLifecycleStep,
+  steps: TicketLifecycleStep[],
+): StepState {
+  const currentIdx = steps.indexOf(currentStep);
+  const stepIdx = steps.indexOf(step);
+  if (stepIdx < currentIdx) return "done";
+  if (stepIdx === currentIdx) return "current";
+  return "upcoming";
+}
 
 function getStepState(
   step: EventResponse["status"],
@@ -493,6 +565,7 @@ function VisibilityToggle({
 
 function OverviewTab({
   event,
+  onOpenTickets,
   onToggleOwnVotes,
   onToggleLeaderboard,
   onTogglePublicLeaderboard,
@@ -501,6 +574,7 @@ function OverviewTab({
   togglingPublicLeaderboard,
 }: {
   event: EventResponse;
+  onOpenTickets: () => void;
   onToggleOwnVotes: () => void;
   onToggleLeaderboard: () => void;
   onTogglePublicLeaderboard: () => void;
@@ -508,6 +582,10 @@ function OverviewTab({
   togglingLeaderboard: boolean;
   togglingPublicLeaderboard: boolean;
 }) {
+  if (event.eventType === "TICKETING") {
+    return <TicketingOverviewTab event={event} onOpenTickets={onOpenTickets} />;
+  }
+
   // Build the step list — insert REJECTED after PENDING_APPROVAL if relevant
   const displaySteps =
     event.status === "REJECTED"
@@ -694,6 +772,279 @@ function OverviewTab({
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TicketingOverviewTab({
+  event,
+  onOpenTickets,
+}: {
+  event: EventResponse;
+  onOpenTickets: () => void;
+}) {
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeResponse[]>([]);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(true);
+  const [ticketError, setTicketError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTicketTypes() {
+      setIsLoadingTickets(true);
+      setTicketError(null);
+      try {
+        const list = await listTicketTypes(event.id);
+        if (!cancelled) setTicketTypes(list);
+      } catch (loadError) {
+        if (!cancelled) {
+          setTicketError(
+            loadError instanceof ApiClientError
+              ? loadError.message
+              : "Unable to load ticket types.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoadingTickets(false);
+      }
+    }
+
+    void loadTicketTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id]);
+
+  const displaySteps =
+    event.status === "REJECTED"
+      ? (["DRAFT", "PENDING_APPROVAL", "REJECTED"] as TicketLifecycleStep[])
+      : TICKET_LIFECYCLE_STEPS;
+  const currentStep = getCurrentTicketLifecycleStep(event);
+  const activeTicketTypes = ticketTypes.filter((type) => type.isActive);
+  const disabledTicketTypes = ticketTypes.length - activeTicketTypes.length;
+  const totalSold = ticketTypes.reduce((sum, type) => sum + type.quantitySold, 0);
+  const limitedCapacity = ticketTypes.reduce(
+    (sum, type) => sum + (type.quantityAvailable ?? 0),
+    0,
+  );
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="space-y-6">
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+                Ticketing Lifecycle
+              </p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-ink/52">
+                Track approval, ticket sales, and event day readiness without the voting workflow.
+              </p>
+            </div>
+            <span className={`rounded-full border px-3 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.18em] ${getEventStatusBadgeClass(event.status)}`}>
+              {formatTicketLifecycleStep(currentStep)}
+            </span>
+          </div>
+
+          <div className="mt-6">
+            {displaySteps.map((step, i) => {
+              const isLast = i === displaySteps.length - 1;
+              const isRejectedStep = step === "REJECTED";
+              const state = isRejectedStep
+                ? event.status === "REJECTED"
+                  ? "current"
+                  : "upcoming"
+                : getTicketStepState(step, currentStep, displaySteps);
+
+              return (
+                <div key={step} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                        state === "done"
+                          ? "border-[#1b6f4b] bg-[#eef9f2] text-[#1b6f4b]"
+                          : state === "current" && isRejectedStep
+                            ? "border-accent bg-accent text-white shadow-[0_0_0_4px_rgba(180,15,23,0.12)]"
+                            : state === "current"
+                              ? "border-primary bg-primary text-white shadow-[0_0_0_4px_rgba(15,76,219,0.12)]"
+                              : "border-[#dce4f1] bg-white text-ink/28"
+                      }`}
+                    >
+                      {state === "done" ? (
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                        </svg>
+                      ) : (
+                        <span>{i + 1}</span>
+                      )}
+                    </div>
+                    {!isLast && (
+                      <div
+                        className={`my-0.5 w-0.5 flex-1 rounded-full ${state === "done" ? "bg-[#cfe7da]" : "bg-[#e8edf4]"}`}
+                        style={{ minHeight: 20 }}
+                      />
+                    )}
+                  </div>
+
+                  <div className={`pb-5 ${isLast ? "pb-0" : ""}`}>
+                    <p
+                      className={`text-sm font-semibold ${
+                        state === "current"
+                          ? "text-ink"
+                          : state === "done"
+                            ? "text-ink/58"
+                            : "text-ink/28"
+                      }`}
+                    >
+                      {formatTicketLifecycleStep(step)}
+                    </p>
+                    {state === "current" && isRejectedStep && event.rejectionReason && (
+                      <p className="mt-0.5 text-xs italic text-accent/70">
+                        {event.rejectionReason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Ticketing Dates
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Event Starts", value: formatDateTime(event.eventStartAt) },
+              { label: "Event Ends", value: formatDateTime(event.eventEndAt) },
+              { label: "Sales Open", value: formatDateTime(event.ticketSalesStartAt) },
+              { label: "Sales Close", value: formatDateTime(event.ticketSalesEndAt) },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                className="rounded-xl border border-[#edf0f6] bg-[#f7f9fc] p-4"
+              >
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink/38">
+                  {label}
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-ink">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+            Venue
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-[#edf0f6] bg-[#f7f9fc] p-4">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink/38">
+                Venue Name
+              </p>
+              <p className="mt-1.5 text-sm font-semibold text-ink">
+                {event.venueName || "Not set"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#edf0f6] bg-[#f7f9fc] p-4">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink/38">
+                Address
+              </p>
+              <p className="mt-1.5 text-sm font-semibold text-ink">
+                {event.venueAddress || "Not set"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)] lg:self-start">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+              Ticket Types
+            </p>
+            <p className="mt-1 font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
+              {isLoadingTickets ? "..." : ticketTypes.length}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenTickets}
+            className="rounded-full border border-primary/18 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/5"
+          >
+            Manage
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <MetricTile label="Active" value={isLoadingTickets ? "..." : String(activeTicketTypes.length)} />
+          <MetricTile label="Disabled" value={isLoadingTickets ? "..." : String(disabledTicketTypes)} />
+          <MetricTile label="Tickets sold" value={isLoadingTickets ? "..." : String(totalSold)} />
+          <MetricTile
+            label="Limited capacity"
+            value={isLoadingTickets ? "..." : limitedCapacity ? String(limitedCapacity) : "Unlimited"}
+          />
+        </div>
+
+        {ticketError && (
+          <p className="mt-5 rounded-xl border border-accent/16 bg-accent/5 px-3 py-2 text-sm font-medium text-accent">
+            {ticketError}
+          </p>
+        )}
+
+        {!isLoadingTickets && !ticketError && ticketTypes.length === 0 && (
+          <div className="mt-5 rounded-xl border border-[#edf0f6] bg-[#f7f9fc] p-4">
+            <p className="text-sm font-semibold text-ink">No ticket types yet</p>
+            <p className="mt-1 text-sm leading-6 text-ink/50">
+              Add at least one paid ticket type before selling tickets.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenTickets}
+              className="mt-4 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90"
+            >
+              Add ticket type
+            </button>
+          </div>
+        )}
+
+        {!isLoadingTickets && ticketTypes.length > 0 && (
+          <div className="mt-5 space-y-3">
+            {ticketTypes.slice(0, 4).map((type) => (
+              <div
+                key={type.id}
+                className="rounded-xl border border-[#edf0f6] bg-[#f7f9fc] px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{type.name}</p>
+                    <p className="mt-0.5 text-xs text-ink/46">
+                      {type.quantitySold} sold
+                      {type.quantityAvailable === null
+                        ? " · unlimited"
+                        : ` · ${Math.max(type.quantityAvailable - type.quantitySold, 0)} left`}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-primary/16 bg-[#f0f4ff] px-2.5 py-0.5 text-[0.68rem] font-semibold text-primary/80">
+                    {formatCurrency(type.priceMinor, type.currency)}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {ticketTypes.length > 4 && (
+              <button
+                type="button"
+                onClick={onOpenTickets}
+                className="w-full rounded-full border border-primary/14 px-4 py-2 text-xs font-semibold text-ink/58 transition hover:bg-primary/5"
+              >
+                View all {ticketTypes.length} ticket types
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1489,6 +1840,323 @@ function ContestantsTab({
           onClose={() => setSelectedContestant(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ticket types tab
+// ---------------------------------------------------------------------------
+
+function TicketTypesTab({ eventId }: { eventId: string }) {
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState("GHS");
+  const [quantityAvailable, setQuantityAvailable] = useState("");
+
+  async function loadTicketTypes() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setTicketTypes(await listTicketTypes(eventId));
+    } catch (loadError) {
+      setError(
+        loadError instanceof ApiClientError
+          ? loadError.message
+          : "Unable to load ticket types.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadTicketTypes();
+  }, [eventId]);
+
+  function resetForm() {
+    setEditingId(null);
+    setName("");
+    setDescription("");
+    setPrice("");
+    setCurrency("GHS");
+    setQuantityAvailable("");
+  }
+
+  function startEditing(ticketType: TicketTypeResponse) {
+    setEditingId(ticketType.id);
+    setName(ticketType.name);
+    setDescription(ticketType.description ?? "");
+    setPrice((ticketType.priceMinor / 100).toString());
+    setCurrency(ticketType.currency);
+    setQuantityAvailable(ticketType.quantityAvailable?.toString() ?? "");
+  }
+
+  async function handleSubmit() {
+    setError(null);
+    const priceMinor = Math.round(Number.parseFloat(price || "0") * 100);
+    const quantity = quantityAvailable ? Number.parseInt(quantityAvailable, 10) : null;
+
+    if (!name.trim()) {
+      setError("Ticket type name is required.");
+      return;
+    }
+    if (!Number.isFinite(priceMinor) || priceMinor < 50) {
+      setError("Ticket price must be at least GHS 0.50.");
+      return;
+    }
+    if (quantityAvailable && (!Number.isInteger(quantity) || quantity! < 1)) {
+      setError("Quantity must be at least 1 when set.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        priceMinor,
+        currency: currency.trim().toUpperCase(),
+        quantityAvailable: quantity,
+        sortOrder: editingId
+          ? ticketTypes.find((type) => type.id === editingId)?.sortOrder
+          : ticketTypes.length,
+      };
+
+      if (editingId) {
+        const updated = await updateTicketType(eventId, editingId, payload);
+        setTicketTypes((current) =>
+          current.map((type) => (type.id === updated.id ? updated : type)),
+        );
+      } else {
+        const created = await createTicketType(eventId, payload);
+        setTicketTypes((current) => [...current, created]);
+      }
+      resetForm();
+    } catch (saveError) {
+      setError(
+        saveError instanceof ApiClientError
+          ? saveError.message
+          : "Unable to save ticket type.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDisable(ticketType: TicketTypeResponse) {
+    setError(null);
+    try {
+      await disableTicketType(eventId, ticketType.id);
+      setTicketTypes((current) =>
+        current.filter((type) => type.id !== ticketType.id),
+      );
+      if (editingId === ticketType.id) resetForm();
+    } catch (disableError) {
+      setError(
+        disableError instanceof ApiClientError
+          ? disableError.message
+          : "Unable to disable ticket type.",
+      );
+    }
+  }
+
+  const totalSold = ticketTypes.reduce((sum, type) => sum + type.quantitySold, 0);
+  const grossCapacity = ticketTypes.reduce(
+    (sum, type) => sum + (type.quantityAvailable ?? 0),
+    0,
+  );
+
+  if (isLoading) {
+    return (
+      <AppLoadingState
+        compact
+        label="Loading ticket types"
+        detail="Fetching ticket tiers and inventory."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <MetricTile label="Ticket types" value={String(ticketTypes.length)} />
+          <MetricTile label="Tickets sold" value={String(totalSold)} />
+          <MetricTile
+            label="Limited capacity"
+            value={grossCapacity ? String(grossCapacity) : "Unlimited"}
+          />
+        </div>
+
+        {ticketTypes.length === 0 ? (
+          <div className="rounded-[1.5rem] border border-primary/10 bg-white/70 p-10 text-center">
+            <p className="font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+              No ticket types yet
+            </p>
+            <p className="mt-2 text-sm leading-6 text-ink/50">
+              Add Regular, VIP, Early Bird, or any paid ticket tier this event needs.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {ticketTypes.map((ticketType) => {
+              const remaining =
+                ticketType.quantityAvailable === null
+                  ? null
+                  : Math.max(ticketType.quantityAvailable - ticketType.quantitySold, 0);
+              return (
+                <div
+                  key={ticketType.id}
+                  className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-5 shadow-[0_10px_30px_-22px_rgba(7,17,31,0.22)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-display text-lg font-semibold tracking-[-0.03em] text-ink">
+                        {ticketType.name}
+                      </p>
+                      {ticketType.description && (
+                        <p className="mt-1 text-sm leading-6 text-ink/50">
+                          {ticketType.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="rounded-full border border-primary/16 bg-[#f0f4ff] px-3 py-1 text-xs font-semibold text-primary">
+                      {formatCurrency(ticketType.priceMinor, ticketType.currency)}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl bg-[#f7f9fc] px-4 py-3">
+                      <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-ink/36">
+                        Sold
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-ink">
+                        {ticketType.quantitySold}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-[#f7f9fc] px-4 py-3">
+                      <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-ink/36">
+                        Remaining
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-ink">
+                        {remaining === null ? "Unlimited" : remaining}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startEditing(ticketType)}
+                      className="rounded-full border border-primary/18 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/5"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDisable(ticketType)}
+                      className="rounded-full border border-accent/18 px-4 py-2 text-xs font-semibold text-accent transition hover:bg-accent/5"
+                    >
+                      Disable
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <aside className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-5 shadow-[0_14px_38px_-26px_rgba(7,17,31,0.22)] xl:sticky xl:top-8 xl:self-start">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+          {editingId ? "Edit ticket type" : "New ticket type"}
+        </p>
+        <div className="mt-5 space-y-4">
+          <label className="block">
+            <span className="text-xs font-semibold text-ink/60">Name</span>
+            <input
+              className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Regular"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-ink/60">Description</span>
+            <textarea
+              className="mt-2 min-h-24 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 py-2 text-sm outline-none transition focus:border-primary/40"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Standard access ticket"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold text-ink/60">Price</span>
+              <input
+                type="number"
+                min="0.5"
+                step="0.01"
+                className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="50"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink/60">Currency</span>
+              <input
+                className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm uppercase outline-none transition focus:border-primary/40"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-xs font-semibold text-ink/60">Quantity available</span>
+            <input
+              type="number"
+              min="1"
+              className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+              value={quantityAvailable}
+              onChange={(e) => setQuantityAvailable(e.target.value)}
+              placeholder="Leave blank for unlimited"
+            />
+          </label>
+          {error && (
+            <p className="rounded-xl border border-accent/16 bg-accent/5 px-3 py-2 text-sm font-medium text-accent">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={saving}
+              className="flex-1 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Saving..." : editingId ? "Save changes" : "Add ticket"}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="rounded-full border border-primary/14 px-4 py-2.5 text-sm font-semibold text-ink/58 transition hover:bg-primary/5"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -2345,10 +3013,14 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
-    { key: "nominations", label: "Nominations" },
-    { key: "contestants", label: "Contestants" },
-    { key: "votes", label: "Votes" },
-    { key: "leaderboard", label: "Leaderboard" },
+    ...(event.eventType === "TICKETING"
+      ? [{ key: "tickets" as const, label: "Tickets" }]
+      : [
+          { key: "nominations" as const, label: "Nominations" },
+          { key: "contestants" as const, label: "Contestants" },
+          { key: "votes" as const, label: "Votes" },
+          { key: "leaderboard" as const, label: "Leaderboard" },
+        ]),
   ];
 
   return (
@@ -2432,21 +3104,19 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
       {/* ── Quick stats ──────────────────────────────────────────────────── */}
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
-        {[
-          { label: "Categories", value: String(event.categories.length) },
-          {
-            label: "Voting starts",
-            value: formatDate(event.votingStartAt),
-          },
-          {
-            label: "Nominations open",
-            value: formatDate(event.nominationStartAt),
-          },
-          {
-            label: "Nominations close",
-            value: formatDate(event.nominationEndAt),
-          },
-        ].map(({ label, value }) => (
+        {(event.eventType === "TICKETING"
+          ? [
+              { label: "Type", value: "Ticketing" },
+              { label: "Event date", value: formatDate(event.eventStartAt) },
+              { label: "Sales open", value: formatDate(event.ticketSalesStartAt) },
+              { label: "Sales close", value: formatDate(event.ticketSalesEndAt) },
+            ]
+          : [
+              { label: "Categories", value: String(event.categories.length) },
+              { label: "Voting starts", value: formatDate(event.votingStartAt) },
+              { label: "Nominations open", value: formatDate(event.nominationStartAt) },
+              { label: "Nominations close", value: formatDate(event.nominationEndAt) },
+            ]).map(({ label, value }) => (
           <div
             key={label}
             className="rounded-[1.4rem] border border-white/80 bg-white/80 p-5 shadow-[0_10px_32px_-18px_rgba(7,17,31,0.18)]"
@@ -2483,6 +3153,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
         {activeTab === "overview" && (
           <OverviewTab
             event={event}
+            onOpenTickets={() => setActiveTab("tickets")}
             onToggleOwnVotes={handleToggleOwnVotes}
             onToggleLeaderboard={handleToggleLeaderboard}
             onTogglePublicLeaderboard={handleTogglePublicLeaderboard}
@@ -2508,6 +3179,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
         {activeTab === "leaderboard" && (
           <LeaderboardTab eventId={event.id} />
         )}
+        {activeTab === "tickets" && <TicketTypesTab eventId={event.id} />}
       </div>
     </div>
   );

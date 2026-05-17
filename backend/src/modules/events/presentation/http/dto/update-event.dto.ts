@@ -1,4 +1,14 @@
-import { IsBoolean, IsDateString, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from "class-validator";
+
+import { EventType } from "../../../domain/event-type";
 
 export class UpdateEventDto {
   @IsOptional()
@@ -10,6 +20,10 @@ export class UpdateEventDto {
   @IsString()
   @MaxLength(4000)
   description?: string;
+
+  @IsOptional()
+  @IsEnum(EventType)
+  eventType?: EventType;
 
   @IsOptional()
   @IsUrl()
@@ -42,6 +56,32 @@ export class UpdateEventDto {
   @IsOptional()
   @IsDateString()
   votingEndAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  eventStartAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  eventEndAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  venueName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  venueAddress?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  ticketSalesStartAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  ticketSalesEndAt?: string | null;
 
   @IsOptional()
   @IsBoolean()
