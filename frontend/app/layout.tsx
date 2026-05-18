@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 
 import { FloatingWhatsAppButton } from "@/components/floating-whatsapp-button";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className="bg-canvas font-body text-ink antialiased">
         <AuthProvider>{children}</AuthProvider>
         <FloatingWhatsAppButton />
+        <Analytics />
       </body>
     </html>
   );
