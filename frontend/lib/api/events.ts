@@ -3,6 +3,8 @@ import {
   ContestantCredentialsResponse,
   ContestantResponse,
   ConfirmNominationInput,
+  ConfirmPhoneVerificationInput,
+  ConfirmPhoneVerificationResponse,
   CreateEventCategoryInput,
   CreateEventInput,
   CreateTicketOrderInput,
@@ -13,6 +15,8 @@ import {
   NominationResponse,
   RejectNominationInput,
   SubmitNominationInput,
+  StartPhoneVerificationInput,
+  StartPhoneVerificationResponse,
   UpdateContestantInput,
   UpdateEventInput,
   UpdateTicketTypeInput,
@@ -140,6 +144,24 @@ export function verifyTicketOrder(
   return apiRequest<TicketOrderResponse>(
     `/events/${eventId}/ticket-orders/verify?${qs}`,
   );
+}
+
+export function startPhoneVerification(
+  input: StartPhoneVerificationInput,
+): Promise<StartPhoneVerificationResponse> {
+  return apiRequest<StartPhoneVerificationResponse>("/phone-verifications/start", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function confirmPhoneVerification(
+  input: ConfirmPhoneVerificationInput,
+): Promise<ConfirmPhoneVerificationResponse> {
+  return apiRequest<ConfirmPhoneVerificationResponse>("/phone-verifications/confirm", {
+    method: "POST",
+    body: input,
+  });
 }
 
 export function listPendingEvents(): Promise<EventResponse[]> {

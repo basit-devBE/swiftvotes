@@ -41,8 +41,13 @@ export const validationSchema = Joi.object({
   PAYSTACK_SECRET_KEY: Joi.string().allow("").default(""),
   PAYSTACK_PUBLIC_KEY: Joi.string().allow("").default(""),
   PAYSTACK_BASE_URL: Joi.string().uri().default("https://api.paystack.co"),
+  USE_PAYSTACK: Joi.string().valid("true", "false").default("false"),
   SMS_ENABLED: Joi.string().valid("true", "false").default("false"),
   SMS_SENDER_ID: Joi.string().allow("").default("SwiftVote"),
+  SMS_API_KEY: Joi.string().allow("").default(""),
+  SMS_BASE_URL: Joi.string()
+    .uri()
+    .default("https://sms.arkesel.com/api/v2"),
   ARKESEL_SMS_API_KEY: Joi.string().allow("").default(""),
   ARKESEL_SMS_BASE_URL: Joi.string()
     .uri()

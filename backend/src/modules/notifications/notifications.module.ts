@@ -15,6 +15,6 @@ import { ArkeselSmsService } from "./infrastructure/sms/arkesel-sms.service";
       useClass: NodemailerNotificationsService,
     },
   ],
-  exports: [NOTIFICATIONS_SERVICE],
+  exports: [NOTIFICATIONS_SERVICE, ArkeselSmsService],
 })
 export class NotificationsModule {}
