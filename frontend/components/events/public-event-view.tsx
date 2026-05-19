@@ -7,7 +7,14 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppLoadingState } from "@/components/app-loading-state";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
-import { createTicketOrder, getEvent, listContestants, listTicketTypes } from "@/lib/api/events";
+import {
+  confirmPhoneVerification,
+  createTicketOrder,
+  getEvent,
+  listContestants,
+  listTicketTypes,
+  startPhoneVerification,
+} from "@/lib/api/events";
 import {
   ContestantResponse,
   EventCategoryResponse,
@@ -17,6 +24,8 @@ import {
 import { PublicLeaderboard } from "@/components/votes/public-leaderboard";
 import { VoteModal } from "@/components/votes/vote-modal";
 import { NominationForm, StatusBanner } from "./nomination-form";
+
+const usePaystack = process.env.NEXT_PUBLIC_USE_PAYSTACK === "true";
 
 function formatDate(date: string | null): string {
   if (!date) return "Not set";
@@ -241,6 +250,14 @@ function TicketCheckoutPanel({
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [verificationChallenge, setVerificationChallenge] = useState<{
+    challengeId: string;
+    maskedPhone: string;
+    expiresAt: string;
+  } | null>(null);
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -277,46 +294,97 @@ function TicketCheckoutPanel({
     setQuantities((current) => ({ ...current, [ticketType.id]: clamped }));
   }
 
-  async function handleSubmit(eventSubmit: FormEvent<HTMLFormElement>) {
-    eventSubmit.preventDefault();
+  function resetPhoneVerification(nextPhone: string) {
+    setBuyerPhone(nextPhone);
+    setOtpCode("");
+    setVerificationChallenge(null);
+    setVerifiedPhone(null);
+    setNotice(null);
+  }
+
+  function validateBuyerDetails(): boolean {
     setError(null);
+    setNotice(null);
 
     if (!salesState.isOpen) {
       setError(salesState.message);
-      return;
+      return false;
     }
     if (selectedItems.length === 0) {
       setError("Select at least one ticket.");
-      return;
+      return false;
     }
     if (!buyerName.trim()) {
       setError("Enter your name.");
-      return;
+      return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim())) {
       setError("Enter a valid email address.");
-      return;
+      return false;
     }
+    if (!usePaystack && !buyerPhone.trim()) {
+      setError("Enter the mobile money phone number to verify.");
+      return false;
+    }
+    return true;
+  }
 
+  async function handleSubmit(eventSubmit: FormEvent<HTMLFormElement>) {
+    eventSubmit.preventDefault();
+    if (!validateBuyerDetails()) return;
     setIsSubmitting(true);
+
     try {
-      const result = await createTicketOrder(event.id, {
-        items: selectedItems.map((item) => ({
-          ticketTypeId: item.ticketType.id,
-          quantity: item.quantity,
-        })),
-        buyerName: buyerName.trim(),
-        buyerEmail: buyerEmail.trim(),
-        buyerPhone: buyerPhone.trim() || undefined,
-        callbackOrigin: window.location.origin,
-      });
-      window.location.href = result.paymentUrl;
+      if (usePaystack) {
+        const result = await createTicketOrder(event.id, {
+          items: selectedItems.map((item) => ({
+            ticketTypeId: item.ticketType.id,
+            quantity: item.quantity,
+          })),
+          buyerName: buyerName.trim(),
+          buyerEmail: buyerEmail.trim(),
+          buyerPhone: buyerPhone.trim() || undefined,
+          callbackOrigin: window.location.origin,
+        });
+        window.location.href = result.paymentUrl;
+        return;
+      }
+
+      if (!verificationChallenge) {
+        const challenge = await startPhoneVerification({
+          phone: buyerPhone.trim(),
+          purpose: "JUNIPAY_COLLECTION",
+        });
+        setVerificationChallenge({
+          challengeId: challenge.challengeId,
+          maskedPhone: challenge.maskedPhone,
+          expiresAt: challenge.expiresAt,
+        });
+        setNotice(`Verification code sent to ${challenge.maskedPhone}.`);
+        return;
+      }
+
+      if (!verifiedPhone) {
+        const result = await confirmPhoneVerification({
+          challengeId: verificationChallenge.challengeId,
+          code: otpCode,
+          purpose: "JUNIPAY_COLLECTION",
+        });
+        setVerifiedPhone(result.phone);
+        setNotice("Phone number verified. JuniPay payment collection will be connected here.");
+        return;
+      }
+
+      setNotice("Phone number verified. Payment collection is paused until JuniPay is connected.");
     } catch (checkoutError) {
       setError(
         checkoutError instanceof ApiClientError
           ? checkoutError.message
-          : "Unable to start checkout. Please try again.",
+          : usePaystack
+            ? "Unable to start checkout. Please try again."
+            : "Unable to verify this phone number. Please try again.",
       );
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -414,16 +482,38 @@ function TicketCheckoutPanel({
             placeholder="you@example.com"
           />
         </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-ink/60">Phone</span>
-          <input
-            className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
-            value={buyerPhone}
-            onChange={(inputEvent) => setBuyerPhone(inputEvent.target.value)}
-            disabled={!salesState.isOpen || isSubmitting}
-            placeholder="Optional"
-          />
-        </label>
+        {!usePaystack ? (
+          <>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink/60">Phone</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
+                value={buyerPhone}
+                onChange={(inputEvent) => resetPhoneVerification(inputEvent.target.value)}
+                disabled={!salesState.isOpen || isSubmitting || Boolean(verifiedPhone)}
+                placeholder="0241234567"
+              />
+            </label>
+            {verificationChallenge && !verifiedPhone ? (
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/60">Verification code</span>
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm tracking-[0.24em] outline-none transition focus:border-primary/40"
+                  value={otpCode}
+                  onChange={(inputEvent) => setOtpCode(inputEvent.target.value.replace(/\D/g, ""))}
+                  disabled={!salesState.isOpen || isSubmitting}
+                  placeholder="123456"
+                />
+              </label>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       <div className="mt-5 rounded-2xl bg-[#07111f] p-4 text-white">
@@ -444,13 +534,31 @@ function TicketCheckoutPanel({
           {error}
         </p>
       )}
+      {notice && (
+        <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          {notice}
+        </p>
+      )}
 
       <button
         type="submit"
-        disabled={!salesState.isOpen || isSubmitting || selectedItems.length === 0}
+        disabled={
+          !salesState.isOpen ||
+          isSubmitting ||
+          selectedItems.length === 0 ||
+          (!usePaystack && Boolean(verificationChallenge) && !verifiedPhone && otpCode.length !== 6)
+        }
         className="mt-5 flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-ink/12 disabled:text-ink/40"
       >
-        {isSubmitting ? "Opening checkout..." : "Pay with Paystack"}
+        {isSubmitting
+          ? usePaystack ? "Opening checkout..." : "Checking..."
+          : usePaystack
+            ? "Pay with Paystack"
+            : !verificationChallenge
+              ? "Send verification code"
+              : !verifiedPhone
+                ? "Verify phone number"
+                : "Payment pending JuniPay"}
       </button>
     </form>
   );

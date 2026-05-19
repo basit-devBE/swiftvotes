@@ -48,6 +48,14 @@ export class ArkeselSmsService {
     };
 
     try {
+      this.logger.log(
+        `Sending Arkesel SMS payload: ${JSON.stringify({
+          url,
+          body,
+        })}`,
+        "Notifications",
+      );
+
       const response = await fetch(url, {
         method: "POST",
         headers: {

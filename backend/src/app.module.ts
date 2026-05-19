@@ -20,6 +20,7 @@ import { EventsModule } from "./modules/events/events.module";
 import { HealthModule } from "./modules/health/health.module";
 import { NominationsModule } from "./modules/nominations/nominations.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { PhoneVerificationsModule } from "./modules/phone-verifications/phone-verifications.module";
 import { SchedulingModule } from "./modules/scheduling/scheduling.module";
 import { TicketingModule } from "./modules/ticketing/ticketing.module";
 import { UploadsModule } from "./modules/uploads/uploads.module";
@@ -59,6 +60,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
     AccessControlModule,
     ContestantsModule,
     NotificationsModule,
+    PhoneVerificationsModule,
     EventsModule,
     NominationsModule,
     UploadsModule,

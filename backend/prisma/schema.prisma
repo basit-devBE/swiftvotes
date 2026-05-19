@@ -91,6 +91,10 @@ enum TicketPaymentStatus {
   REFUNDED
 }
 
+enum PhoneVerificationPurpose {
+  JUNIPAY_COLLECTION
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -449,6 +453,23 @@ model IssuedTicket {
   @@index([eventId, status])
   @@index([orderId])
   @@index([ticketTypeId])
+}
+
+model PhoneVerificationChallenge {
+  id              String                   @id @default(cuid())
+  phone           String
+  normalizedPhone String
+  purpose         PhoneVerificationPurpose
+  codeHash        String
+  expiresAt       DateTime
+  verifiedAt      DateTime?
+  attemptCount    Int                      @default(0)
+  maxAttempts     Int                      @default(5)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([normalizedPhone, purpose, createdAt])
+  @@index([expiresAt])
 }
 
 model TicketPayment {

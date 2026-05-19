@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { ApiClientError } from "@/lib/api/client";
+import {
+  confirmPhoneVerification,
+  startPhoneVerification,
+} from "@/lib/api/events";
 import { castVote } from "@/lib/api/votes";
 import {
   ContestantResponse,
@@ -16,6 +20,7 @@ const inputClass =
   "mt-0 w-full rounded-xl border border-[#d6deeb] bg-white px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition";
 
 const QUANTITY_PRESETS = [1, 5, 10, 20, 50];
+const usePaystack = process.env.NEXT_PUBLIC_USE_PAYSTACK === "true";
 
 function formatPrice(minor: number, currency: string): string {
   if (minor === 0) return "Free";
@@ -53,6 +58,14 @@ export function VoteModal({
   const [customQuantity, setCustomQuantity] = useState<string>("");
   const [voterName, setVoterName] = useState<string>(user?.fullName ?? "");
   const [voterEmail, setVoterEmail] = useState<string>(user?.email ?? "");
+  const [voterPhone, setVoterPhone] = useState<string>("");
+  const [otpCode, setOtpCode] = useState<string>("");
+  const [verificationChallenge, setVerificationChallenge] = useState<{
+    challengeId: string;
+    maskedPhone: string;
+  } | null>(null);
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string>("");
   const [step, setStep] = useState<Step>("form");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -81,10 +94,19 @@ export function VoteModal({
     return (
       voterName.trim().length > 0 &&
       voterEmail.trim().length > 0 &&
+      (isFree || usePaystack || voterPhone.trim().length > 0) &&
       quantity >= 1 &&
       Number.isFinite(quantity)
     );
-  }, [voterName, voterEmail, quantity]);
+  }, [isFree, voterName, voterEmail, voterPhone, quantity]);
+
+  function resetPhoneVerification(nextPhone: string) {
+    setVoterPhone(nextPhone);
+    setOtpCode("");
+    setVerificationChallenge(null);
+    setVerifiedPhone(null);
+    setNotice("");
+  }
 
   async function onSubmit(event_: React.FormEvent) {
     event_.preventDefault();
@@ -92,8 +114,41 @@ export function VoteModal({
 
     setStep("submitting");
     setErrorMessage("");
+    setNotice("");
 
     try {
+      if (!isFree && !usePaystack) {
+        if (!verificationChallenge) {
+          const challenge = await startPhoneVerification({
+            phone: voterPhone.trim(),
+            purpose: "JUNIPAY_COLLECTION",
+          });
+          setVerificationChallenge({
+            challengeId: challenge.challengeId,
+            maskedPhone: challenge.maskedPhone,
+          });
+          setNotice(`Verification code sent to ${challenge.maskedPhone}.`);
+          setStep("form");
+          return;
+        }
+
+        if (!verifiedPhone) {
+          const result = await confirmPhoneVerification({
+            challengeId: verificationChallenge.challengeId,
+            code: otpCode,
+            purpose: "JUNIPAY_COLLECTION",
+          });
+          setVerifiedPhone(result.phone);
+          setNotice("Phone number verified. JuniPay payment collection will be connected here.");
+          setStep("form");
+          return;
+        }
+
+        setNotice("Phone number verified. Payment collection is paused until JuniPay is connected.");
+        setStep("form");
+        return;
+      }
+
       const result = await castVote(event.id, {
         contestantId: contestant.id,
         quantity: isFree ? 1 : quantity,
@@ -314,15 +369,71 @@ export function VoteModal({
                 </p>
               </div>
 
+              {!isFree && !usePaystack && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
+                      Mobile money phone
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      value={voterPhone}
+                      onChange={(e) => resetPhoneVerification(e.target.value)}
+                      className={inputClass}
+                      placeholder="0241234567"
+                      disabled={step === "submitting" || Boolean(verifiedPhone)}
+                    />
+                    <p className="mt-1.5 text-xs text-ink/40">
+                      We&apos;ll verify this number before starting JuniPay collection.
+                    </p>
+                  </div>
+
+                  {verificationChallenge && !verifiedPhone && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
+                        Verification code
+                      </label>
+                      <input
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                        className={`${inputClass} tracking-[0.24em]`}
+                        placeholder="123456"
+                        disabled={step === "submitting"}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
               {step === "error" && (
                 <div className="rounded-xl border border-[#f0cfd3] bg-[#fff2f4] px-4 py-3 text-sm text-[#b40f17]">
                   {errorMessage}
                 </div>
               )}
 
+              {notice && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {notice}
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={!canSubmit || step === "submitting"}
+                disabled={
+                  !canSubmit ||
+                  step === "submitting" ||
+                  (!isFree &&
+                    !usePaystack &&
+                    Boolean(verificationChallenge) &&
+                    !verifiedPhone &&
+                    otpCode.length !== 6)
+                }
                 className="button-primary mt-2 w-full disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {step === "submitting" ? (
@@ -335,8 +446,14 @@ export function VoteModal({
                   </span>
                 ) : isFree ? (
                   "Cast vote"
-                ) : (
+                ) : usePaystack ? (
                   `Pay ${formatPrice(totalMinor, category.currency)}`
+                ) : !verificationChallenge ? (
+                  "Send verification code"
+                ) : !verifiedPhone ? (
+                  "Verify phone number"
+                ) : (
+                  "Payment pending JuniPay"
                 )}
               </button>
             </form>

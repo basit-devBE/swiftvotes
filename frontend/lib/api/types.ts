@@ -184,6 +184,34 @@ export type CreateTicketOrderInput = {
   callbackOrigin?: string;
 };
 
+export type PhoneVerificationPurpose = "JUNIPAY_COLLECTION";
+
+export type StartPhoneVerificationInput = {
+  phone: string;
+  purpose: PhoneVerificationPurpose;
+};
+
+export type StartPhoneVerificationResponse = {
+  challengeId: string;
+  maskedPhone: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+};
+
+export type ConfirmPhoneVerificationInput = {
+  challengeId: string;
+  code: string;
+  purpose: PhoneVerificationPurpose;
+};
+
+export type ConfirmPhoneVerificationResponse = {
+  challengeId: string;
+  verified: true;
+  phone: string;
+  normalizedPhone: string;
+  verifiedAt: string;
+};
+
 export type TicketOrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED";
 
 export type TicketOrderItemResponse = {
