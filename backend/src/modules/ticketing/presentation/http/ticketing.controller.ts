@@ -130,6 +130,8 @@ export class TicketingController {
       buyerName: body.buyerName,
       buyerEmail: body.buyerEmail,
       buyerPhone: body.buyerPhone,
+      momoProvider: body.momoProvider,
+      phoneVerificationChallengeId: body.phoneVerificationChallengeId,
       callbackOrigin: body.callbackOrigin,
       ipAddress: request.ip ?? null,
     });

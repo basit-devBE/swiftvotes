@@ -2,6 +2,7 @@ import {
   IsEmail,
   IsInt,
   IsOptional,
+  IsIn,
   IsString,
   IsUrl,
   MaxLength,
@@ -26,4 +27,17 @@ export class CastVoteDto {
   @IsOptional()
   @IsUrl({ require_tld: false })
   callbackOrigin?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  voterPhone?: string;
+
+  @IsOptional()
+  @IsIn(["mtn", "vodafone", "airteltigo"])
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+
+  @IsOptional()
+  @IsString()
+  phoneVerificationChallengeId?: string;
 }

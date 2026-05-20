@@ -9,11 +9,12 @@ import {
   confirmPhoneVerification,
   startPhoneVerification,
 } from "@/lib/api/events";
-import { castVote } from "@/lib/api/votes";
+import { castVote, verifyVote } from "@/lib/api/votes";
 import {
   ContestantResponse,
   EventCategoryResponse,
   EventResponse,
+  VerifyVoteResponse,
 } from "@/lib/api/types";
 
 const inputClass =
@@ -21,6 +22,12 @@ const inputClass =
 
 const QUANTITY_PRESETS = [1, 5, 10, 20, 50];
 const usePaystack = process.env.NEXT_PUBLIC_USE_PAYSTACK === "true";
+type MomoProvider = "mtn" | "vodafone" | "airteltigo";
+const momoProviders: Array<{ value: MomoProvider; label: string }> = [
+  { value: "mtn", label: "MTN" },
+  { value: "vodafone", label: "Vodafone" },
+  { value: "airteltigo", label: "AirtelTigo" },
+];
 
 function formatPrice(minor: number, currency: string): string {
   if (minor === 0) return "Free";
@@ -44,7 +51,52 @@ type Props = {
   onVoteSuccess?: () => void;
 };
 
-type Step = "form" | "submitting" | "success" | "error";
+type Step =
+  | "form"
+  | "submitting"
+  | "payment_pending"
+  | "payment_failed"
+  | "success"
+  | "error";
+
+function StatusPill({
+  label,
+  state,
+}: {
+  label: string;
+  state: "idle" | "active" | "done";
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+        state === "done"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : state === "active"
+            ? "border-primary/20 bg-primary/8 text-primary"
+            : "border-[#d6deeb] bg-white text-ink/45"
+      }`}
+    >
+      {state === "done" ? (
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M9 12.75 11.25 15 15 9.75" />
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-7 9a7 7 0 1 1 14 0 7 7 0 0 1-14 0Z"
+          />
+        </svg>
+      ) : state === "active" ? (
+        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <span className="h-3.5 w-3.5 rounded-full border border-current/35" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export function VoteModal({
   event,
@@ -59,15 +111,22 @@ export function VoteModal({
   const [voterName, setVoterName] = useState<string>(user?.fullName ?? "");
   const [voterEmail, setVoterEmail] = useState<string>(user?.email ?? "");
   const [voterPhone, setVoterPhone] = useState<string>("");
+  const [momoProvider, setMomoProvider] = useState<MomoProvider>("mtn");
   const [otpCode, setOtpCode] = useState<string>("");
   const [verificationChallenge, setVerificationChallenge] = useState<{
     challengeId: string;
     maskedPhone: string;
   } | null>(null);
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
   const [notice, setNotice] = useState<string>("");
   const [step, setStep] = useState<Step>("form");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [paymentAttempts, setPaymentAttempts] = useState(0);
+  const [paymentCheckKey, setPaymentCheckKey] = useState(0);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [confirmedVote, setConfirmedVote] = useState<VerifyVoteResponse | null>(null);
 
   const isFree = category.votePriceMinor === 0;
   const totalMinor = quantity * category.votePriceMinor;
@@ -94,11 +153,12 @@ export function VoteModal({
     return (
       voterName.trim().length > 0 &&
       voterEmail.trim().length > 0 &&
-      (isFree || usePaystack || voterPhone.trim().length > 0) &&
+      (isFree || usePaystack || (voterPhone.trim().length > 0 && momoProvider)) &&
       quantity >= 1 &&
       Number.isFinite(quantity)
     );
-  }, [isFree, voterName, voterEmail, voterPhone, quantity]);
+  }, [isFree, voterName, voterEmail, voterPhone, momoProvider, quantity]);
+  const paymentRequestCompleted = step === "success";
 
   function resetPhoneVerification(nextPhone: string) {
     setVoterPhone(nextPhone);
@@ -106,6 +166,87 @@ export function VoteModal({
     setVerificationChallenge(null);
     setVerifiedPhone(null);
     setNotice("");
+    setPaymentReference(null);
+    setPaymentAttempts(0);
+    setConfirmedVote(null);
+  }
+
+  async function runPaymentStatusCheck(
+    reference: string,
+    signal: { cancelled: boolean },
+  ): Promise<"confirmed" | "failed" | "pending" | "error"> {
+    try {
+      const result = await verifyVote(event.id, reference);
+      if (signal.cancelled) return "error";
+      if (result.status === "CONFIRMED") {
+        setConfirmedVote(result);
+        setStep("success");
+        onVoteSuccess?.();
+        return "confirmed";
+      }
+      if (result.status === "FAILED") {
+        setErrorMessage("Payment was not confirmed, so no vote was recorded.");
+        setStep("payment_failed");
+        return "failed";
+      }
+      return "pending";
+    } catch (error) {
+      if (signal.cancelled) return "error";
+      setErrorMessage(
+        error instanceof ApiClientError
+          ? error.message
+          : "We couldn't confirm this payment yet.",
+      );
+      return "error";
+    }
+  }
+
+  useEffect(() => {
+    if (step !== "payment_pending" || !paymentReference || usePaystack) return;
+
+    const activeReference = paymentReference;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const maxAttempts = 8;
+
+    async function poll() {
+      attempts += 1;
+      setPaymentAttempts(attempts);
+      setIsCheckingPayment(true);
+
+      const outcome = await runPaymentStatusCheck(activeReference, { cancelled });
+      if (cancelled) return;
+
+      if (outcome === "confirmed" || outcome === "failed") {
+        setIsCheckingPayment(false);
+        return;
+      }
+
+      if (outcome === "pending" && attempts < maxAttempts) {
+        timeoutId = setTimeout(() => {
+          void poll();
+        }, 2200);
+        return;
+      }
+
+      setIsCheckingPayment(false);
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [event.id, onVoteSuccess, paymentCheckKey, paymentReference, step, usePaystack]);
+
+  async function handleCheckAgain() {
+    if (!paymentReference) return;
+    setErrorMessage("");
+    setNotice("");
+    setStep("payment_pending");
+    setPaymentCheckKey((current) => current + 1);
   }
 
   async function onSubmit(event_: React.FormEvent) {
@@ -117,6 +258,7 @@ export function VoteModal({
     setNotice("");
 
     try {
+      let verifiedPhoneForPayment = verifiedPhone;
       if (!isFree && !usePaystack) {
         if (!verificationChallenge) {
           const challenge = await startPhoneVerification({
@@ -132,21 +274,17 @@ export function VoteModal({
           return;
         }
 
-        if (!verifiedPhone) {
+        if (!verifiedPhoneForPayment) {
+          setIsVerifyingPhone(true);
           const result = await confirmPhoneVerification({
             challengeId: verificationChallenge.challengeId,
             code: otpCode,
             purpose: "JUNIPAY_COLLECTION",
           });
+          verifiedPhoneForPayment = result.phone;
           setVerifiedPhone(result.phone);
-          setNotice("Phone number verified. JuniPay payment collection will be connected here.");
-          setStep("form");
-          return;
+          setNotice("Phone verified. Requesting mobile money payment now.");
         }
-
-        setNotice("Phone number verified. Payment collection is paused until JuniPay is connected.");
-        setStep("form");
-        return;
       }
 
       const result = await castVote(event.id, {
@@ -154,6 +292,10 @@ export function VoteModal({
         quantity: isFree ? 1 : quantity,
         voterName: voterName.trim(),
         voterEmail: voterEmail.trim(),
+        voterPhone: !isFree && !usePaystack ? verifiedPhoneForPayment ?? voterPhone.trim() : undefined,
+        momoProvider: !isFree && !usePaystack ? momoProvider : undefined,
+        phoneVerificationChallengeId:
+          !isFree && !usePaystack ? verificationChallenge?.challengeId : undefined,
         callbackOrigin: window.location.origin,
       });
 
@@ -162,6 +304,16 @@ export function VoteModal({
         return;
       }
 
+      if (result.type === "payment" && !result.paymentUrl) {
+        setPaymentReference(result.reference);
+        setConfirmedVote(null);
+        setPaymentAttempts(0);
+        setNotice("");
+        setPaymentCheckKey((current) => current + 1);
+        setStep("payment_pending");
+        return;
+      }
+      setConfirmedVote(null);
       setStep("success");
       onVoteSuccess?.();
     } catch (err) {
@@ -185,6 +337,8 @@ export function VoteModal({
       } else {
         setErrorMessage("Something went wrong. Please try again.");
       }
+    } finally {
+      setIsVerifyingPhone(false);
     }
   }
 
@@ -251,33 +405,174 @@ export function VoteModal({
 
         {/* Body */}
         <div className="px-6 py-6">
-          {step === "success" ? (
+          {step === "success" || step === "payment_pending" || step === "payment_failed" ? (
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef9f2]">
-                <svg className="h-8 w-8 text-[#1b6f4b]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              <div
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                  step === "success"
+                    ? "bg-[#eef9f2]"
+                    : step === "payment_failed"
+                      ? "bg-[#fff2f4]"
+                      : "bg-primary/10"
+                }`}
+              >
+                <svg
+                  className={`h-8 w-8 ${
+                    step === "success"
+                      ? "text-[#1b6f4b]"
+                      : step === "payment_failed"
+                        ? "text-[#b40f17]"
+                        : "text-primary"
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  {step === "success" ? (
+                    <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  ) : step === "payment_failed" ? (
+                    <path d="M9.75 9.75 14.25 14.25M14.25 9.75 9.75 14.25M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  ) : (
+                    <path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2Zm1 5h-2v6l5 3 .9-1.7-3.9-2.3V7Z" />
+                  )}
                 </svg>
               </div>
               <div>
                 <p className="font-display text-xl font-semibold tracking-tight text-ink">
-                  Vote{!isFree && quantity > 1 ? "s" : ""} cast!
+                  {step === "success"
+                    ? "Voting confirmed"
+                    : step === "payment_failed"
+                      ? "Payment not confirmed"
+                      : isCheckingPayment
+                        ? "Checking your payment"
+                        : "Waiting for confirmation"}
                 </p>
                 <p className="mt-1 text-sm text-ink/55">
-                  {isFree ? 1 : quantity} vote{!isFree && quantity > 1 ? "s" : ""} for {contestant.name}.
+                  {step === "success"
+                    ? `${confirmedVote?.quantity ?? (isFree ? 1 : quantity)} vote${(confirmedVote?.quantity ?? (isFree ? 1 : quantity)) > 1 ? "s" : ""} for ${contestant.name} have been recorded successfully.`
+                    : step === "payment_failed"
+                      ? "The payment did not complete successfully, so your vote was not recorded."
+                      : isCheckingPayment
+                        ? "Approve the mobile money prompt on your phone. We are checking with JuniPay and will confirm the vote here."
+                        : "We have sent the payment prompt, but the vote is not confirmed yet."}
                 </p>
-                {!isFree && (
+                {step === "success" && !isFree && (
                   <p className="mt-1 text-sm text-ink/55">
                     A receipt is on its way to {voterEmail}.
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="button-primary mt-2"
-              >
-                Done
-              </button>
+
+              <div className="w-full rounded-2xl border border-ink/10 bg-[#f7f9fc] p-4 text-left">
+                <div className="flex flex-wrap gap-2">
+                  <StatusPill label="Prompt sent" state={paymentReference ? "done" : "idle"} />
+                  <StatusPill
+                    label="Payment verified"
+                    state={
+                      step === "success"
+                        ? "done"
+                        : isCheckingPayment
+                          ? "active"
+                          : step === "payment_failed"
+                            ? "idle"
+                            : "idle"
+                    }
+                  />
+                  <StatusPill
+                    label="Vote confirmed"
+                    state={step === "success" ? "done" : "idle"}
+                  />
+                </div>
+
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-ink/55">Contestant</dt>
+                    <dd className="font-semibold text-ink">{contestant.name}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-ink/55">Category</dt>
+                    <dd className="font-semibold text-ink">{category.name}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-ink/55">Votes</dt>
+                    <dd className="font-semibold text-ink">
+                      {confirmedVote?.quantity ?? (isFree ? 1 : quantity)}
+                    </dd>
+                  </div>
+                  {!isFree && (
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-ink/55">Amount</dt>
+                      <dd className="font-semibold text-ink">
+                        {formatPrice(confirmedVote?.amountMinor ?? totalMinor, category.currency)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+
+              {step === "payment_pending" && !isCheckingPayment && (
+                <p className="max-w-sm text-sm leading-6 text-ink/55">
+                  Approval may still be pending on the wallet. If you have already approved it, check again.
+                </p>
+              )}
+
+              {step === "payment_pending" && errorMessage && (
+                <div className="w-full rounded-xl border border-[#f0cfd3] bg-[#fff2f4] px-4 py-3 text-sm text-[#b40f17]">
+                  {errorMessage}
+                </div>
+              )}
+
+              <div className="mt-2 flex w-full flex-col gap-3">
+                {step === "success" ? (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="button-primary w-full"
+                  >
+                    Close
+                  </button>
+                ) : step === "payment_failed" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("form");
+                        setPaymentReference(null);
+                        setConfirmedVote(null);
+                      }}
+                      className="button-primary w-full"
+                    >
+                      Try again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="button-secondary w-full"
+                    >
+                      Close
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleCheckAgain()}
+                      disabled={isCheckingPayment}
+                      className="button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isCheckingPayment
+                        ? `Checking${paymentAttempts > 0 ? ` (${paymentAttempts})` : ""}...`
+                        : "Check status again"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="button-secondary w-full"
+                    >
+                      Close for now
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="flex flex-col gap-5">
@@ -371,6 +666,35 @@ export function VoteModal({
 
               {!isFree && !usePaystack && (
                 <>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusPill
+                      label="Code sent"
+                      state={verificationChallenge ? "done" : "idle"}
+                    />
+                    <StatusPill
+                      label="Phone verified"
+                      state={
+                        verifiedPhone
+                          ? "done"
+                          : isVerifyingPhone
+                            ? "active"
+                            : verificationChallenge
+                              ? "idle"
+                              : "idle"
+                      }
+                    />
+                    <StatusPill
+                      label="Payment request"
+                      state={
+                        paymentRequestCompleted
+                          ? "done"
+                          : step === "submitting" && Boolean(verifiedPhone)
+                            ? "active"
+                            : "idle"
+                      }
+                    />
+                  </div>
+
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
                       Mobile money phone
@@ -391,6 +715,29 @@ export function VoteModal({
                     </p>
                   </div>
 
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
+                      Network
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {momoProviders.map((provider) => (
+                        <button
+                          key={provider.value}
+                          type="button"
+                          onClick={() => setMomoProvider(provider.value)}
+                          disabled={step === "submitting" || Boolean(verifiedPhone)}
+                          className={`h-10 rounded-xl border text-xs font-semibold transition ${
+                            momoProvider === provider.value
+                              ? "border-primary bg-primary text-white"
+                              : "border-[#d6deeb] bg-white text-ink/70"
+                          }`}
+                        >
+                          {provider.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {verificationChallenge && !verifiedPhone && (
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-ink/40">
@@ -406,6 +753,12 @@ export function VoteModal({
                         placeholder="123456"
                         disabled={step === "submitting"}
                       />
+                    </div>
+                  )}
+
+                  {verifiedPhone && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      Phone number verified. Mobile money checkout is ready.
                     </div>
                   )}
                 </>
@@ -451,9 +804,9 @@ export function VoteModal({
                 ) : !verificationChallenge ? (
                   "Send verification code"
                 ) : !verifiedPhone ? (
-                  "Verify phone number"
+                  isVerifyingPhone ? "Verifying..." : "Verify and pay"
                 ) : (
-                  "Payment pending JuniPay"
+                  `Pay ${formatPrice(totalMinor, category.currency)}`
                 )}
               </button>
             </form>

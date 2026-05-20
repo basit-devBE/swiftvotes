@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ConfigType } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { appConfig } from "../../../../core/config/app.config";
 import { PrismaService } from "../../../../core/prisma/prisma.service";
@@ -19,6 +20,9 @@ import { EventsRepository } from "../../../events/application/ports/events.repos
 import { EventStatus } from "../../../events/domain/event-status";
 import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifications.tokens";
 import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
+import { JunipayService } from "../../../junipay/infrastructure/junipay.service";
+import { AssertPhoneVerificationUseCase } from "../../../phone-verifications/application/use-cases/assert-phone-verification.use-case";
+import { PhoneVerificationPurpose } from "../../../phone-verifications/domain/phone-verification-purpose";
 import { PaystackService } from "../../infrastructure/payments/paystack.service";
 import { Vote } from "../../domain/vote";
 import { VoteStatus } from "../../domain/vote-status";
@@ -34,6 +38,9 @@ export type CastVoteInput = {
   quantity: number;
   voterName: string;
   voterEmail: string;
+  voterPhone?: string;
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+  phoneVerificationChallengeId?: string;
   callbackOrigin?: string;
   ipAddress?: string | null;
 };
@@ -44,7 +51,7 @@ export type CastVoteResult =
       type: "payment";
       voteId: string;
       reference: string;
-      paymentUrl: string;
+      paymentUrl: string | null;
       quantity: number;
       amountMinor: number;
       currency: string;
@@ -66,6 +73,8 @@ export class CastVoteUseCase {
     @Inject(appConfig.KEY)
     private readonly app: ConfigType<typeof appConfig>,
     private readonly paystack: PaystackService,
+    private readonly junipay: JunipayService,
+    private readonly assertPhoneVerification: AssertPhoneVerificationUseCase,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -153,13 +162,106 @@ export class CastVoteUseCase {
       return { type: "free", vote };
     }
 
-    // Paid path — initialize a Paystack transaction, then create a Payment + Vote
-    // pair atomically so both rows always exist together.
+    // Paid path — create a Payment + Vote pair atomically so both rows always
+    // exist before asking the provider to collect from the user.
     const amountMinor = input.quantity * category.votePriceMinor;
     const callbackUrl = this.buildCallbackUrl({
       origin: input.callbackOrigin,
       eventId: event.id,
     });
+
+    if (!this.usePaystack()) {
+      if (!input.voterPhone || !input.momoProvider || !input.phoneVerificationChallengeId) {
+        throw new BadRequestException(
+          "Phone verification and mobile money provider are required.",
+        );
+      }
+      const verifiedPhone = await this.assertPhoneVerification.execute({
+        challengeId: input.phoneVerificationChallengeId,
+        phone: input.voterPhone,
+        purpose: PhoneVerificationPurpose.JUNIPAY_COLLECTION,
+      });
+      const reference = `swv_${randomUUID()}`;
+      const rawInitResponse: Prisma.InputJsonValue = {
+        reference,
+        provider: "junipay",
+        state: "local_pending",
+      };
+
+      const vote = await this.prisma.$transaction(async (tx) => {
+        const payment = await this.paymentsRepository.createPending(
+          {
+            reference,
+            amountMinor,
+            currency: category.currency,
+            voterEmail,
+            voterName,
+            customerIp: input.ipAddress ?? null,
+            eventId: event.id,
+            categoryId: category.id,
+            contestantId: contestant.id,
+            provider: "junipay",
+            channel: "mobile_money",
+            mobileNumber: verifiedPhone.normalizedPhone,
+            rawInitResponse,
+            metadata: {
+              purpose: "vote",
+              momoProvider: input.momoProvider,
+              phoneVerificationChallengeId: verifiedPhone.challengeId,
+            },
+          },
+          tx,
+        );
+
+        const createdVote = await this.votesRepository.create(
+          {
+            eventId: event.id,
+            categoryId: category.id,
+            contestantId: contestant.id,
+            voterName,
+            voterEmail,
+            quantity: input.quantity,
+            amountMinor,
+            currency: category.currency,
+            status: VoteStatus.PENDING_PAYMENT,
+            transactionRef: reference,
+            ipAddress: input.ipAddress ?? null,
+          },
+          tx,
+        );
+
+        await this.paymentsRepository.linkVote(payment.id, createdVote.id, tx);
+
+        return createdVote;
+      });
+
+      const init = await this.junipay.initializeMobileMoneyCollection({
+        reference,
+        phoneNumber: verifiedPhone.phone,
+        provider: input.momoProvider,
+        amountMinor,
+        currency: category.currency,
+        senderEmail: voterEmail,
+        description: `Vote for ${contestant.name} in ${event.name}`,
+        callbackUrl: this.buildJunipayCallbackUrl(),
+      });
+
+      await this.paymentsRepository.updateInitialization({
+        reference,
+        providerRef: init.providerRef,
+        rawInitResponse: init.raw as Prisma.InputJsonValue,
+      });
+
+      return {
+        type: "payment",
+        voteId: vote.id,
+        reference,
+        paymentUrl: null,
+        quantity: vote.quantity,
+        amountMinor: vote.amountMinor,
+        currency: vote.currency,
+      };
+    }
 
     const init = await this.paystack.initializeTransaction({
       email: voterEmail,
@@ -239,5 +341,13 @@ export class CastVoteUseCase {
     const url = new URL("/vote/callback", origin);
     url.searchParams.set("eventId", input.eventId);
     return url.toString();
+  }
+
+  private buildJunipayCallbackUrl(): string | null {
+    return process.env.JUNIPAY_CALLBACK_URL || null;
+  }
+
+  private usePaystack(): boolean {
+    return process.env.USE_PAYSTACK === "true";
   }
 }

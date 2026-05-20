@@ -22,6 +22,7 @@ import {
   RecordTicketWebhookEventInput,
   TicketingRepository,
   TicketPaymentWebhookEvent,
+  UpdateTicketPaymentInitializationInput,
   UpdateTicketTypeInput,
 } from "../../application/ports/ticketing.repository";
 import {
@@ -155,6 +156,10 @@ export class PrismaTicketingRepository implements TicketingRepository {
             buyerEmail: input.buyerEmail.trim().toLowerCase(),
             buyerName: input.buyerName,
             buyerPhone: input.buyerPhone ?? null,
+            provider: input.payment.provider ?? undefined,
+            providerRef: input.payment.providerRef ?? undefined,
+            channel: input.payment.channel ?? undefined,
+            mobileNumber: input.payment.mobileNumber ?? undefined,
             customerIp: input.payment.customerIp ?? null,
             rawInitResponse: input.payment.rawInitResponse ?? Prisma.JsonNull,
             metadata: input.payment.metadata ?? Prisma.JsonNull,
@@ -188,6 +193,22 @@ export class PrismaTicketingRepository implements TicketingRepository {
     });
     if (!payment) return null;
     return this.findOrderById(payment.orderId);
+  }
+
+  async updatePaymentInitialization(
+    input: UpdateTicketPaymentInitializationInput,
+  ): Promise<TicketPayment> {
+    const payment = await this.prisma.ticketPayment.update({
+      where: { reference: input.reference },
+      data: {
+        providerRef: input.providerRef ?? undefined,
+        rawInitResponse:
+          input.rawInitResponse !== undefined
+            ? input.rawInitResponse ?? Prisma.JsonNull
+            : undefined,
+      },
+    });
+    return this.toPaymentDomain(payment);
   }
 
   async markPaymentSucceededAndIssueTickets(

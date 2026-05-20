@@ -3,6 +3,8 @@ import { ConfigModule } from "@nestjs/config";
 
 import { appConfig } from "../../core/config/app.config";
 import { EventsModule } from "../events/events.module";
+import { JunipayModule } from "../junipay/junipay.module";
+import { PhoneVerificationsModule } from "../phone-verifications/phone-verifications.module";
 import { VotesModule } from "../votes/votes.module";
 import { ConfirmTicketOrderUseCase } from "./application/use-cases/confirm-ticket-order.use-case";
 import { CreateTicketOrderUseCase } from "./application/use-cases/create-ticket-order.use-case";
@@ -14,11 +16,22 @@ import { UpdateTicketTypeUseCase } from "./application/use-cases/update-ticket-t
 import { TICKETING_REPOSITORY } from "./application/ticketing.tokens";
 import { PrismaTicketingRepository } from "./infrastructure/persistence/prisma-ticketing.repository";
 import { TicketPaymentWebhooksController } from "./presentation/http/ticket-payment-webhooks.controller";
+import { JunipayWebhooksController } from "./presentation/http/junipay-webhooks.controller";
 import { TicketingController } from "./presentation/http/ticketing.controller";
 
 @Module({
-  imports: [ConfigModule.forFeature(appConfig), EventsModule, VotesModule],
-  controllers: [TicketingController, TicketPaymentWebhooksController],
+  imports: [
+    ConfigModule.forFeature(appConfig),
+    EventsModule,
+    VotesModule,
+    JunipayModule,
+    PhoneVerificationsModule,
+  ],
+  controllers: [
+    TicketingController,
+    TicketPaymentWebhooksController,
+    JunipayWebhooksController,
+  ],
   providers: [
     CreateTicketTypeUseCase,
     UpdateTicketTypeUseCase,

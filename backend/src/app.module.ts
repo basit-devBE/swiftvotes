@@ -8,6 +8,7 @@ import { appConfig } from "./core/config/app.config";
 import { authConfig } from "./core/config/auth.config";
 import { databaseConfig } from "./core/config/database.config";
 import { emailConfig } from "./core/config/email.config";
+import { junipayConfig } from "./core/config/junipay.config";
 import { validationSchema } from "./core/config/env.validation";
 import { paystackConfig } from "./core/config/paystack.config";
 import { smsConfig } from "./core/config/sms.config";
@@ -39,6 +40,7 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filter";
         authConfig,
         databaseConfig,
         emailConfig,
+        junipayConfig,
         paystackConfig,
         smsConfig,
         storageConfig,

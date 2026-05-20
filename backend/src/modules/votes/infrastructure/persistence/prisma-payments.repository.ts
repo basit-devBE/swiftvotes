@@ -24,6 +24,7 @@ import {
   PaymentWithFullContext,
   RecordWebhookEventInput,
   StatusBreakdownEntry,
+  UpdatePaymentInitializationInput,
 } from "../../application/ports/payments.repository";
 import { Payment, PaymentWebhookEvent } from "../../domain/payment";
 import { PaymentStatus } from "../../domain/payment-status";
@@ -49,6 +50,10 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
         eventId: input.eventId,
         categoryId: input.categoryId,
         contestantId: input.contestantId,
+        provider: input.provider ?? undefined,
+        providerRef: input.providerRef ?? undefined,
+        channel: input.channel ?? undefined,
+        mobileNumber: input.mobileNumber ?? undefined,
         rawInitResponse: input.rawInitResponse ?? Prisma.JsonNull,
         metadata: input.metadata ?? Prisma.JsonNull,
       },
@@ -61,6 +66,24 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
       where: { reference },
     });
     return payment ? this.toDomain(payment) : null;
+  }
+
+  async updateInitialization(
+    input: UpdatePaymentInitializationInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Payment> {
+    const client = tx ?? this.prisma;
+    const payment = await client.payment.update({
+      where: { reference: input.reference },
+      data: {
+        providerRef: input.providerRef ?? undefined,
+        rawInitResponse:
+          input.rawInitResponse !== undefined
+            ? input.rawInitResponse ?? Prisma.JsonNull
+            : undefined,
+      },
+    });
+    return this.toDomain(payment);
   }
 
   async linkVote(

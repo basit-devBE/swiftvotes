@@ -18,6 +18,16 @@ export type CreatePendingPaymentInput = {
 
   rawInitResponse?: Prisma.InputJsonValue | null;
   metadata?: Prisma.InputJsonValue | null;
+  provider?: string;
+  providerRef?: string | null;
+  channel?: string | null;
+  mobileNumber?: string | null;
+};
+
+export type UpdatePaymentInitializationInput = {
+  reference: string;
+  providerRef?: string | null;
+  rawInitResponse?: Prisma.InputJsonValue | null;
 };
 
 export type MarkPaymentSucceededInput = {
@@ -137,6 +147,11 @@ export interface PaymentsRepository {
   ): Promise<Payment>;
 
   findByReference(reference: string): Promise<Payment | null>;
+
+  updateInitialization(
+    input: UpdatePaymentInitializationInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Payment>;
 
   linkVote(
     paymentId: string,

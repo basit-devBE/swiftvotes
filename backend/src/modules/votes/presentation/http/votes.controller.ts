@@ -44,6 +44,9 @@ export class VotesController {
       voterName: body.voterName,
       voterEmail: body.voterEmail,
       callbackOrigin: body.callbackOrigin,
+      voterPhone: body.voterPhone,
+      momoProvider: body.momoProvider,
+      phoneVerificationChallengeId: body.phoneVerificationChallengeId,
       ipAddress: request.ip ?? null,
     });
     return CastVoteResponseDto.fromResult(result);

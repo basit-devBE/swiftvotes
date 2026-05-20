@@ -181,6 +181,8 @@ export type CreateTicketOrderInput = {
   buyerName: string;
   buyerEmail: string;
   buyerPhone?: string;
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+  phoneVerificationChallengeId?: string;
   callbackOrigin?: string;
 };
 
@@ -284,7 +286,7 @@ export type TicketOrderResponse = {
 export type CreateTicketOrderResponse = {
   order: TicketOrderResponse;
   reference: string;
-  paymentUrl: string;
+  paymentUrl: string | null;
 };
 
 export type NominationStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
@@ -380,6 +382,9 @@ export type CastVoteInput = {
   quantity: number;
   voterName: string;
   voterEmail: string;
+  voterPhone?: string;
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+  phoneVerificationChallengeId?: string;
   callbackOrigin?: string;
 };
 
