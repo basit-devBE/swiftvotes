@@ -7,7 +7,6 @@ import {
 
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
-import { EventType } from "../../../events/domain/event-type";
 import { TicketType } from "../../domain/ticket-type";
 import { TICKETING_REPOSITORY } from "../ticketing.tokens";
 import { TicketingRepository } from "../ports/ticketing.repository";
@@ -41,7 +40,7 @@ export class CreateTicketTypeUseCase {
       throw new NotFoundException("Event not found.");
     }
 
-    if (event.eventType !== EventType.TICKETING) {
+    if (!event.hasTicketing) {
       throw new BadRequestException("Ticket types can only be added to ticketing events.");
     }
 

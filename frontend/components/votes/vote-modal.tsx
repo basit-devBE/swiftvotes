@@ -9,6 +9,10 @@ import {
   confirmPhoneVerification,
   startPhoneVerification,
 } from "@/lib/api/events";
+import {
+  momoProviderPhoneMessage,
+  phoneMatchesMomoProvider,
+} from "@/lib/momo-phone";
 import { castVote, verifyVote } from "@/lib/api/votes";
 import {
   ContestantResponse,
@@ -159,6 +163,7 @@ export function VoteModal({
     );
   }, [isFree, voterName, voterEmail, voterPhone, momoProvider, quantity]);
   const paymentRequestCompleted = step === "success";
+  const phoneSelectionLocked = Boolean(verificationChallenge);
 
   function resetPhoneVerification(nextPhone: string) {
     setVoterPhone(nextPhone);
@@ -260,6 +265,12 @@ export function VoteModal({
     try {
       let verifiedPhoneForPayment = verifiedPhone;
       if (!isFree && !usePaystack) {
+        if (!phoneMatchesMomoProvider(voterPhone.trim(), momoProvider)) {
+          setStep("error");
+          setErrorMessage(momoProviderPhoneMessage(momoProvider));
+          return;
+        }
+
         if (!verificationChallenge) {
           const challenge = await startPhoneVerification({
             phone: voterPhone.trim(),
@@ -708,7 +719,7 @@ export function VoteModal({
                       onChange={(e) => resetPhoneVerification(e.target.value)}
                       className={inputClass}
                       placeholder="0241234567"
-                      disabled={step === "submitting" || Boolean(verifiedPhone)}
+                      disabled={step === "submitting" || phoneSelectionLocked}
                     />
                     <p className="mt-1.5 text-xs text-ink/40">
                       We&apos;ll verify this number before starting JuniPay collection.
@@ -725,7 +736,7 @@ export function VoteModal({
                           key={provider.value}
                           type="button"
                           onClick={() => setMomoProvider(provider.value)}
-                          disabled={step === "submitting" || Boolean(verifiedPhone)}
+                          disabled={step === "submitting" || phoneSelectionLocked}
                           className={`h-10 rounded-xl border text-xs font-semibold transition ${
                             momoProvider === provider.value
                               ? "border-primary bg-primary text-white"
@@ -754,6 +765,12 @@ export function VoteModal({
                         disabled={step === "submitting"}
                       />
                     </div>
+                  )}
+
+                  {verificationChallenge && (
+                    <p className="text-xs text-ink/45">
+                      Phone number and network are locked until this verification is completed.
+                    </p>
                   )}
 
                   {verifiedPhone && (

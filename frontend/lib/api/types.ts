@@ -73,6 +73,8 @@ export type EventResponse = {
   description: string;
   status: EventStatus;
   eventType: EventType;
+  hasVoting: boolean;
+  hasTicketing: boolean;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl: string | null;
@@ -115,6 +117,8 @@ export type CreateEventInput = {
   name: string;
   description: string;
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl?: string;

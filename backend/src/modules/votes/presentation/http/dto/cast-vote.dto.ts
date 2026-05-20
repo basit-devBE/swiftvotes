@@ -9,6 +9,8 @@ import {
   Min,
 } from "class-validator";
 
+import { IsMatchingMomoProviderPhone } from "../../../../../shared/validation/momo-provider-phone.validator";
+
 export class CastVoteDto {
   @IsString()
   contestantId!: string;
@@ -31,6 +33,7 @@ export class CastVoteDto {
   @IsOptional()
   @IsString()
   @MaxLength(30)
+  @IsMatchingMomoProviderPhone("momoProvider")
   voterPhone?: string;
 
   @IsOptional()

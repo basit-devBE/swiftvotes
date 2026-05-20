@@ -5,7 +5,7 @@ import {
   EventCategoryRecord,
   UpdateDraftEventRecord,
 } from "../ports/events.repository";
-import { EventType } from "../../domain/event-type";
+import { deriveEventCapabilities, EventType } from "../../domain/event-type";
 
 export const MIN_PAID_VOTE_PRICE_MINOR = 50;
 
@@ -49,6 +49,8 @@ function ensureCategorySet(categories: EventCategoryRecord[] | undefined): void 
 
 export function validateEventChronology(input: {
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   nominationStartAt?: Date | null;
   nominationEndAt?: Date | null;
   votingStartAt: Date;
@@ -58,7 +60,9 @@ export function validateEventChronology(input: {
   ticketSalesStartAt?: Date | null;
   ticketSalesEndAt?: Date | null;
 }): void {
-  if (input.eventType === EventType.TICKETING) {
+  const capabilities = deriveEventCapabilities(input);
+
+  if (capabilities.hasTicketing) {
     const eventStartAt = normalizeComparableDate(input.eventStartAt);
     const eventEndAt = normalizeComparableDate(input.eventEndAt);
     const ticketSalesStartAt = normalizeComparableDate(input.ticketSalesStartAt);
@@ -90,43 +94,55 @@ export function validateEventChronology(input: {
       );
     }
 
-    return;
   }
 
-  const nominationStartAt = normalizeComparableDate(input.nominationStartAt);
-  const nominationEndAt = normalizeComparableDate(input.nominationEndAt);
-  const votingStartAt = input.votingStartAt.getTime();
-  const votingEndAt = input.votingEndAt.getTime();
+  if (capabilities.hasVoting) {
+    const nominationStartAt = normalizeComparableDate(input.nominationStartAt);
+    const nominationEndAt = normalizeComparableDate(input.nominationEndAt);
+    const votingStartAt = input.votingStartAt.getTime();
+    const votingEndAt = input.votingEndAt.getTime();
 
-  if (nominationStartAt && nominationEndAt && nominationStartAt > nominationEndAt) {
-    throw new BadRequestException(
-      "Nomination start date cannot be after nomination end date.",
-    );
-  }
+    if (nominationStartAt && nominationEndAt && nominationStartAt > nominationEndAt) {
+      throw new BadRequestException(
+        "Nomination start date cannot be after nomination end date.",
+      );
+    }
 
-  if (nominationEndAt && nominationEndAt > votingStartAt) {
-    throw new BadRequestException(
-      "Nomination end date cannot be after voting start date.",
-    );
-  }
+    if (nominationEndAt && nominationEndAt > votingStartAt) {
+      throw new BadRequestException(
+        "Nomination end date cannot be after voting start date.",
+      );
+    }
 
-  if (votingStartAt >= votingEndAt) {
-    throw new BadRequestException(
-      "Voting start date must be before voting end date.",
-    );
+    if (votingStartAt >= votingEndAt) {
+      throw new BadRequestException(
+        "Voting start date must be before voting end date.",
+      );
+    }
   }
 }
 
 export function validateCreateEventInput(input: CreateDraftEventRecord): void {
-  if ((input.eventType ?? EventType.VOTING) === EventType.VOTING) {
+  const capabilities = deriveEventCapabilities(input);
+  if (!capabilities.hasVoting && !capabilities.hasTicketing) {
+    throw new BadRequestException(
+      "Enable at least one capability: voting or ticketing.",
+    );
+  }
+  if (capabilities.hasVoting) {
     ensureCategorySet(input.categories);
   }
-  validateEventChronology(input);
+  validateEventChronology({
+    ...input,
+    ...capabilities,
+  });
 }
 
 export function validateUpdateEventInput(
   existing: {
     eventType?: EventType;
+    hasVoting?: boolean;
+    hasTicketing?: boolean;
     nominationStartAt: Date | null;
     nominationEndAt: Date | null;
     votingStartAt: Date;
@@ -138,8 +154,20 @@ export function validateUpdateEventInput(
   },
   input: UpdateDraftEventRecord,
 ): void {
+  const capabilities = deriveEventCapabilities({
+    eventType: input.eventType ?? existing.eventType,
+    hasVoting: input.hasVoting ?? existing.hasVoting,
+    hasTicketing: input.hasTicketing ?? existing.hasTicketing,
+  });
+  if (!capabilities.hasVoting && !capabilities.hasTicketing) {
+    throw new BadRequestException(
+      "Enable at least one capability: voting or ticketing.",
+    );
+  }
+
   validateEventChronology({
     eventType: input.eventType ?? existing.eventType,
+    ...capabilities,
     nominationStartAt:
       input.nominationStartAt === undefined
         ? existing.nominationStartAt

@@ -28,6 +28,14 @@ export class CreateEventDto {
   @IsEnum(EventType)
   eventType?: EventType;
 
+  @IsOptional()
+  @IsBoolean()
+  hasVoting?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasTicketing?: boolean;
+
   @IsUrl()
   primaryFlyerUrl!: string;
 

@@ -13,7 +13,6 @@ import { appConfig } from "../../../../core/config/app.config";
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { EventStatus } from "../../../events/domain/event-status";
-import { EventType } from "../../../events/domain/event-type";
 import { JunipayService } from "../../../junipay/infrastructure/junipay.service";
 import { AssertPhoneVerificationUseCase } from "../../../phone-verifications/application/use-cases/assert-phone-verification.use-case";
 import { PhoneVerificationPurpose } from "../../../phone-verifications/domain/phone-verification-purpose";
@@ -43,6 +42,15 @@ export type CreateTicketOrderResult = {
   paymentUrl: string | null;
 };
 
+const TICKETING_ACTIVE_EVENT_STATUSES = new Set<EventStatus>([
+  EventStatus.APPROVED,
+  EventStatus.NOMINATIONS_OPEN,
+  EventStatus.NOMINATIONS_CLOSED,
+  EventStatus.VOTING_SCHEDULED,
+  EventStatus.VOTING_LIVE,
+  EventStatus.VOTING_CLOSED,
+]);
+
 @Injectable()
 export class CreateTicketOrderUseCase {
   constructor(
@@ -69,11 +77,11 @@ export class CreateTicketOrderUseCase {
       throw new NotFoundException("Event not found.");
     }
 
-    if (event.eventType !== EventType.TICKETING) {
+    if (!event.hasTicketing) {
       throw new BadRequestException("Tickets can only be bought for ticketing events.");
     }
 
-    if (event.status !== EventStatus.APPROVED) {
+    if (!TICKETING_ACTIVE_EVENT_STATUSES.has(event.status)) {
       throw new ConflictException("Ticket sales are not open for this event.");
     }
 

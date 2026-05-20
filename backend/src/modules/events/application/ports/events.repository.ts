@@ -19,6 +19,8 @@ export type CreateDraftEventRecord = {
   slug: string;
   description: string;
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl?: string | null;
@@ -43,6 +45,8 @@ export type UpdateDraftEventRecord = {
   name?: string;
   description?: string;
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   primaryFlyerUrl?: string;
   primaryFlyerKey?: string;
   bannerUrl?: string | null;

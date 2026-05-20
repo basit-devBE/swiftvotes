@@ -18,7 +18,11 @@ import {
 import { EventCategory } from "../../domain/event-category";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
-import { EventType } from "../../domain/event-type";
+import {
+  deriveEventCapabilities,
+  deriveLegacyEventType,
+  EventType,
+} from "../../domain/event-type";
 
 const EVENT_INCLUDE = {
   categories: {
@@ -35,6 +39,12 @@ export class PrismaEventsRepository implements EventsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async createDraftWithOwner(input: CreateDraftEventRecord): Promise<Event> {
+    const capabilities = deriveEventCapabilities({
+      eventType: input.eventType,
+      hasVoting: input.hasVoting,
+      hasTicketing: input.hasTicketing,
+    });
+
     const event = await this.prisma.$transaction(async (tx) => {
       const createdEvent = await tx.event.create({
         data: {
@@ -42,7 +52,9 @@ export class PrismaEventsRepository implements EventsRepository {
           name: input.name,
           slug: input.slug,
           description: input.description,
-          eventType: input.eventType ?? PrismaEventType.VOTING,
+          eventType: deriveLegacyEventType(capabilities) as PrismaEventType,
+          hasVoting: capabilities.hasVoting,
+          hasTicketing: capabilities.hasTicketing,
           primaryFlyerUrl: input.primaryFlyerUrl,
           primaryFlyerKey: input.primaryFlyerKey,
           bannerUrl: input.bannerUrl ?? null,
@@ -163,7 +175,7 @@ export class PrismaEventsRepository implements EventsRepository {
   async findLifecycleCandidates(): Promise<Event[]> {
     const events = await this.prisma.event.findMany({
       where: {
-        eventType: PrismaEventType.VOTING,
+        hasVoting: true,
         status: {
           in: [
             PrismaEventStatus.APPROVED,
@@ -190,12 +202,28 @@ export class PrismaEventsRepository implements EventsRepository {
   }
 
   async updateDraft(eventId: string, input: UpdateDraftEventRecord): Promise<Event> {
+    const hasCapabilityUpdate =
+      input.eventType !== undefined ||
+      input.hasVoting !== undefined ||
+      input.hasTicketing !== undefined;
+    const capabilities = hasCapabilityUpdate
+      ? deriveEventCapabilities({
+          eventType: input.eventType,
+          hasVoting: input.hasVoting,
+          hasTicketing: input.hasTicketing,
+        })
+      : null;
+
     const event = await this.prisma.event.update({
       where: { id: eventId },
       data: {
         name: input.name,
         description: input.description,
-        eventType: input.eventType,
+        eventType: capabilities
+          ? (deriveLegacyEventType(capabilities) as PrismaEventType)
+          : undefined,
+        hasVoting: capabilities?.hasVoting,
+        hasTicketing: capabilities?.hasTicketing,
         primaryFlyerUrl: input.primaryFlyerUrl,
         primaryFlyerKey: input.primaryFlyerKey,
         bannerUrl: input.bannerUrl,
@@ -325,6 +353,12 @@ export class PrismaEventsRepository implements EventsRepository {
   }
 
   private toDomainEvent(event: PrismaEventWithCategories): Event {
+    const capabilities = deriveEventCapabilities({
+      eventType: event.eventType as EventType,
+      hasVoting: event.hasVoting,
+      hasTicketing: event.hasTicketing,
+    });
+
     return {
       id: event.id,
       creatorUserId: event.creatorUserId,
@@ -332,7 +366,9 @@ export class PrismaEventsRepository implements EventsRepository {
       slug: event.slug,
       description: event.description,
       status: event.status as EventStatus,
-      eventType: event.eventType as EventType,
+      eventType: deriveLegacyEventType(capabilities),
+      hasVoting: capabilities.hasVoting,
+      hasTicketing: capabilities.hasTicketing,
       primaryFlyerUrl: event.primaryFlyerUrl,
       primaryFlyerKey: event.primaryFlyerKey,
       bannerUrl: event.bannerUrl,

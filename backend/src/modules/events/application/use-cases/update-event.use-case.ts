@@ -10,6 +10,7 @@ import { EventsRepository } from "../ports/events.repository";
 import { Event } from "../../domain/event";
 import { EventStatus } from "../../domain/event-status";
 import { EventType } from "../../domain/event-type";
+import { deriveEventCapabilities } from "../../domain/event-type";
 import { SystemRole } from "../../../users/domain/system-role";
 import { validateUpdateEventInput } from "./event-validation";
 
@@ -18,6 +19,8 @@ export type UpdateEventInput = {
   name?: string;
   description?: string;
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   primaryFlyerUrl?: string;
   primaryFlyerKey?: string;
   bannerUrl?: string | null;
@@ -65,6 +68,15 @@ export class UpdateEventUseCase {
 
     validateUpdateEventInput(event, input);
 
-    return this.eventsRepository.updateDraft(input.eventId, input);
+    const capabilities = deriveEventCapabilities({
+      eventType: input.eventType ?? event.eventType,
+      hasVoting: input.hasVoting ?? event.hasVoting,
+      hasTicketing: input.hasTicketing ?? event.hasTicketing,
+    });
+
+    return this.eventsRepository.updateDraft(input.eventId, {
+      ...input,
+      ...capabilities,
+    });
   }
 }

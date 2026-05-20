@@ -4,6 +4,7 @@ import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 import { Event } from "../../domain/event";
 import { EventType } from "../../domain/event-type";
+import { deriveEventCapabilities } from "../../domain/event-type";
 import { buildEventSlug } from "./build-event-slug";
 import { validateCreateEventInput } from "./event-validation";
 
@@ -12,6 +13,8 @@ export type CreateEventInput = {
   name: string;
   description: string;
   eventType?: EventType;
+  hasVoting?: boolean;
+  hasTicketing?: boolean;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl?: string | null;
@@ -49,14 +52,17 @@ export class CreateEventUseCase {
 
   async execute(input: CreateEventInput): Promise<Event> {
     const slug = buildEventSlug(input.name);
+    const capabilities = deriveEventCapabilities(input);
 
     validateCreateEventInput({
       ...input,
+      ...capabilities,
       slug,
     });
 
     return this.eventsRepository.createDraftWithOwner({
       ...input,
+      ...capabilities,
       slug,
     });
   }

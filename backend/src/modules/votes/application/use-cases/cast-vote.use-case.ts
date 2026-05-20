@@ -88,6 +88,10 @@ export class CastVoteUseCase {
       throw new NotFoundException("Event not found.");
     }
 
+    if (!event.hasVoting) {
+      throw new BadRequestException("Voting is not enabled for this event.");
+    }
+
     if (event.status !== EventStatus.VOTING_LIVE) {
       throw new ConflictException("Voting is not currently live for this event.");
     }

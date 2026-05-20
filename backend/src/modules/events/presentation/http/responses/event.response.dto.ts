@@ -9,6 +9,8 @@ export class EventResponseDto {
   description!: string;
   status!: string;
   eventType!: string;
+  hasVoting!: boolean;
+  hasTicketing!: boolean;
   primaryFlyerUrl!: string;
   primaryFlyerKey!: string;
   bannerUrl!: string | null;
@@ -45,6 +47,8 @@ export class EventResponseDto {
       description: event.description,
       status: event.status,
       eventType: event.eventType,
+      hasVoting: event.hasVoting,
+      hasTicketing: event.hasTicketing,
       primaryFlyerUrl: event.primaryFlyerUrl,
       primaryFlyerKey: event.primaryFlyerKey,
       bannerUrl: event.bannerUrl,
