@@ -4,12 +4,20 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "../../../core/prisma/prisma.service";
-import { PaystackService } from "../../votes/infrastructure/payments/paystack.service";
+import {
+  momoProviderPhoneMessage,
+  phoneMatchesMomoProvider,
+} from "../../../shared/validation/momo-phone";
 import { EventStatus } from "../../events/domain/event-status";
+import { JunipayService } from "../../junipay/infrastructure/junipay.service";
+import { ConfirmVoteUseCase } from "../../votes/application/use-cases/confirm-vote.use-case";
+import { Payment } from "../../votes/domain/payment";
 import { PaymentStatus } from "../../votes/domain/payment-status";
 import { VoteStatus } from "../../votes/domain/vote-status";
 import { PAYMENTS_REPOSITORY, VOTES_REPOSITORY } from "../../votes/application/votes.tokens";
@@ -17,22 +25,7 @@ import { PaymentsRepository } from "../../votes/application/ports/payments.repos
 import { VotesRepository } from "../../votes/application/ports/votes.repository";
 
 type UssdPayload = Record<string, unknown>;
-type MomoProvider = "mtn" | "vod" | "atl";
-
-const USSD_CONTINUABLE_CHARGE_STATUSES = new Set([
-  "pay_offline",
-  "pending",
-  "ongoing",
-  "success",
-]);
-
-const PAYSTACK_INPUT_REQUIRED_STATUSES = new Set([
-  "send_address",
-  "send_birthday",
-  "send_otp",
-  "send_phone",
-  "send_pin",
-]);
+type MomoProvider = "mtn" | "vodafone" | "airteltigo";
 
 type ResolvedContestant = {
   contestant: {
@@ -59,7 +52,8 @@ type ResolvedContestant = {
 export class UssdHooksService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly paystack: PaystackService,
+    private readonly junipay: JunipayService,
+    private readonly confirmVote: ConfirmVoteUseCase,
     @Inject(PAYMENTS_REPOSITORY)
     private readonly paymentsRepository: PaymentsRepository,
     @Inject(VOTES_REPOSITORY)
@@ -123,9 +117,11 @@ export class UssdHooksService {
         "momo_provider is required.",
       ),
     );
+    this.assertPhoneMatchesProvider(phone, provider);
     const amountMinor = resolved.quantity * resolved.category.votePriceMinor;
     const voterName = `USSD voter ${phone}`;
     const voterEmail = "basitmohammed362@gmail.com";
+    const normalizedPhone = this.toInternationalPhone(phone);
 
     if (amountMinor === 0) {
       const vote = await this.votesRepository.create({
@@ -147,7 +143,7 @@ export class UssdHooksService {
       };
     }
 
-    const reference = this.paystack.generateReference();
+    const reference = `swv_${randomUUID()}`;
     const metadata = {
       source: "ussd",
       ussdProvider: "arkesel",
@@ -157,106 +153,21 @@ export class UssdHooksService {
       network: this.getSessionValue(payload, "network") ?? null,
       mobileMoneyProvider: provider,
       phoneNumber: phone,
+      normalizedPhoneNumber: normalizedPhone,
       contestantCode: resolved.contestant.code,
+      contestantName: resolved.contestant.name,
       eventId: resolved.event.id,
+      eventName: resolved.event.name,
       categoryId: resolved.category.id,
+      categoryName: resolved.category.name,
       contestantId: resolved.contestant.id,
       quantity: resolved.quantity,
     };
 
-    const charge = await this.paystack.chargeMobileMoney({
-      email: voterEmail,
-      amountMinor,
-      currency: resolved.category.currency,
-      reference,
-      phone,
-      provider,
-      metadata,
-    });
-
-    const rawInitResponse: Prisma.InputJsonValue = {
-      reference: charge.reference,
-      status: charge.status,
-      displayText: charge.displayText,
-      raw: charge.raw as Prisma.InputJsonValue,
-    };
-    const chargeStatus = charge.status.toLowerCase();
-
-    if (chargeStatus === "failed" || chargeStatus === "timeout") {
-      await this.recordFailedPayment({
-        reference: charge.reference,
-        amountMinor,
-        currency: resolved.category.currency,
-        voterEmail,
-        voterName,
-        eventId: resolved.event.id,
-        categoryId: resolved.category.id,
-        contestantId: resolved.contestant.id,
-        rawInitResponse,
-        metadata: metadata as Prisma.InputJsonValue,
-        failureReason:
-          charge.displayText ?? "Paystack could not start the mobile money charge.",
-      });
-
-      return {
-        payment_message:
-          charge.displayText ??
-          "Payment could not be started. Check the MoMo number and network, then try again.",
-        payment_reference: charge.reference,
-        payment_status: PaymentStatus.FAILED,
-      };
-    }
-
-    if (PAYSTACK_INPUT_REQUIRED_STATUSES.has(chargeStatus)) {
-      await this.recordFailedPayment({
-        reference: charge.reference,
-        amountMinor,
-        currency: resolved.category.currency,
-        voterEmail,
-        voterName,
-        eventId: resolved.event.id,
-        categoryId: resolved.category.id,
-        contestantId: resolved.contestant.id,
-        rawInitResponse,
-        metadata: metadata as Prisma.InputJsonValue,
-        failureReason: `paystack:${chargeStatus}:unsupported-in-ussd`,
-      });
-
-      return {
-        payment_message:
-          "This MoMo option cannot complete in USSD. Please vote on the web or try another network.",
-        payment_reference: charge.reference,
-        payment_status: PaymentStatus.FAILED,
-      };
-    }
-
-    if (!USSD_CONTINUABLE_CHARGE_STATUSES.has(chargeStatus)) {
-      await this.recordFailedPayment({
-        reference: charge.reference,
-        amountMinor,
-        currency: resolved.category.currency,
-        voterEmail,
-        voterName,
-        eventId: resolved.event.id,
-        categoryId: resolved.category.id,
-        contestantId: resolved.contestant.id,
-        rawInitResponse,
-        metadata: metadata as Prisma.InputJsonValue,
-        failureReason: `paystack:${chargeStatus}:unsupported-status`,
-      });
-
-      return {
-        payment_message:
-          "MoMo payment could not start in USSD. Please vote on the web or try another network.",
-        payment_reference: charge.reference,
-        payment_status: PaymentStatus.FAILED,
-      };
-    }
-
-    await this.prisma.$transaction(async (tx) => {
+    const createdVote = await this.prisma.$transaction(async (tx) => {
       const payment = await this.paymentsRepository.createPending(
         {
-          reference: charge.reference,
+          reference,
           amountMinor,
           currency: resolved.category.currency,
           voterEmail,
@@ -264,7 +175,14 @@ export class UssdHooksService {
           eventId: resolved.event.id,
           categoryId: resolved.category.id,
           contestantId: resolved.contestant.id,
-          rawInitResponse,
+          provider: "junipay",
+          channel: "ussd",
+          mobileNumber: normalizedPhone,
+          rawInitResponse: {
+            reference,
+            provider: "junipay",
+            state: "local_pending",
+          },
           metadata: metadata as Prisma.InputJsonValue,
         },
         tx,
@@ -281,17 +199,63 @@ export class UssdHooksService {
           amountMinor,
           currency: resolved.category.currency,
           status: VoteStatus.PENDING_PAYMENT,
-          transactionRef: charge.reference,
+          transactionRef: reference,
         },
         tx,
       );
 
       await this.paymentsRepository.linkVote(payment.id, vote.id, tx);
+      return vote;
     });
 
+    try {
+      const init = await this.junipay.initializeMobileMoneyCollection({
+        reference,
+        phoneNumber: phone,
+        provider,
+        amountMinor,
+        currency: resolved.category.currency,
+        senderEmail: voterEmail,
+        description: `Vote for ${resolved.contestant.name} in ${resolved.event.name}`,
+        callbackUrl: process.env.JUNIPAY_CALLBACK_URL || null,
+      });
+
+      await this.paymentsRepository.updateInitialization({
+        reference,
+        providerRef: init.providerRef,
+        rawInitResponse: init.raw as Prisma.InputJsonValue,
+      });
+    } catch (error) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.paymentsRepository.markFailed(
+          {
+            reference,
+            failureReason:
+              error instanceof Error ? error.message : "JuniPay request failed.",
+            failedAt: new Date(),
+          },
+          tx,
+        );
+
+        const vote = await this.votesRepository.findByTransactionRef(reference);
+        if (vote ?? createdVote) {
+          await this.votesRepository.updateStatus(
+            (vote ?? createdVote).id,
+            VoteStatus.FAILED,
+            undefined,
+            tx,
+          );
+        }
+      });
+
+      throw new ServiceUnavailableException(
+        "Could not start mobile money payment.",
+      );
+    }
+
     return {
-      payment_message: `Request sent to ${phone}. Approve the MoMo prompt on your phone. Do not enter your PIN here.`,
-      payment_reference: charge.reference,
+      payment_message: `Payment request sent to ${phone}. Dial *170# and approve the request, or go to Approvals to approve it.`,
+      payment_reference: reference,
       payment_status: PaymentStatus.PENDING,
     };
   }
@@ -307,10 +271,17 @@ export class UssdHooksService {
       throw new NotFoundException("Payment reference was not found.");
     }
 
+    if (payment.provider === "junipay" && payment.status === PaymentStatus.PENDING) {
+      await this.confirmVote.execute(reference).catch(() => undefined);
+    }
+
+    const refreshedPayment =
+      (await this.paymentsRepository.findByReference(reference)) ?? payment;
+
     return {
-      payment_reference: payment.reference,
-      payment_status: payment.status,
-      payment_message: this.paymentStatusMessage(payment.status),
+      payment_reference: refreshedPayment.reference,
+      payment_status: refreshedPayment.status,
+      payment_message: this.paymentStatusMessage(refreshedPayment),
     };
   }
 
@@ -426,48 +397,6 @@ export class UssdHooksService {
     return value;
   }
 
-  private async recordFailedPayment(input: {
-    reference: string;
-    amountMinor: number;
-    currency: string;
-    voterEmail: string;
-    voterName: string;
-    eventId: string;
-    categoryId: string;
-    contestantId: string;
-    rawInitResponse: Prisma.InputJsonValue;
-    metadata: Prisma.InputJsonValue;
-    failureReason: string;
-  }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await this.paymentsRepository.createPending(
-        {
-          reference: input.reference,
-          amountMinor: input.amountMinor,
-          currency: input.currency,
-          voterEmail: input.voterEmail,
-          voterName: input.voterName,
-          eventId: input.eventId,
-          categoryId: input.categoryId,
-          contestantId: input.contestantId,
-          rawInitResponse: input.rawInitResponse,
-          metadata: input.metadata,
-        },
-        tx,
-      );
-
-      await this.paymentsRepository.markFailed(
-        {
-          reference: input.reference,
-          failureReason: input.failureReason,
-          failedAt: new Date(),
-          rawVerifyResponse: input.rawInitResponse,
-        },
-        tx,
-      );
-    });
-  }
-
   private parseQuantity(value: string): number {
     const quantity = Number.parseInt(value, 10);
     if (!Number.isInteger(quantity) || quantity < 1) {
@@ -483,12 +412,18 @@ export class UssdHooksService {
     const normalized = value.trim().toLowerCase();
     if (normalized === "1" || normalized.includes("mtn")) return "mtn";
     if (normalized === "2" || normalized.includes("vod") || normalized.includes("telecel")) {
-      return "vod";
+      return "vodafone";
     }
     if (normalized === "3" || normalized.includes("atl") || normalized.includes("airtel")) {
-      return "atl";
+      return "airteltigo";
     }
     throw new BadRequestException("Unsupported payment network.");
+  }
+
+  private assertPhoneMatchesProvider(phone: string, provider: MomoProvider): void {
+    if (!phoneMatchesMomoProvider(phone, provider)) {
+      throw new BadRequestException(momoProviderPhoneMessage(provider));
+    }
   }
 
   private toLocalPhone(value: string): string {
@@ -509,11 +444,28 @@ export class UssdHooksService {
     return `${currency} ${(minor / 100).toFixed(2)}`;
   }
 
-  private paymentStatusMessage(status: PaymentStatus): string {
-    if (status === PaymentStatus.SUCCEEDED) return "Payment confirmed. Your votes have been counted.";
-    if (status === PaymentStatus.FAILED) return "Payment failed. No votes were counted.";
-    if (status === PaymentStatus.ABANDONED) return "Payment was not completed. No votes were counted.";
-    if (status === PaymentStatus.REFUNDED) return "Payment was refunded.";
-    return "Payment is still pending. Approve the MoMo prompt or check again shortly.";
+  private paymentStatusMessage(payment: Payment): string {
+    const metadata =
+      payment?.metadata && typeof payment.metadata === "object"
+        ? (payment.metadata as Record<string, unknown>)
+        : null;
+    const contestantName =
+      metadata && typeof metadata.contestantName === "string"
+        ? metadata.contestantName
+        : "this contestant";
+    const quantity =
+      metadata && typeof metadata.quantity === "number"
+        ? metadata.quantity
+        : null;
+
+    if (payment?.status === PaymentStatus.SUCCEEDED) {
+      return quantity
+        ? `Payment confirmed. ${quantity} vote${quantity > 1 ? "s have" : " has"} been counted for ${contestantName}.`
+        : "Payment confirmed. Your votes have been counted.";
+    }
+    if (payment?.status === PaymentStatus.FAILED) return "Payment failed. No votes were counted.";
+    if (payment?.status === PaymentStatus.ABANDONED) return "Payment was not completed. No votes were counted.";
+    if (payment?.status === PaymentStatus.REFUNDED) return "Payment was refunded.";
+    return "Payment is still pending. Dial *170# and approve the request, or go to Approvals to approve it.";
   }
 }

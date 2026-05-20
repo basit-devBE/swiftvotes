@@ -49,6 +49,11 @@ import {
   UpdateContestantInput,
 } from "@/lib/api/types";
 import {
+  getEventModeLabel,
+  hasTicketingEnabled,
+  hasVotingEnabled,
+} from "@/lib/event-capabilities";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -582,7 +587,7 @@ function OverviewTab({
   togglingLeaderboard: boolean;
   togglingPublicLeaderboard: boolean;
 }) {
-  if (event.eventType === "TICKETING") {
+  if (hasTicketingEnabled(event) && !hasVotingEnabled(event)) {
     return <TicketingOverviewTab event={event} onOpenTickets={onOpenTickets} />;
   }
 
@@ -3013,14 +3018,17 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
-    ...(event.eventType === "TICKETING"
-      ? [{ key: "tickets" as const, label: "Tickets" }]
-      : [
+    ...(hasVotingEnabled(event)
+      ? [
           { key: "nominations" as const, label: "Nominations" },
           { key: "contestants" as const, label: "Contestants" },
           { key: "votes" as const, label: "Votes" },
           { key: "leaderboard" as const, label: "Leaderboard" },
-        ]),
+        ]
+      : []),
+    ...(hasTicketingEnabled(event)
+      ? [{ key: "tickets" as const, label: "Tickets" }]
+      : []),
   ];
 
   return (
@@ -3104,19 +3112,24 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
       {/* ── Quick stats ──────────────────────────────────────────────────── */}
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
-        {(event.eventType === "TICKETING"
-          ? [
-              { label: "Type", value: "Ticketing" },
-              { label: "Event date", value: formatDate(event.eventStartAt) },
-              { label: "Sales open", value: formatDate(event.ticketSalesStartAt) },
-              { label: "Sales close", value: formatDate(event.ticketSalesEndAt) },
-            ]
-          : [
-              { label: "Categories", value: String(event.categories.length) },
-              { label: "Voting starts", value: formatDate(event.votingStartAt) },
-              { label: "Nominations open", value: formatDate(event.nominationStartAt) },
-              { label: "Nominations close", value: formatDate(event.nominationEndAt) },
-            ]).map(({ label, value }) => (
+        {[
+          {
+            label: "Mode",
+            value: getEventModeLabel(event),
+          },
+          {
+            label: hasTicketingEnabled(event) ? "Event date" : "Voting starts",
+            value: formatDate(hasTicketingEnabled(event) ? event.eventStartAt : event.votingStartAt),
+          },
+          {
+            label: hasTicketingEnabled(event) ? "Sales open" : "Nominations open",
+            value: formatDate(hasTicketingEnabled(event) ? event.ticketSalesStartAt : event.nominationStartAt),
+          },
+          {
+            label: hasVotingEnabled(event) ? "Categories" : "Sales close",
+            value: hasVotingEnabled(event) ? String(event.categories.length) : formatDate(event.ticketSalesEndAt),
+          },
+        ].map(({ label, value }) => (
           <div
             key={label}
             className="rounded-[1.4rem] border border-white/80 bg-white/80 p-5 shadow-[0_10px_32px_-18px_rgba(7,17,31,0.18)]"

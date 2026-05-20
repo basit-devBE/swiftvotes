@@ -12,12 +12,18 @@ import {
   submitEvent,
   updateEvent,
 } from "@/lib/api/events";
-import { EventResponse, EventType } from "@/lib/api/types";
+import { EventResponse } from "@/lib/api/types";
 import {
   createEventBannerUploadIntent,
   createEventFlyerUploadIntent,
   uploadFileToSignedUrl,
 } from "@/lib/api/uploads";
+import {
+  deriveLegacyEventType,
+  getEventModeLabel,
+  hasTicketingEnabled,
+  hasVotingEnabled,
+} from "@/lib/event-capabilities";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types & helpers
@@ -58,18 +64,18 @@ type StepDefinition = {
 const MIN_PAID_VOTE_PRICE_MINOR = 50;
 const MIN_TICKET_PRICE_MINOR = 50;
 
-const VOTING_STEPS: StepDefinition[] = [
+const EVENT_STEPS: StepDefinition[] = [
   {
     key: "basics",
-    title: "Basic info",
-    subtitle: "Name & description",
+    title: "Event setup",
+    subtitle: "Identity & capabilities",
     description: "Set the identity of the event people will see first.",
   },
   {
     key: "schedule",
     title: "Schedule",
-    subtitle: "Voting timeline",
-    description: "Define when nominations and voting become available.",
+    subtitle: "Voting & sales dates",
+    description: "Define when voting, ticket sales, and event dates become available.",
   },
   {
     key: "media",
@@ -79,48 +85,15 @@ const VOTING_STEPS: StepDefinition[] = [
   },
   {
     key: "categories",
-    title: "Categories",
-    subtitle: "Voting tracks",
-    description: "Structure the ballot into clear categories and prices.",
+    title: "Offer setup",
+    subtitle: "Categories & tickets",
+    description: "Structure the voting categories and ticket tiers people can pay for.",
   },
   {
     key: "review",
     title: "Review",
     subtitle: "Confirm & submit",
     description: "Check readiness, save the draft, and send for approval.",
-  },
-];
-
-const TICKETING_STEPS: StepDefinition[] = [
-  {
-    key: "basics",
-    title: "Event details",
-    subtitle: "Name & description",
-    description: "Set the event identity buyers will see before choosing tickets.",
-  },
-  {
-    key: "schedule",
-    title: "Ticket schedule",
-    subtitle: "Event & sales dates",
-    description: "Set when the event happens and when paid ticket sales should open and close.",
-  },
-  {
-    key: "media",
-    title: "Event media",
-    subtitle: "Flyer & banner",
-    description: "Upload the artwork that will sell the event on public pages.",
-  },
-  {
-    key: "categories",
-    title: "Ticket setup",
-    subtitle: "Ticket tiers",
-    description: "Save the event first, then add Regular, VIP, Early Bird, or any other paid ticket types.",
-  },
-  {
-    key: "review",
-    title: "Review",
-    subtitle: "Confirm & submit",
-    description: "Check the ticketing event setup, save the draft, and submit it for approval.",
   },
 ];
 
@@ -313,8 +286,11 @@ export function EventEditor({
     ["DRAFT", "REJECTED"].includes(initialEvent?.status ?? "DRAFT");
 
   // Form state
-  const [eventType, setEventType] = useState<EventType>(
-    initialEvent?.eventType ?? "VOTING",
+  const [hasVoting, setHasVoting] = useState<boolean>(
+    initialEvent ? hasVotingEnabled(initialEvent) : true,
+  );
+  const [hasTicketing, setHasTicketing] = useState<boolean>(
+    initialEvent ? hasTicketingEnabled(initialEvent) : false,
   );
   const [name, setName] = useState(initialEvent?.name ?? "");
   const [description, setDescription] = useState(initialEvent?.description ?? "");
@@ -378,18 +354,14 @@ export function EventEditor({
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [savedDraft, setSavedDraft] = useState<EventResponse | null>(null);
 
-  const isTicketing = eventType === "TICKETING";
-  const steps = useMemo(
-    () => (isTicketing ? TICKETING_STEPS : VOTING_STEPS),
-    [isTicketing],
-  );
+  const eventModeLabel = getEventModeLabel({ hasVoting, hasTicketing });
+  const steps = EVENT_STEPS;
   const currentStep = steps[stepIndex] ?? steps[0];
   const isLastStep = stepIndex === steps.length - 1;
   const isFirstStep = stepIndex === 0;
   const progressPercent = ((stepIndex + 1) / steps.length) * 100;
   const CurrentStepIcon = stepIcons[currentStep.key];
   const minVotingDateTime = getCurrentDateTimeLocalValue();
-
   const pageHeading = useMemo(() => {
     if (!isUpdate) return "Create Event";
     if (adminMode) return "Edit Event";
@@ -403,6 +375,11 @@ export function EventEditor({
     ["DRAFT", "REJECTED"].includes(effectiveEvent?.status ?? "DRAFT") &&
     !isSaving;
 
+  const supportsVoting = hasVoting;
+  const supportsTicketing = hasTicketing;
+  const isVotingOnly = supportsVoting && !supportsTicketing;
+  const isTicketingOnly = supportsTicketing && !supportsVoting;
+  const isHybridEvent = supportsVoting && supportsTicketing;
   const hasValidTicketType = ticketTypes.some((ticketType) => {
     const priceMinor = toVotePriceMinor(ticketType.price);
     return (
@@ -415,45 +392,59 @@ export function EventEditor({
   const completedStepCount = useMemo(() => {
     let count = 0;
     if (name.trim() && description.trim()) count += 1;
-    if (isTicketing && !isUpdate) {
-      if (eventStartAt && ticketSalesStartAt && ticketSalesEndAt) count += 1;
-    } else if (votingStartAt && votingEndAt) count += 1;
+    if (
+      (!supportsVoting || (votingStartAt && votingEndAt)) &&
+      (!supportsTicketing || (eventStartAt && ticketSalesStartAt && ticketSalesEndAt))
+    ) count += 1;
     if (primaryFlyerUrl && primaryFlyerKey) count += 1;
-    if (isTicketing) {
-      if (hasValidTicketType) count += 1;
-    } else if (
+    if (
+      (!supportsVoting || (
       categories.length > 0 &&
       categories.every((category) => category.name.trim() && category.description.trim())
+      )) &&
+      (!supportsTicketing || hasValidTicketType)
     ) {
       count += 1;
     }
     if (
       name.trim() &&
       description.trim() &&
-      (isTicketing ? eventStartAt && ticketSalesStartAt && ticketSalesEndAt : votingStartAt && votingEndAt) &&
+      (!supportsVoting || (votingStartAt && votingEndAt)) &&
+      (!supportsTicketing || (eventStartAt && ticketSalesStartAt && ticketSalesEndAt)) &&
       primaryFlyerUrl &&
       primaryFlyerKey &&
-      (isTicketing ? hasValidTicketType : categories.length > 0)
+      (!supportsVoting || categories.length > 0) &&
+      (!supportsTicketing || hasValidTicketType)
     ) {
       count += 1;
     }
     return count;
-  }, [categories, description, eventStartAt, hasValidTicketType, isTicketing, name, primaryFlyerKey, primaryFlyerUrl, ticketSalesEndAt, ticketSalesStartAt, votingEndAt, votingStartAt]);
+  }, [categories, description, eventStartAt, hasValidTicketType, name, primaryFlyerKey, primaryFlyerUrl, supportsTicketing, supportsVoting, ticketSalesEndAt, ticketSalesStartAt, votingEndAt, votingStartAt]);
 
   const previewChecks = [
     { label: "Event identity", done: Boolean(name.trim() && description.trim()) },
     {
-      label: isTicketing ? "Ticketing schedule" : "Voting schedule",
-      done: isTicketing
-        ? Boolean(eventStartAt && ticketSalesStartAt && ticketSalesEndAt)
-        : Boolean(votingStartAt && votingEndAt),
+      label:
+        supportsVoting && supportsTicketing
+          ? "Voting and ticketing schedule"
+          : supportsTicketing
+            ? "Ticketing schedule"
+            : "Voting schedule",
+      done:
+        (!supportsVoting || Boolean(votingStartAt && votingEndAt)) &&
+        (!supportsTicketing || Boolean(eventStartAt && ticketSalesStartAt && ticketSalesEndAt)),
     },
     { label: "Primary flyer", done: Boolean(primaryFlyerUrl && primaryFlyerKey) },
     {
-      label: isTicketing ? "At least one ticket type" : "At least one category",
-      done: isTicketing
-        ? hasValidTicketType
-        : (categories.length > 0 && categories.some((category) => category.name.trim())),
+      label:
+        supportsVoting && supportsTicketing
+          ? "Categories and ticket types"
+          : supportsTicketing
+            ? "At least one ticket type"
+            : "At least one category",
+      done:
+        (!supportsVoting || (categories.length > 0 && categories.some((category) => category.name.trim()))) &&
+        (!supportsTicketing || hasValidTicketType),
     },
   ];
 
@@ -576,7 +567,7 @@ export function EventEditor({
     const ticketSalesEndDate = toValidDate(ticketSalesEndAt);
     const now = new Date();
 
-    if (isTicketing) {
+    if (supportsTicketing) {
       if (!ticketEventStartDate || !ticketSalesStartDate || !ticketSalesEndDate) {
         setError("Event date, ticket sales open date, and ticket sales close date are required.");
         return;
@@ -611,22 +602,24 @@ export function EventEditor({
         setError("Ticket sales close date cannot be after the event starts.");
         return;
       }
-    } else if (!votingStartDate || !votingEndDate) {
+    }
+
+    if (supportsVoting && (!votingStartDate || !votingEndDate)) {
       setError("Voting open and close dates are required.");
       return;
     }
 
-    if (!isTicketing && !adminMode && votingStartDate! < now) {
+    if (supportsVoting && !adminMode && votingStartDate! < now) {
       setError("Voting open date cannot be in the past.");
       return;
     }
 
-    if (!isTicketing && !adminMode && votingEndDate! < now) {
+    if (supportsVoting && !adminMode && votingEndDate! < now) {
       setError("Voting close date cannot be in the past.");
       return;
     }
 
-    if (!isTicketing && votingEndDate! <= votingStartDate!) {
+    if (supportsVoting && votingEndDate! <= votingStartDate!) {
       setError("Voting close date must be after the voting open date.");
       return;
     }
@@ -643,7 +636,7 @@ export function EventEditor({
       }))
       .filter((ticketType) => ticketType.name.trim() || ticketType.description.trim() || ticketType.price.trim());
 
-    if (isTicketing) {
+    if (supportsTicketing) {
       if (normalizedTicketTypes.length === 0) {
         setError("Add at least one ticket type before saving this ticketing event.");
         setStepIndex(steps.findIndex((step) => step.key === "categories"));
@@ -669,7 +662,7 @@ export function EventEditor({
       }
     }
 
-    const invalidPriceCategory = isTicketing ? undefined : categories.find((category) => {
+    const invalidPriceCategory = !supportsVoting ? undefined : categories.find((category) => {
       const minor = toVotePriceMinor(category.votePrice);
       return (
         !Number.isFinite(minor) ||
@@ -693,41 +686,46 @@ export function EventEditor({
       const eventPayload = {
         name,
         description,
-        eventType,
+        hasVoting: supportsVoting,
+        hasTicketing: supportsTicketing,
+        eventType: deriveLegacyEventType({
+          hasVoting: supportsVoting,
+          hasTicketing: supportsTicketing,
+        }),
         primaryFlyerUrl,
         primaryFlyerKey,
         bannerUrl: bannerUrl || undefined,
         bannerKey: bannerKey || undefined,
-        nominationStartAt: isTicketing ? undefined : toIsoOrUndefined(nominationStartAt),
-        nominationEndAt: isTicketing ? undefined : toIsoOrUndefined(nominationEndAt),
-        votingStartAt: isTicketing
-          ? (ticketSalesStartDate ?? new Date(getFallbackFutureDateTime(1))).toISOString()
-          : votingStartDate!.toISOString(),
-        votingEndAt: isTicketing
-          ? (ticketSalesEndDate ?? new Date(getFallbackFutureDateTime(2))).toISOString()
-          : votingEndDate!.toISOString(),
-        eventStartAt: ticketEventStartDate?.toISOString(),
-        eventEndAt: ticketEventEndDate?.toISOString(),
-        venueName: venueName.trim() || undefined,
-        venueAddress: venueAddress.trim() || undefined,
-        ticketSalesStartAt: ticketSalesStartDate?.toISOString(),
-        ticketSalesEndAt: ticketSalesEndDate?.toISOString(),
-        contestantsCanViewOwnVotes: isTicketing ? false : contestantsCanViewOwnVotes,
-        contestantsCanViewLeaderboard: isTicketing ? false : contestantsCanViewLeaderboard,
-        publicCanViewLeaderboard: isTicketing ? false : publicCanViewLeaderboard,
+        nominationStartAt: supportsVoting ? toIsoOrUndefined(nominationStartAt) : undefined,
+        nominationEndAt: supportsVoting ? toIsoOrUndefined(nominationEndAt) : undefined,
+        votingStartAt: supportsVoting
+          ? votingStartDate!.toISOString()
+          : (ticketSalesStartDate ?? new Date(getFallbackFutureDateTime(1))).toISOString(),
+        votingEndAt: supportsVoting
+          ? votingEndDate!.toISOString()
+          : (ticketSalesEndDate ?? new Date(getFallbackFutureDateTime(2))).toISOString(),
+        eventStartAt: supportsTicketing ? ticketEventStartDate?.toISOString() : undefined,
+        eventEndAt: supportsTicketing ? ticketEventEndDate?.toISOString() : undefined,
+        venueName: supportsTicketing ? venueName.trim() || undefined : undefined,
+        venueAddress: supportsTicketing ? venueAddress.trim() || undefined : undefined,
+        ticketSalesStartAt: supportsTicketing ? ticketSalesStartDate?.toISOString() : undefined,
+        ticketSalesEndAt: supportsTicketing ? ticketSalesEndDate?.toISOString() : undefined,
+        contestantsCanViewOwnVotes: supportsVoting ? contestantsCanViewOwnVotes : false,
+        contestantsCanViewLeaderboard: supportsVoting ? contestantsCanViewLeaderboard : false,
+        publicCanViewLeaderboard: supportsVoting ? publicCanViewLeaderboard : false,
       };
 
       const createPayload = {
         ...eventPayload,
-        categories: isTicketing
-          ? undefined
-          : categories.map((c, i) => ({
+        categories: supportsVoting
+          ? categories.map((c, i) => ({
               name: c.name,
               description: c.description,
               votePriceMinor: toVotePriceMinor(c.votePrice),
               currency: c.currency.trim().toUpperCase(),
               sortOrder: i,
-            })),
+            }))
+          : undefined,
       };
 
       if (isUpdate && initialEvent) {
@@ -740,7 +738,7 @@ export function EventEditor({
         router.refresh();
       } else {
         const created = await createEvent(createPayload);
-        if (isTicketing) {
+        if (supportsTicketing) {
           await Promise.all(
             normalizedTicketTypes.map((ticketType, index) =>
               createTicketType(created.id, {
@@ -810,13 +808,15 @@ export function EventEditor({
           <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#07111f]/62">
             {adminMode
               ? "Update public event details, scheduling, visibility, and media for this event regardless of its current status."
-              : isTicketing
-                ? "Add the public details, sales dates, venue information, and media that admins will review before ticket sales go live."
-                : "Add the public details, media, schedules, categories, and vote pricing that admins will review before approval."}
+              : isHybridEvent
+                ? "Set up both the public voting flow and the paid ticketing flow in one event before sending it for approval."
+                : isTicketingOnly
+                  ? "Add the public details, sales dates, venue information, and media that admins will review before ticket sales go live."
+                  : "Add the public details, media, schedules, categories, and vote pricing that admins will review before approval."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
-              {isTicketing ? "Ticketing setup" : "5-step setup"}
+              {eventModeLabel}
             </span>
             <span className="rounded-full border border-[#dce6f7] bg-white/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07111f]/58">
               {adminMode ? "Admin override" : "Approval-ready preview"}
@@ -992,69 +992,81 @@ export function EventEditor({
                       Identity
                     </p>
                     <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                      {isTicketing
-                        ? "Use the event name people already know, then describe the experience buyers are paying to attend."
-                        : "Use the event name people already know, then explain who can nominate, who can vote, and what the categories represent."}
+                      {isHybridEvent
+                        ? "Use the event name people already know, then explain both the live event experience and how voting works."
+                        : isTicketingOnly
+                          ? "Use the event name people already know, then describe the experience buyers are paying to attend."
+                          : "Use the event name people already know, then explain who can nominate, who can vote, and what the categories represent."}
                     </p>
                   </div>
                 </div>
                 <div className="space-y-5">
-                    {!isUpdate && (
-                      <Field label="Event type" required>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {[
-                            {
-                              key: "VOTING" as const,
-                              title: "Voting Event",
-                              text: "Pageantry, awards, contestants, categories, and votes.",
-                            },
-                            {
-                              key: "TICKETING" as const,
-                              title: "Ticketing Event",
-                              text: "Public event page with paid ticket tiers and sales tracking.",
-                            },
-                          ].map((option) => (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => setEventType(option.key)}
-                              disabled={!isEditable}
-                              className={`min-h-[112px] rounded-[20px] border p-4 text-left transition ${
-                                eventType === option.key
-                                  ? "border-[#0f4cdb]/40 bg-[#eef4ff] shadow-[0_14px_28px_-24px_rgba(15,76,219,0.6)]"
-                                  : "border-[#e4eaf4] bg-white hover:border-[#0f4cdb]/24"
-                              }`}
-                            >
-                              <span className="text-[13px] font-semibold text-[#07111f]">
-                                {option.title}
+                    <Field label="Capabilities" required>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          {
+                            key: "voting" as const,
+                            title: "Enable voting",
+                            text: "Categories, contestants, nominations, and paid or free votes.",
+                            active: supportsVoting,
+                            toggle: () => setHasVoting((current) => !current),
+                          },
+                          {
+                            key: "ticketing" as const,
+                            title: "Enable ticketing",
+                            text: "Paid ticket tiers, sales dates, buyer checkout, and order tracking.",
+                            active: supportsTicketing,
+                            toggle: () => setHasTicketing((current) => !current),
+                          },
+                        ].map((option) => (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={option.toggle}
+                            disabled={!isEditable}
+                            className={`min-h-[112px] rounded-[20px] border p-4 text-left transition ${
+                              option.active
+                                ? "border-[#0f4cdb]/40 bg-[#eef4ff] shadow-[0_14px_28px_-24px_rgba(15,76,219,0.6)]"
+                                : "border-[#e4eaf4] bg-white hover:border-[#0f4cdb]/24"
+                            }`}
+                          >
+                            <span className="flex items-center justify-between gap-3 text-[13px] font-semibold text-[#07111f]">
+                              {option.title}
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${option.active ? "bg-[#0f4cdb] text-white" : "bg-[#eef1f6] text-[#6b7485]"}`}>
+                                {option.active ? "On" : "Off"}
                               </span>
-                              <span className="mt-2 block text-[12px] leading-5 text-[#07111f]/56">
-                                {option.text}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </Field>
-                    )}
+                            </span>
+                            <span className="mt-2 block text-[12px] leading-5 text-[#07111f]/56">
+                              {option.text}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {!supportsVoting && !supportsTicketing ? (
+                        <p className="text-[12px] font-medium text-[#b40f17]">
+                          Turn on at least one capability before saving this event.
+                        </p>
+                      ) : null}
+                    </Field>
                     <Field label="Event name" required>
                       <input
                         className={inputCls}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder={isTicketing ? "Afro Night Live 2026" : "Campus Choice Awards 2026"}
+                        placeholder={supportsTicketing ? "Afro Night Live 2026" : "Campus Choice Awards 2026"}
                         disabled={!isEditable}
                       />
                     </Field>
                     <Field
                       label="Description"
                       required
-                      hint={isTicketing ? "Describe the event, venue experience, and who should attend." : "Describe the purpose, audience, and how voting will work."}
+                      hint={isHybridEvent ? "Describe the event, who should attend, and how the voting experience fits into it." : supportsTicketing ? "Describe the event, venue experience, and who should attend." : "Describe the purpose, audience, and how voting will work."}
                     >
                       <textarea
                         className={textareaCls}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder={isTicketing ? "Example: A live campus concert with regular and VIP ticket access." : "Example: Campus Choice Awards celebrates student leaders across fashion, talent, impact, and entertainment categories. Public voting opens after nominations are confirmed."}
+                        placeholder={isHybridEvent ? "Example: A live awards night with paid ticket access and public voting for selected categories." : supportsTicketing ? "Example: A live campus concert with regular and VIP ticket access." : "Example: Campus Choice Awards celebrates student leaders across fashion, talent, impact, and entertainment categories. Public voting opens after nominations are confirmed."}
                         disabled={!isEditable}
                       />
                     </Field>
@@ -1072,12 +1084,14 @@ export function EventEditor({
                     Timing
                   </p>
                   <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                    {isTicketing
-                      ? "Set when the event happens and when paid ticket sales should be open."
-                      : "Nominations are optional. Voting dates are required and should reflect the exact public window."}
+                    {isHybridEvent
+                      ? "Set both the voting window and the ticket sales window. Ticket sales should not extend beyond the event start."
+                      : isTicketingOnly
+                        ? "Set when the event happens and when paid ticket sales should be open."
+                        : "Nominations are optional. Voting dates are required and should reflect the exact public window."}
                   </p>
                 </div>
-                {isTicketing ? (
+                {supportsTicketing ? (
                   <div className="space-y-6">
                     <div className="grid gap-5 sm:grid-cols-2">
                       <Field label="Event starts" required>
@@ -1146,8 +1160,10 @@ export function EventEditor({
                       </Field>
                     </div>
                   </div>
-                ) : (
+                ) : null}
+                {supportsVoting ? (
                   <>
+                {supportsTicketing && <div className="my-6 h-px bg-[#eef1f6]" />}
                 <div className="mb-6 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[22px] border border-[#e8eef7] bg-white p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
@@ -1275,7 +1291,7 @@ export function EventEditor({
                   </div>
                 </div>
                 </>
-                )}
+                ) : null}
               </div>
             )}
 
@@ -1286,7 +1302,7 @@ export function EventEditor({
                     Visual assets
                   </p>
                   <p className="mt-2 text-[14px] leading-6 text-[#07111f]/58">
-                    {isTicketing
+                    {supportsTicketing
                       ? "The flyer appears in event listings and ticket pages. Add a banner when you have landscape artwork for the public event header."
                       : "The flyer appears in event listings and voting pages. Add a banner when you have landscape artwork for the public event header."}
                   </p>
@@ -1403,7 +1419,7 @@ export function EventEditor({
 
             {currentStep.key === "categories" && (
               <div className="rounded-[26px] border border-[#edf2f8] bg-[linear-gradient(180deg,#fbfcff_0%,#ffffff_100%)] p-5 sm:p-6">
-                {isTicketing ? (
+                {supportsTicketing ? (
                   <>
                     <div className="mb-6">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0f4cdb]">
@@ -1531,8 +1547,10 @@ export function EventEditor({
                       </>
                     )}
                   </>
-                ) : (
+                ) : null}
+                {supportsVoting ? (
                   <>
+                {supportsTicketing && <div className="my-6 h-px bg-[#eef1f6]" />}
                 <div className="mb-6">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0f4cdb]">
                     Ballot structure
@@ -1632,7 +1650,7 @@ export function EventEditor({
                   </button>
                 )}
                   </>
-                )}
+                ) : null}
               </div>
             )}
 
@@ -1694,7 +1712,7 @@ export function EventEditor({
 
                 <ReviewRow label="Event name" value={name || "—"} />
                 <ReviewRow label="Description" value={description || "—"} />
-                {isTicketing ? (
+                {supportsTicketing && (
                   <>
                     <ReviewRow
                       label="Event date"
@@ -1713,8 +1731,10 @@ export function EventEditor({
                       }
                     />
                   </>
-                ) : (
+                )}
+                {supportsVoting && (
                   <>
+                    {supportsTicketing && <div className="h-px bg-[#eef1f6]" />}
                     <ReviewRow
                       label="Nominations"
                       value={
@@ -1735,15 +1755,21 @@ export function EventEditor({
                 )}
                 <ReviewRow label="Primary flyer" value={primaryFlyerUrl ? "Uploaded" : "Missing"} valueTone={primaryFlyerUrl ? "default" : "warn"} />
                 <ReviewRow label="Banner" value={bannerUrl ? "Uploaded" : "Not set"} />
-                <div className="rounded-lg border border-[#eef1f6] bg-[#fafbfd] p-4">
-                  <p className="text-[12px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
-                    {isTicketing ? "Ticket setup" : `Categories (${categories.length})`}
-                  </p>
-                  {isTicketing ? (
+                {supportsTicketing && (
+                  <div className="rounded-lg border border-[#eef1f6] bg-[#fafbfd] p-4">
+                    <p className="text-[12px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
+                      Ticket setup
+                    </p>
                     <p className="mt-3 text-[13px] leading-5 text-[#07111f]/65">
                       {configuredTicketTypeCount} ticket type{configuredTicketTypeCount === 1 ? "" : "s"} configured before submission.
                     </p>
-                  ) : (
+                  </div>
+                )}
+                {supportsVoting && (
+                <div className="rounded-lg border border-[#eef1f6] bg-[#fafbfd] p-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-wider text-[#9aa4b6]">
+                    Categories ({categories.length})
+                  </p>
                     <ul className="mt-3 space-y-2">
                       {categories.map((c, i) => (
                         <li key={i} className="flex items-center justify-between gap-3 text-[13px]">
@@ -1756,8 +1782,8 @@ export function EventEditor({
                         </li>
                       ))}
                     </ul>
-                  )}
                 </div>
+                )}
               </div>
               </div>
             )}
@@ -1853,18 +1879,18 @@ export function EventEditor({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-[20px] bg-[#f7f9fd] px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
-                      {isTicketing ? "Type" : "Categories"}
+                      {isHybridEvent ? "Mode" : supportsTicketing ? "Type" : "Categories"}
                     </p>
                     <p className="mt-2 text-[1.35rem] font-semibold tracking-[-0.03em] text-[#07111f]">
-                      {isTicketing ? "Ticketing" : categories.length}
+                      {isHybridEvent ? "Hybrid" : supportsTicketing ? "Ticketing" : categories.length}
                     </p>
                   </div>
                   <div className="rounded-[20px] bg-[#f7f9fd] px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#07111f]/42">
-                      {isTicketing ? "Sales open" : "Voting opens"}
+                      {supportsTicketing ? "Sales open" : "Voting opens"}
                     </p>
                     <p className="mt-2 text-[13px] font-semibold leading-5 text-[#07111f]">
-                      {formatPreviewDate(isTicketing ? ticketSalesStartAt : votingStartAt)}
+                      {formatPreviewDate(supportsTicketing ? ticketSalesStartAt : votingStartAt)}
                     </p>
                   </div>
                 </div>
@@ -1921,24 +1947,24 @@ export function EventEditor({
                   <div className="mt-4 grid gap-3 rounded-[20px] bg-[#f7f9fd] p-4 text-[12px]">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-[#9aa4b6]">
-                        {isTicketing ? "Sales open" : "Voting opens"}
+                        {supportsTicketing ? "Sales open" : "Voting opens"}
                       </span>
                       <span className="font-semibold text-[#07111f]">
-                        {formatPreviewDate(isTicketing ? ticketSalesStartAt : votingStartAt)}
+                        {formatPreviewDate(supportsTicketing ? ticketSalesStartAt : votingStartAt)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-[#9aa4b6]">
-                        {isTicketing ? "Event date" : "Voting closes"}
+                        {supportsTicketing ? "Event date" : "Voting closes"}
                       </span>
                       <span className="font-semibold text-[#07111f]">
-                        {formatPreviewDate(isTicketing ? eventStartAt : votingEndAt)}
+                        {formatPreviewDate(supportsTicketing ? eventStartAt : votingEndAt)}
                       </span>
                     </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {(isTicketing ? ticketPreview : categoryPreview).map((category) => (
+                    {[...(supportsVoting ? categoryPreview : []), ...(supportsTicketing ? ticketPreview : [])].slice(0, 4).map((category) => (
                       <span
                         key={category}
                         className="rounded-full border border-[#dbe5f5] bg-white px-3 py-1 text-[11px] font-semibold text-[#07111f]/66"
@@ -1946,7 +1972,7 @@ export function EventEditor({
                         {category}
                       </span>
                     ))}
-                    {!isTicketing && categories.length > 3 && (
+                    {supportsVoting && categories.length > 3 && (
                       <span className="rounded-full border border-[#dbe5f5] bg-white px-3 py-1 text-[11px] font-semibold text-[#0f4cdb]">
                         +{categories.length - 3} more
                       </span>

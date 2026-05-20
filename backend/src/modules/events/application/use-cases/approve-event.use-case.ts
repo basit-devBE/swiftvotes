@@ -12,7 +12,6 @@ import { NotificationsService } from "../../../notifications/application/ports/n
 import { Event } from "../../domain/event";
 import { determineEventStatusForTimestamp } from "../../domain/event-lifecycle";
 import { EventStatus } from "../../domain/event-status";
-import { EventType } from "../../domain/event-type";
 import { EVENTS_REPOSITORY } from "../events.tokens";
 import { EventsRepository } from "../ports/events.repository";
 
@@ -43,7 +42,7 @@ export class ApproveEventUseCase {
       );
     }
 
-    if (event.eventType === EventType.TICKETING) {
+    if (event.hasTicketing) {
       const ticketTypeCount = await this.eventsRepository.countActiveTicketTypes(
         input.eventId,
       );
@@ -58,7 +57,7 @@ export class ApproveEventUseCase {
     const nextStatus = determineEventStatusForTimestamp(
       {
         approvedAt,
-        eventType: event.eventType,
+        hasVoting: event.hasVoting,
         nominationStartAt: event.nominationStartAt,
         nominationEndAt: event.nominationEndAt,
         votingStartAt: event.votingStartAt,

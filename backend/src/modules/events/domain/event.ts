@@ -10,6 +10,8 @@ export type Event = {
   description: string;
   status: EventStatus;
   eventType: EventType;
+  hasVoting: boolean;
+  hasTicketing: boolean;
   primaryFlyerUrl: string;
   primaryFlyerKey: string;
   bannerUrl: string | null;

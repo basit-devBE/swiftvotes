@@ -18,9 +18,18 @@ import {
 import {
   ContestantResponse,
   EventCategoryResponse,
+  EventStatus,
   EventResponse,
   TicketTypeResponse,
 } from "@/lib/api/types";
+import {
+  momoProviderPhoneMessage,
+  phoneMatchesMomoProvider,
+} from "@/lib/momo-phone";
+import {
+  hasTicketingEnabled,
+  hasVotingEnabled,
+} from "@/lib/event-capabilities";
 import { PublicLeaderboard } from "@/components/votes/public-leaderboard";
 import { VoteModal } from "@/components/votes/vote-modal";
 import { NominationForm, StatusBanner } from "./nomination-form";
@@ -118,7 +127,16 @@ function getTicketSalesState(event: EventResponse): {
   isOpen: boolean;
   message: string;
 } {
-  if (event.status !== "APPROVED") {
+  if (
+    ![
+      "APPROVED",
+      "NOMINATIONS_OPEN",
+      "NOMINATIONS_CLOSED",
+      "VOTING_SCHEDULED",
+      "VOTING_LIVE",
+      "VOTING_CLOSED",
+    ].includes(event.status)
+  ) {
     return {
       isOpen: false,
       message: "Ticket sales will open after this event is approved.",
@@ -331,6 +349,7 @@ function TicketCheckoutPanel({
   );
   const currency = selectedItems[0]?.ticketType.currency ?? ticketTypes[0]?.currency ?? "GHS";
   const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const phoneSelectionLocked = Boolean(verificationChallenge);
 
   function setQuantity(ticketType: TicketTypeResponse, nextQuantity: number) {
     const remaining =
@@ -371,6 +390,10 @@ function TicketCheckoutPanel({
     }
     if (!usePaystack && !buyerPhone.trim()) {
       setError("Enter the mobile money phone number to verify.");
+      return false;
+    }
+    if (!usePaystack && !phoneMatchesMomoProvider(buyerPhone.trim(), momoProvider)) {
+      setError(momoProviderPhoneMessage(momoProvider));
       return false;
     }
     return true;
@@ -590,7 +613,7 @@ function TicketCheckoutPanel({
                 className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
                 value={buyerPhone}
                 onChange={(inputEvent) => resetPhoneVerification(inputEvent.target.value)}
-                disabled={!salesState.isOpen || isSubmitting || Boolean(verifiedPhone)}
+                disabled={!salesState.isOpen || isSubmitting || phoneSelectionLocked}
                 placeholder="0241234567"
               />
             </label>
@@ -622,7 +645,7 @@ function TicketCheckoutPanel({
                     key={provider.value}
                     type="button"
                     onClick={() => setMomoProvider(provider.value)}
-                    disabled={!salesState.isOpen || isSubmitting || Boolean(verifiedPhone)}
+                    disabled={!salesState.isOpen || isSubmitting || phoneSelectionLocked}
                     className={`h-10 rounded-xl border text-xs font-semibold transition ${
                       momoProvider === provider.value
                         ? "border-primary bg-primary text-white"
@@ -634,6 +657,11 @@ function TicketCheckoutPanel({
                 ))}
               </div>
             </div>
+            {verificationChallenge ? (
+              <p className="text-xs text-ink/45">
+                Phone number and network are locked until this verification is completed.
+              </p>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -707,9 +735,10 @@ export function PublicEventView({ eventId }: { eventId: string }) {
       try {
         const result = await getEvent(eventId);
         const [contestantList, ticketTypeList] =
-          result.eventType === "TICKETING"
-            ? [[], await listTicketTypes(eventId)]
-            : [await listContestants(eventId), []];
+          await Promise.all([
+            hasVotingEnabled(result) ? listContestants(eventId) : Promise.resolve([]),
+            hasTicketingEnabled(result) ? listTicketTypes(eventId) : Promise.resolve([]),
+          ]);
         if (!cancelled) {
           setEvent(result);
           setContestants(contestantList);
@@ -756,8 +785,10 @@ export function PublicEventView({ eventId }: { eventId: string }) {
   }
 
   const isOwner = user?.id === event.creatorUserId;
+  const supportsVoting = hasVotingEnabled(event);
+  const supportsTicketing = hasTicketingEnabled(event);
   const nominationsOpen = event.status === "NOMINATIONS_OPEN";
-  const votingLive = event.status === "VOTING_LIVE";
+  const votingLive = supportsVoting && event.status === "VOTING_LIVE";
 
   const showLeaderboard =
     event.publicCanViewLeaderboard &&
@@ -848,7 +879,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
     </div>
   );
 
-  if (event.eventType === "TICKETING") {
+  if (supportsTicketing && !supportsVoting) {
     const hasTicketTypes = ticketTypes.length > 0;
 
     return (
@@ -1014,6 +1045,50 @@ export function PublicEventView({ eventId }: { eventId: string }) {
           <EventDetails event={event} />
         </section>
 
+        {supportsTicketing && (
+          <section className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                Tickets
+              </p>
+              {ticketTypes.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {ticketTypes.map((ticketType) => (
+                    <div
+                      key={ticketType.id}
+                      className="rounded-[1.25rem] border border-[#edf0f6] bg-[#f7f9fc] p-5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+                            {ticketType.name}
+                          </p>
+                          {ticketType.description && (
+                            <p className="mt-1 text-sm leading-6 text-ink/50">
+                              {ticketType.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 rounded-full border border-primary/16 bg-white px-3 py-1 text-xs font-semibold text-primary">
+                          {formatCurrency(ticketType.priceMinor, ticketType.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-primary/16 bg-[#f7f9fc] p-6 text-sm text-ink/52">
+                  Ticket types are being prepared by the organiser.
+                </div>
+              )}
+            </div>
+
+            <aside className="lg:sticky lg:top-8 lg:self-start">
+              <TicketCheckoutPanel event={event} ticketTypes={ticketTypes} />
+            </aside>
+          </section>
+        )}
+
         {/* Vote modal */}
         {votingContestant && votingCategory && (
           <VoteModal
@@ -1055,10 +1130,22 @@ export function PublicEventView({ eventId }: { eventId: string }) {
             </p>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               {[
-                { label: "Nominations open", value: formatDate(event.nominationStartAt) },
-                { label: "Nominations close", value: formatDate(event.nominationEndAt) },
-                { label: "Voting starts", value: formatDate(event.votingStartAt) },
-                { label: "Voting ends", value: formatDate(event.votingEndAt) },
+                ...(supportsVoting
+                  ? [
+                      { label: "Nominations open", value: formatDate(event.nominationStartAt) },
+                      { label: "Nominations close", value: formatDate(event.nominationEndAt) },
+                      { label: "Voting starts", value: formatDate(event.votingStartAt) },
+                      { label: "Voting ends", value: formatDate(event.votingEndAt) },
+                    ]
+                  : []),
+                ...(supportsTicketing
+                  ? [
+                      { label: "Sales open", value: formatDate(event.ticketSalesStartAt) },
+                      { label: "Sales close", value: formatDate(event.ticketSalesEndAt) },
+                      { label: "Event starts", value: formatDate(event.eventStartAt) },
+                      { label: "Event ends", value: formatDate(event.eventEndAt) },
+                    ]
+                  : []),
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-[#f7f9fc] px-4 py-3">
                   <dt className="text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-ink/36">
@@ -1070,6 +1157,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
             </dl>
           </div>
 
+          {supportsVoting && (
           <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
               Categories
@@ -1093,8 +1181,9 @@ export function PublicEventView({ eventId }: { eventId: string }) {
               ))}
             </div>
           </div>
+          )}
 
-          {contestants.length > 0 && (
+          {supportsVoting && contestants.length > 0 && (
             <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
               <div className="flex items-baseline gap-3">
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
@@ -1138,12 +1227,55 @@ export function PublicEventView({ eventId }: { eventId: string }) {
             </div>
           )}
 
-          {showLeaderboard && (
+          {supportsVoting && showLeaderboard && (
             <PublicLeaderboard eventId={event.id} refreshKey={leaderboardVersion} />
+          )}
+
+          {supportsTicketing && (
+            <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-7 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.12)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
+                Tickets
+              </p>
+              {ticketTypes.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {ticketTypes.map((ticketType) => (
+                    <div
+                      key={ticketType.id}
+                      className="rounded-[1.25rem] border border-[#edf0f6] bg-[#f7f9fc] p-5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-display text-xl font-semibold tracking-[-0.03em] text-ink">
+                            {ticketType.name}
+                          </p>
+                          {ticketType.description && (
+                            <p className="mt-1 text-sm leading-6 text-ink/50">
+                              {ticketType.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 rounded-full border border-primary/16 bg-white px-3 py-1 text-xs font-semibold text-primary">
+                          {formatCurrency(ticketType.priceMinor, ticketType.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-primary/16 bg-[#f7f9fc] p-6 text-sm text-ink/52">
+                  Ticket types are being prepared by the organiser.
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         <aside className="lg:sticky lg:top-8 lg:self-start">
+          <div className="space-y-6">
+          {supportsTicketing && (
+            <TicketCheckoutPanel event={event} ticketTypes={ticketTypes} />
+          )}
+          {supportsVoting && (
           <div className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-7 shadow-[0_16px_48px_-24px_rgba(7,17,31,0.18)]">
             <p className="font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
               {nominationsOpen ? "Submit a nomination" : "Nominations"}
@@ -1157,10 +1289,12 @@ export function PublicEventView({ eventId }: { eventId: string }) {
               {nominationsOpen ? <NominationForm event={event} /> : <StatusBanner event={event} />}
             </div>
           </div>
+          )}
+          </div>
         </aside>
       </div>
 
-      {votingContestant && votingCategory && (
+      {supportsVoting && votingContestant && votingCategory && (
         <VoteModal
           event={event}
           contestant={votingContestant}

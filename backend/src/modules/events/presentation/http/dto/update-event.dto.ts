@@ -26,6 +26,14 @@ export class UpdateEventDto {
   eventType?: EventType;
 
   @IsOptional()
+  @IsBoolean()
+  hasVoting?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasTicketing?: boolean;
+
+  @IsOptional()
   @IsUrl()
   primaryFlyerUrl?: string;
 

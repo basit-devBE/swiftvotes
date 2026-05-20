@@ -8,6 +8,12 @@ import { AppLoadingState } from "@/components/app-loading-state";
 import { ApiClientError } from "@/lib/api/client";
 import { listApprovedEvents } from "@/lib/api/events";
 import { EventResponse, EventStatus } from "@/lib/api/types";
+import {
+  getEventModeLabel,
+  getEventModeSearchTokens,
+  hasTicketingEnabled,
+  hasVotingEnabled,
+} from "@/lib/event-capabilities";
 
 const STATUS_OPTIONS: Array<"all" | EventStatus> = [
   "all",
@@ -52,7 +58,7 @@ function eventMatches(event: EventResponse, query: string, status: "all" | Event
     event.name,
     event.description,
     event.status,
-    event.eventType,
+    ...getEventModeSearchTokens(event),
     event.venueName ?? "",
     event.venueAddress ?? "",
     ...event.categories.map((category) => category.name),
@@ -104,8 +110,8 @@ export function PublicEventsView() {
   const remaining = featured
     ? filteredEvents.filter((event) => event.id !== featured.id)
     : filteredEvents;
-  const ticketingCount = events.filter((event) => event.eventType === "TICKETING").length;
-  const votingCount = events.filter((event) => event.eventType === "VOTING").length;
+  const ticketingCount = events.filter((event) => hasTicketingEnabled(event)).length;
+  const votingCount = events.filter((event) => hasVotingEnabled(event)).length;
 
   return (
     <div className="mx-auto max-w-[1320px] pb-16">
@@ -152,10 +158,16 @@ export function PublicEventsView() {
                     {featured.name}
                   </h2>
                   <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-white/72">
-                    <span>{featured.eventType === "TICKETING" ? "Ticketing event" : `${featured.categories.length} categories`}</span>
+                    <span>
+                      {hasTicketingEnabled(featured) && !hasVotingEnabled(featured)
+                        ? "Ticketing event"
+                        : hasVotingEnabled(featured) && hasTicketingEnabled(featured)
+                          ? `${featured.categories.length} categories + ticket sales`
+                          : `${featured.categories.length} categories`}
+                    </span>
                     <span>/</span>
                     <span>
-                      {featured.eventType === "TICKETING"
+                      {hasTicketingEnabled(featured) && !hasVotingEnabled(featured)
                         ? `Sales close ${formatDate(featured.ticketSalesEndAt)}`
                         : `Voting ends ${formatDate(featured.votingEndAt)}`}
                     </span>
@@ -283,7 +295,8 @@ function DirectoryStat({ label, value }: { label: string; value: number }) {
 }
 
 function PublicEventCard({ event }: { event: EventResponse }) {
-  const isTicketing = event.eventType === "TICKETING";
+  const isTicketing = hasTicketingEnabled(event) && !hasVotingEnabled(event);
+  const isHybrid = hasTicketingEnabled(event) && hasVotingEnabled(event);
 
   return (
     <Link
@@ -315,18 +328,18 @@ function PublicEventCard({ event }: { event: EventResponse }) {
         <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[#f8fafc] p-3 text-xs">
           <div>
             <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">
-              {isTicketing ? "Type" : "Categories"}
+              {isHybrid ? "Mode" : isTicketing ? "Type" : "Categories"}
             </p>
             <p className="mt-1 font-semibold text-ink">
-              {isTicketing ? "Ticketing" : event.categories.length}
+              {isHybrid ? getEventModeLabel(event) : isTicketing ? "Ticketing" : event.categories.length}
             </p>
           </div>
           <div>
             <p className="font-semibold uppercase tracking-[0.12em] text-ink/35">
-              {isTicketing ? "Sales close" : "Voting ends"}
+              {hasTicketingEnabled(event) ? "Sales close" : "Voting ends"}
             </p>
             <p className="mt-1 font-semibold text-ink">
-              {formatDate(isTicketing ? event.ticketSalesEndAt : event.votingEndAt)}
+              {formatDate(hasTicketingEnabled(event) ? event.ticketSalesEndAt : event.votingEndAt)}
             </p>
           </div>
         </div>

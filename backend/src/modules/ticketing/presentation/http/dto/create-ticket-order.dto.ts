@@ -12,6 +12,8 @@ import {
   ValidateNested,
 } from "class-validator";
 
+import { IsMatchingMomoProviderPhone } from "../../../../../shared/validation/momo-provider-phone.validator";
+
 export class CreateTicketOrderItemDto {
   @IsString()
   ticketTypeId!: string;
@@ -39,6 +41,7 @@ export class CreateTicketOrderDto {
   @IsOptional()
   @IsString()
   @MaxLength(30)
+  @IsMatchingMomoProviderPhone("momoProvider")
   buyerPhone?: string;
 
   @IsOptional()

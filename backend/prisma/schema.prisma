@@ -125,6 +125,8 @@ model Event {
   description                   String
   status                        EventStatus @default(DRAFT)
   eventType                     EventType   @default(VOTING)
+  hasVoting                     Boolean     @default(true)
+  hasTicketing                  Boolean     @default(false)
   primaryFlyerUrl               String
   primaryFlyerKey               String
   bannerUrl                     String?

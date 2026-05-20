@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "PhoneVerificationChallenge_normalizedPhone_purpose_createdAt_id" RENAME TO "PhoneVerificationChallenge_normalizedPhone_purpose_createdA_idx";
