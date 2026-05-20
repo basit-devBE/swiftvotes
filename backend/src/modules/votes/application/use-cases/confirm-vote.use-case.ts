@@ -14,6 +14,7 @@ import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifications.tokens";
 import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
+import { JunipayService } from "../../../junipay/infrastructure/junipay.service";
 import {
   PaystackService,
   VerifyTransactionResult,
@@ -44,6 +45,7 @@ export class ConfirmVoteUseCase {
     @Inject(NOTIFICATIONS_SERVICE)
     private readonly notifications: NotificationsService,
     private readonly paystack: PaystackService,
+    private readonly junipay: JunipayService,
     private readonly prisma: PrismaService,
     private readonly logger: PinoLogger,
   ) {
@@ -75,6 +77,10 @@ export class ConfirmVoteUseCase {
     const payment = await this.paymentsRepository.findByReference(reference);
     if (!payment) {
       throw new NotFoundException("No payment found for this reference.");
+    }
+
+    if (payment.provider === "junipay") {
+      return this.confirmJunipayPayment({ reference, vote, payment });
     }
 
     const verification = await this.paystack.verifyTransaction(reference);
@@ -228,6 +234,109 @@ export class ConfirmVoteUseCase {
       { scope: "votes", op: "mark-failed", reference, voteId: vote.id },
       "vote marked failed via webhook",
     );
+  }
+
+  private async confirmJunipayPayment(input: {
+    reference: string;
+    vote: Vote;
+    payment: Payment;
+  }): Promise<ConfirmVoteResult> {
+    const verification = await this.junipay.checkTransactionStatus(
+      input.payment.providerRef ?? input.reference,
+    );
+    const rawVerifyResponse = verification.raw as Prisma.InputJsonValue;
+
+    if (verification.status === "success") {
+      if (
+        verification.amountMinor !== null &&
+        verification.amountMinor !== input.payment.amountMinor
+      ) {
+        const updated = await this.prisma.$transaction(async (tx) => {
+          await this.paymentsRepository.markFailed(
+            {
+              reference: input.reference,
+              providerRef: verification.providerRef,
+              failureReason: "junipay:payment-amount-mismatch",
+              failedAt: new Date(),
+              rawVerifyResponse,
+            },
+            tx,
+          );
+          return this.votesRepository.updateStatus(
+            input.vote.id,
+            VoteStatus.FAILED,
+            undefined,
+            tx,
+          );
+        });
+        throw new ConflictException(
+          `JuniPay payment amount mismatch for vote ${updated.id}.`,
+        );
+      }
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await this.paymentsRepository.markSucceeded(
+          {
+            reference: input.reference,
+            providerRef: verification.providerRef,
+            amountPaidMinor: verification.amountMinor ?? input.payment.amountMinor,
+            feeMinor: verification.feesMinor,
+            paidAt: verification.paidAt
+              ? new Date(verification.paidAt)
+              : new Date(),
+            channel: "mobile_money",
+            mobileNumber: verification.mobileNumber,
+            rawVerifyResponse,
+          },
+          tx,
+        );
+        return this.votesRepository.updateStatus(
+          input.vote.id,
+          VoteStatus.CONFIRMED,
+          undefined,
+          tx,
+        );
+      });
+      this.logger.info(
+        { scope: "votes", op: "confirm", reference: input.reference, voteId: updated.id, decision: "confirmed" },
+        "vote confirmed via JuniPay",
+      );
+      await this.dispatchConfirmationEmail(updated);
+      return { vote: updated, alreadyResolved: false };
+    }
+
+    if (verification.status === "failed" || verification.status === "abandoned") {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await this.paymentsRepository.markFailed(
+          {
+            reference: input.reference,
+            providerRef: verification.providerRef,
+            failureReason: verification.message ?? `junipay:${verification.status}`,
+            failedAt: new Date(),
+            rawVerifyResponse,
+          },
+          tx,
+        );
+        return this.votesRepository.updateStatus(
+          input.vote.id,
+          VoteStatus.FAILED,
+          undefined,
+          tx,
+        );
+      });
+      return { vote: updated, alreadyResolved: false };
+    }
+
+    this.logger.info(
+      {
+        scope: "votes",
+        op: "confirm",
+        reference: input.reference,
+        junipayStatus: verification.status,
+      },
+      "vote still pending after JuniPay status check",
+    );
+    return { vote: input.vote, alreadyResolved: true };
   }
 
   private getVerificationMismatchReason(input: {

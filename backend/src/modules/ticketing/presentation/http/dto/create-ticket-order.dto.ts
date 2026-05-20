@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEmail,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -39,6 +40,14 @@ export class CreateTicketOrderDto {
   @IsString()
   @MaxLength(30)
   buyerPhone?: string;
+
+  @IsOptional()
+  @IsIn(["mtn", "vodafone", "airteltigo"])
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+
+  @IsOptional()
+  @IsString()
+  phoneVerificationChallengeId?: string;
 
   @IsOptional()
   @IsString()

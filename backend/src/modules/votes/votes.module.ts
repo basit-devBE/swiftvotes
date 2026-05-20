@@ -5,7 +5,9 @@ import { appConfig } from "../../core/config/app.config";
 import { paystackConfig } from "../../core/config/paystack.config";
 import { ContestantsModule } from "../contestants/contestants.module";
 import { EventsModule } from "../events/events.module";
+import { JunipayModule } from "../junipay/junipay.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { PhoneVerificationsModule } from "../phone-verifications/phone-verifications.module";
 import { CastVoteUseCase } from "./application/use-cases/cast-vote.use-case";
 import { ConfirmVoteUseCase } from "./application/use-cases/confirm-vote.use-case";
 import { GetEventVotesSummaryUseCase } from "./application/use-cases/get-event-votes-summary.use-case";
@@ -28,6 +30,8 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
     ConfigModule.forFeature(paystackConfig),
     EventsModule,
     NotificationsModule,
+    JunipayModule,
+    PhoneVerificationsModule,
     forwardRef(() => ContestantsModule),
   ],
   controllers: [VotesController, PaymentWebhooksController, PaymentsController],
@@ -50,6 +54,11 @@ import { PaymentWebhooksController } from "./presentation/http/webhooks.controll
       useClass: PrismaPaymentsRepository,
     },
   ],
-  exports: [VOTES_REPOSITORY, PAYMENTS_REPOSITORY, PaystackService],
+  exports: [
+    VOTES_REPOSITORY,
+    PAYMENTS_REPOSITORY,
+    PaystackService,
+    ConfirmVoteUseCase,
+  ],
 })
 export class VotesModule {}

@@ -26,6 +26,51 @@ import { VoteModal } from "@/components/votes/vote-modal";
 import { NominationForm, StatusBanner } from "./nomination-form";
 
 const usePaystack = process.env.NEXT_PUBLIC_USE_PAYSTACK === "true";
+type MomoProvider = "mtn" | "vodafone" | "airteltigo";
+const momoProviders: Array<{ value: MomoProvider; label: string }> = [
+  { value: "mtn", label: "MTN" },
+  { value: "vodafone", label: "Vodafone" },
+  { value: "airteltigo", label: "AirtelTigo" },
+];
+
+function StatusPill({
+  label,
+  state,
+}: {
+  label: string;
+  state: "idle" | "active" | "done";
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+        state === "done"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : state === "active"
+            ? "border-primary/20 bg-primary/8 text-primary"
+            : "border-primary/12 bg-white text-ink/45"
+      }`}
+    >
+      {state === "done" ? (
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M9 12.75 11.25 15 15 9.75" />
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-7 9a7 7 0 1 1 14 0 7 7 0 0 1-14 0Z"
+          />
+        </svg>
+      ) : state === "active" ? (
+        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <span className="h-3.5 w-3.5 rounded-full border border-current/35" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
 
 function formatDate(date: string | null): string {
   if (!date) return "Not set";
@@ -250,6 +295,7 @@ function TicketCheckoutPanel({
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [momoProvider, setMomoProvider] = useState<MomoProvider>("mtn");
   const [otpCode, setOtpCode] = useState("");
   const [verificationChallenge, setVerificationChallenge] = useState<{
     challengeId: string;
@@ -257,6 +303,7 @@ function TicketCheckoutPanel({
     expiresAt: string;
   } | null>(null);
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -346,7 +393,11 @@ function TicketCheckoutPanel({
           buyerPhone: buyerPhone.trim() || undefined,
           callbackOrigin: window.location.origin,
         });
-        window.location.href = result.paymentUrl;
+        if (result.paymentUrl) {
+          window.location.href = result.paymentUrl;
+          return;
+        }
+        setNotice("Payment request started. Complete the prompt to finish checkout.");
         return;
       }
 
@@ -364,18 +415,36 @@ function TicketCheckoutPanel({
         return;
       }
 
-      if (!verifiedPhone) {
+      let verifiedPhoneForPayment = verifiedPhone;
+      if (!verifiedPhoneForPayment) {
+        setIsVerifyingPhone(true);
         const result = await confirmPhoneVerification({
           challengeId: verificationChallenge.challengeId,
           code: otpCode,
           purpose: "JUNIPAY_COLLECTION",
         });
+        verifiedPhoneForPayment = result.phone;
         setVerifiedPhone(result.phone);
-        setNotice("Phone number verified. JuniPay payment collection will be connected here.");
-        return;
+        setNotice("Phone verified. Requesting mobile money payment now.");
       }
 
-      setNotice("Phone number verified. Payment collection is paused until JuniPay is connected.");
+      const result = await createTicketOrder(event.id, {
+        items: selectedItems.map((item) => ({
+          ticketTypeId: item.ticketType.id,
+          quantity: item.quantity,
+        })),
+        buyerName: buyerName.trim(),
+        buyerEmail: buyerEmail.trim(),
+        buyerPhone: verifiedPhoneForPayment ?? buyerPhone.trim(),
+        momoProvider,
+        phoneVerificationChallengeId: verificationChallenge.challengeId,
+        callbackOrigin: window.location.origin,
+      });
+      if (result.paymentUrl) {
+        window.location.href = result.paymentUrl;
+        return;
+      }
+      setNotice("Payment request sent. Approve the mobile money prompt to complete your ticket purchase.");
     } catch (checkoutError) {
       setError(
         checkoutError instanceof ApiClientError
@@ -385,6 +454,7 @@ function TicketCheckoutPanel({
             : "Unable to verify this phone number. Please try again.",
       );
     } finally {
+      setIsVerifyingPhone(false);
       setIsSubmitting(false);
     }
   }
@@ -484,6 +554,33 @@ function TicketCheckoutPanel({
         </label>
         {!usePaystack ? (
           <>
+            <div className="flex flex-wrap gap-2">
+              <StatusPill
+                label="Code sent"
+                state={verificationChallenge ? "done" : "idle"}
+              />
+              <StatusPill
+                label="Phone verified"
+                state={
+                  verifiedPhone
+                    ? "done"
+                    : isVerifyingPhone
+                      ? "active"
+                      : "idle"
+                }
+              />
+              <StatusPill
+                label="Payment request"
+                state={
+                  notice?.includes("Payment request sent")
+                    ? "done"
+                    : isSubmitting && Boolean(verifiedPhone)
+                      ? "active"
+                      : "idle"
+                }
+              />
+            </div>
+
             <label className="block">
               <span className="text-xs font-semibold text-ink/60">Phone</span>
               <input
@@ -512,6 +609,31 @@ function TicketCheckoutPanel({
                 />
               </label>
             ) : null}
+            {verifiedPhone ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                Phone number verified. Mobile money checkout is ready.
+              </div>
+            ) : null}
+            <div>
+              <span className="text-xs font-semibold text-ink/60">Network</span>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {momoProviders.map((provider) => (
+                  <button
+                    key={provider.value}
+                    type="button"
+                    onClick={() => setMomoProvider(provider.value)}
+                    disabled={!salesState.isOpen || isSubmitting || Boolean(verifiedPhone)}
+                    className={`h-10 rounded-xl border text-xs font-semibold transition ${
+                      momoProvider === provider.value
+                        ? "border-primary bg-primary text-white"
+                        : "border-primary/12 bg-[#fbfcff] text-ink/70"
+                    }`}
+                  >
+                    {provider.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         ) : null}
       </div>
@@ -557,8 +679,8 @@ function TicketCheckoutPanel({
             : !verificationChallenge
               ? "Send verification code"
               : !verifiedPhone
-                ? "Verify phone number"
-                : "Payment pending JuniPay"}
+                ? isVerifyingPhone ? "Verifying..." : "Verify and pay"
+                : "Pay with JuniPay"}
       </button>
     </form>
   );

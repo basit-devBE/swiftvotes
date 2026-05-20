@@ -7,12 +7,16 @@ import {
 } from "@nestjs/common";
 import { ConfigType } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { appConfig } from "../../../../core/config/app.config";
 import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
 import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { EventStatus } from "../../../events/domain/event-status";
 import { EventType } from "../../../events/domain/event-type";
+import { JunipayService } from "../../../junipay/infrastructure/junipay.service";
+import { AssertPhoneVerificationUseCase } from "../../../phone-verifications/application/use-cases/assert-phone-verification.use-case";
+import { PhoneVerificationPurpose } from "../../../phone-verifications/domain/phone-verification-purpose";
 import { PaystackService } from "../../../votes/infrastructure/payments/paystack.service";
 import { TicketOrder } from "../../domain/ticket-order";
 import { TICKETING_REPOSITORY } from "../ticketing.tokens";
@@ -27,6 +31,8 @@ export type CreateTicketOrderUseCaseInput = {
   buyerName: string;
   buyerEmail: string;
   buyerPhone?: string | null;
+  momoProvider?: "mtn" | "vodafone" | "airteltigo";
+  phoneVerificationChallengeId?: string;
   callbackOrigin?: string;
   ipAddress?: string | null;
 };
@@ -34,7 +40,7 @@ export type CreateTicketOrderUseCaseInput = {
 export type CreateTicketOrderResult = {
   order: TicketOrder;
   reference: string;
-  paymentUrl: string;
+  paymentUrl: string | null;
 };
 
 @Injectable()
@@ -47,6 +53,8 @@ export class CreateTicketOrderUseCase {
     @Inject(appConfig.KEY)
     private readonly app: ConfigType<typeof appConfig>,
     private readonly paystack: PaystackService,
+    private readonly junipay: JunipayService,
+    private readonly assertPhoneVerification: AssertPhoneVerificationUseCase,
   ) {}
 
   async execute(
@@ -150,6 +158,72 @@ export class CreateTicketOrderUseCase {
       origin: input.callbackOrigin,
       eventId: event.id,
     });
+
+    if (!this.usePaystack()) {
+      if (!input.buyerPhone || !input.momoProvider || !input.phoneVerificationChallengeId) {
+        throw new BadRequestException(
+          "Phone verification and mobile money provider are required.",
+        );
+      }
+      const verifiedPhone = await this.assertPhoneVerification.execute({
+        challengeId: input.phoneVerificationChallengeId,
+        phone: input.buyerPhone,
+        purpose: PhoneVerificationPurpose.JUNIPAY_COLLECTION,
+      });
+      const reference = `swt_${randomUUID()}`;
+      const order = await this.ticketingRepository.createPendingOrder({
+        eventId: event.id,
+        buyerName,
+        buyerEmail,
+        buyerPhone: verifiedPhone.phone,
+        totalAmountMinor,
+        currency,
+        items: orderItems,
+        payment: {
+          reference,
+          amountMinor: totalAmountMinor,
+          provider: "junipay",
+          channel: "mobile_money",
+          mobileNumber: verifiedPhone.normalizedPhone,
+          rawInitResponse: {
+            reference,
+            provider: "junipay",
+            state: "local_pending",
+          },
+          customerIp: input.ipAddress ?? null,
+          metadata: {
+            purpose: "ticket_order",
+            eventId: event.id,
+            momoProvider: input.momoProvider,
+            phoneVerificationChallengeId: verifiedPhone.challengeId,
+          },
+        },
+      });
+
+      const init = await this.junipay.initializeMobileMoneyCollection({
+        reference,
+        phoneNumber: verifiedPhone.phone,
+        provider: input.momoProvider,
+        amountMinor: totalAmountMinor,
+        currency,
+        senderEmail: buyerEmail,
+        description: `Tickets for ${event.name}`,
+        callbackUrl: this.buildJunipayCallbackUrl(),
+      });
+
+      await this.ticketingRepository.updatePaymentInitialization({
+        reference,
+        providerRef: init.providerRef,
+        rawInitResponse: init.raw as Prisma.InputJsonValue,
+      });
+
+      return {
+        order,
+        reference,
+        paymentUrl: null,
+      };
+    }
+
     const init = await this.paystack.initializeTransaction({
       email: buyerEmail,
       amountMinor: totalAmountMinor,
@@ -238,5 +312,13 @@ export class CreateTicketOrderUseCase {
     const url = new URL("/ticket/callback", origin);
     url.searchParams.set("eventId", input.eventId);
     return url.toString();
+  }
+
+  private buildJunipayCallbackUrl(): string | null {
+    return process.env.JUNIPAY_CALLBACK_URL || null;
+  }
+
+  private usePaystack(): boolean {
+    return process.env.USE_PAYSTACK === "true";
   }
 }

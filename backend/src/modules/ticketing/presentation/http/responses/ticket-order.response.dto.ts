@@ -109,12 +109,12 @@ export class TicketOrderResponseDto {
 export class CreateTicketOrderResponseDto {
   order!: TicketOrderResponseDto;
   reference!: string;
-  paymentUrl!: string;
+  paymentUrl!: string | null;
 
   static fromResult(input: {
     order: TicketOrder;
     reference: string;
-    paymentUrl: string;
+    paymentUrl: string | null;
   }): CreateTicketOrderResponseDto {
     return {
       order: TicketOrderResponseDto.fromDomain(input.order),

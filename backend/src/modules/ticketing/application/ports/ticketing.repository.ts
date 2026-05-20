@@ -35,6 +35,10 @@ export type CreatePendingTicketOrderInput = {
     rawInitResponse?: Prisma.InputJsonValue | null;
     metadata?: Prisma.InputJsonValue | null;
     customerIp?: string | null;
+    provider?: string;
+    providerRef?: string | null;
+    channel?: string | null;
+    mobileNumber?: string | null;
   };
   items: Array<{
     ticketTypeId: string;
@@ -62,6 +66,12 @@ export type MarkTicketPaymentFailedInput = {
   failureReason: string;
   failedAt: Date;
   rawVerifyResponse?: Prisma.InputJsonValue | null;
+};
+
+export type UpdateTicketPaymentInitializationInput = {
+  reference: string;
+  providerRef?: string | null;
+  rawInitResponse?: Prisma.InputJsonValue | null;
 };
 
 export type RecordTicketWebhookEventInput = {
@@ -98,6 +108,9 @@ export interface TicketingRepository {
   findOrderById(orderId: string): Promise<TicketOrder | null>;
   findPaymentByReference(reference: string): Promise<TicketPayment | null>;
   findOrderByPaymentReference(reference: string): Promise<TicketOrder | null>;
+  updatePaymentInitialization(
+    input: UpdateTicketPaymentInitializationInput,
+  ): Promise<TicketPayment>;
   markPaymentSucceededAndIssueTickets(
     input: MarkTicketPaymentSucceededInput,
   ): Promise<TicketOrder>;
