@@ -246,7 +246,7 @@ export class CastVoteUseCase {
         amountMinor,
         currency: category.currency,
         senderEmail: voterEmail,
-        description: `Vote for ${contestant.name} in ${event.name}`,
+        description: "SwiftVotes vote payment",
         callbackUrl: this.buildJunipayCallbackUrl(),
       });
 

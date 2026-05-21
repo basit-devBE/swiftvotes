@@ -216,7 +216,7 @@ export class UssdHooksService {
         amountMinor,
         currency: resolved.category.currency,
         senderEmail: voterEmail,
-        description: `Vote for ${resolved.contestant.name} in ${resolved.event.name}`,
+        description: "SwiftVotes vote payment",
         callbackUrl: process.env.JUNIPAY_CALLBACK_URL || null,
       });
 
