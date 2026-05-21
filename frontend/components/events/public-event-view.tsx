@@ -14,12 +14,14 @@ import {
   listContestants,
   listTicketTypes,
   startPhoneVerification,
+  verifyTicketOrder,
 } from "@/lib/api/events";
 import {
   ContestantResponse,
   EventCategoryResponse,
   EventStatus,
   EventResponse,
+  TicketOrderResponse,
   TicketTypeResponse,
 } from "@/lib/api/types";
 import {
@@ -305,9 +307,11 @@ function EventDetails({ event }: { event: EventResponse }) {
 function TicketCheckoutPanel({
   event,
   ticketTypes,
+  onOrderPaid,
 }: {
   event: EventResponse;
   ticketTypes: TicketTypeResponse[];
+  onOrderPaid?: () => void;
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [buyerName, setBuyerName] = useState("");
@@ -325,6 +329,14 @@ function TicketCheckoutPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<
+    "details" | "payment_pending" | "success" | "payment_failed"
+  >("details");
+  const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [paymentAttempts, setPaymentAttempts] = useState(0);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<TicketOrderResponse | null>(null);
+  const [lastOrder, setLastOrder] = useState<TicketOrderResponse | null>(null);
 
   const salesState = getTicketSalesState(event);
   const availableTicketTypes = ticketTypes.filter((ticketType) => {
@@ -366,7 +378,86 @@ function TicketCheckoutPanel({
     setVerificationChallenge(null);
     setVerifiedPhone(null);
     setNotice(null);
+    setPaymentReference(null);
+    setPaymentAttempts(0);
+    setConfirmedOrder(null);
+    setLastOrder(null);
+    setCheckoutStep("details");
   }
+
+  async function runTicketPaymentStatusCheck(
+    reference: string,
+    signal: { cancelled: boolean },
+  ): Promise<"confirmed" | "failed" | "pending" | "error"> {
+    try {
+      const order = await verifyTicketOrder(event.id, reference);
+      if (signal.cancelled) return "error";
+      setLastOrder(order);
+
+      if (order.status === "PAID") {
+        setConfirmedOrder(order);
+        setCheckoutStep("success");
+        onOrderPaid?.();
+        return "confirmed";
+      }
+
+      if (order.status === "FAILED" || order.status === "CANCELLED") {
+        setError("Payment was not confirmed, so no tickets were issued.");
+        setCheckoutStep("payment_failed");
+        return "failed";
+      }
+
+      return "pending";
+    } catch (statusError) {
+      if (signal.cancelled) return "error";
+      setError(
+        statusError instanceof ApiClientError
+          ? statusError.message
+          : "We couldn't confirm this ticket payment yet.",
+      );
+      return "error";
+    }
+  }
+
+  useEffect(() => {
+    if (checkoutStep !== "payment_pending" || !paymentReference || usePaystack) return;
+
+    const activeReference = paymentReference;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const maxAttempts = 8;
+
+    async function poll() {
+      attempts += 1;
+      setPaymentAttempts(attempts);
+      setIsCheckingPayment(true);
+
+      const outcome = await runTicketPaymentStatusCheck(activeReference, { cancelled });
+      if (cancelled) return;
+
+      if (outcome === "confirmed" || outcome === "failed") {
+        setIsCheckingPayment(false);
+        return;
+      }
+
+      if (outcome === "pending" && attempts < maxAttempts) {
+        timeoutId = setTimeout(() => {
+          void poll();
+        }, 2200);
+        return;
+      }
+
+      setIsCheckingPayment(false);
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [checkoutStep, event.id, paymentReference, onOrderPaid]);
 
   function validateBuyerDetails(): boolean {
     setError(null);
@@ -467,6 +558,10 @@ function TicketCheckoutPanel({
         window.location.href = result.paymentUrl;
         return;
       }
+      setLastOrder(result.order);
+      setPaymentReference(result.reference);
+      setPaymentAttempts(0);
+      setCheckoutStep("payment_pending");
       setNotice("Payment request sent. Approve the mobile money prompt to complete your ticket purchase.");
     } catch (checkoutError) {
       setError(
@@ -480,6 +575,79 @@ function TicketCheckoutPanel({
       setIsVerifyingPhone(false);
       setIsSubmitting(false);
     }
+  }
+
+  if (checkoutStep === "success" && confirmedOrder) {
+    return (
+      <TicketPaymentResult
+        tone="success"
+        title="Tickets confirmed"
+        body="Your payment has been confirmed and your tickets have been issued."
+        order={confirmedOrder}
+        primaryAction={
+          <Link href={`/events/${event.id}`} className="button-primary">
+            Back to event
+          </Link>
+        }
+      />
+    );
+  }
+
+  if (checkoutStep === "payment_failed") {
+    return (
+      <TicketPaymentResult
+        tone="error"
+        title="Payment did not go through"
+        body={error ?? "Your wallet was not charged successfully, so no tickets were issued."}
+        order={lastOrder}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => {
+              setCheckoutStep("details");
+              setError(null);
+              setNotice(null);
+              setPaymentReference(null);
+              setPaymentAttempts(0);
+            }}
+            className="button-primary"
+          >
+            Try again
+          </button>
+        }
+      />
+    );
+  }
+
+  if (checkoutStep === "payment_pending" && paymentReference) {
+    return (
+      <TicketPaymentResult
+        tone="warning"
+        title="Payment request sent"
+        body={
+          isCheckingPayment
+            ? "Approve the mobile money prompt on your phone. We are checking the payment status."
+            : "We have not received confirmation yet. Approve the prompt, then refresh the status."
+        }
+        order={lastOrder}
+        reference={paymentReference}
+        meta={`Status checks: ${paymentAttempts}`}
+        primaryAction={
+          <button
+            type="button"
+            onClick={() => {
+              setCheckoutStep("details");
+              setPaymentReference(null);
+              setPaymentAttempts(0);
+              setNotice(null);
+            }}
+            className="button-secondary"
+          >
+            Edit details
+          </button>
+        }
+      />
+    );
   }
 
   return (
@@ -714,6 +882,127 @@ function TicketCheckoutPanel({
   );
 }
 
+function TicketPaymentResult({
+  tone,
+  title,
+  body,
+  order,
+  reference,
+  meta,
+  primaryAction,
+}: {
+  tone: "success" | "error" | "warning";
+  title: string;
+  body: string;
+  order: TicketOrderResponse | null;
+  reference?: string;
+  meta?: string;
+  primaryAction: React.ReactNode;
+}) {
+  const toneClass =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "error"
+        ? "border-accent/20 bg-accent/5 text-accent"
+        : "border-amber-200 bg-amber-50 text-amber-800";
+  const iconClass =
+    tone === "success"
+      ? "bg-emerald-600"
+      : tone === "error"
+        ? "bg-accent"
+        : "bg-amber-500";
+
+  return (
+    <section className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-7 shadow-[0_16px_48px_-24px_rgba(7,17,31,0.18)]">
+      <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${toneClass}`}>
+        <span className={`h-2 w-2 rounded-full ${iconClass}`} />
+        <span>{tone === "success" ? "Confirmed" : tone === "error" ? "Failed" : "Processing"}</span>
+      </div>
+      <h2 className="mt-5 font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
+        {title}
+      </h2>
+      <p className="mt-2 text-sm leading-6 text-ink/60">{body}</p>
+      {meta ? <p className="mt-2 text-xs font-semibold text-ink/45">{meta}</p> : null}
+
+      <div className="mt-6">
+        {order ? (
+          <TicketOrderReceipt order={order} />
+        ) : reference ? (
+          <div className="rounded-2xl border border-ink/10 bg-[#f7f9fc] px-4 py-3 text-sm">
+            <p className="text-ink/55">Reference</p>
+            <p className="mt-1 break-all font-mono text-xs leading-5 text-ink/70">
+              {reference}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        {primaryAction}
+        {tone === "warning" ? (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="button-primary"
+          >
+            Refresh status
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function TicketOrderReceipt({ order }: { order: TicketOrderResponse }) {
+  const ticketCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+  return (
+    <dl className="w-full divide-y divide-ink/8 rounded-2xl border border-ink/10 bg-[#f7f9fc] text-left">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+        <dt className="text-ink/55">Tickets</dt>
+        <dd className="font-semibold text-ink">{ticketCount}</dd>
+      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+        <dt className="text-ink/55">Amount</dt>
+        <dd className="font-semibold text-ink">
+          {formatCurrency(order.totalAmountMinor, order.currency)}
+        </dd>
+      </div>
+      {order.items.map((item) => (
+        <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
+          <dt className="text-ink/55">{item.ticketTypeName ?? "Ticket"}</dt>
+          <dd className="text-right font-semibold text-ink">
+            {item.quantity} x {formatCurrency(item.unitPriceMinor, order.currency)}
+          </dd>
+        </div>
+      ))}
+      {order.issuedTickets.length > 0 ? (
+        <div className="grid gap-2 px-4 py-3 text-sm">
+          <dt className="text-ink/55">Ticket codes</dt>
+          <dd className="flex flex-wrap gap-2">
+            {order.issuedTickets.map((ticket) => (
+              <span
+                key={ticket.id}
+                className="rounded-full bg-white px-3 py-1 font-mono text-xs font-semibold text-ink ring-1 ring-ink/10"
+              >
+                {ticket.code}
+              </span>
+            ))}
+          </dd>
+        </div>
+      ) : null}
+      {order.payment?.reference ? (
+        <div className="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[6rem_1fr] sm:items-start">
+          <dt className="text-ink/55">Reference</dt>
+          <dd className="break-all font-mono text-xs leading-5 text-ink/70 sm:text-right">
+            {order.payment.reference}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
@@ -727,6 +1016,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
   const [votingContestant, setVotingContestant] =
     useState<ContestantResponse | null>(null);
   const [leaderboardVersion, setLeaderboardVersion] = useState<number>(0);
+  const [ticketInventoryVersion, setTicketInventoryVersion] = useState<number>(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -760,7 +1050,7 @@ export function PublicEventView({ eventId }: { eventId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, ticketInventoryVersion]);
 
   if (isLoading) {
     return (
@@ -947,7 +1237,11 @@ export function PublicEventView({ eventId }: { eventId: string }) {
           </div>
 
           <aside className="space-y-6 lg:sticky lg:top-8 lg:self-start">
-            <TicketCheckoutPanel event={event} ticketTypes={ticketTypes} />
+            <TicketCheckoutPanel
+              event={event}
+              ticketTypes={ticketTypes}
+              onOrderPaid={() => setTicketInventoryVersion((version) => version + 1)}
+            />
             <div className="rounded-[1.5rem] border border-primary/10 bg-white/90 p-7 shadow-[0_16px_48px_-24px_rgba(7,17,31,0.18)]">
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-ink/38">
                 Venue

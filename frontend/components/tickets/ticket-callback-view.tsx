@@ -140,7 +140,7 @@ export function TicketCallbackView() {
     <ResultShell
       tone="warning"
       title="Still processing"
-      body="Paystack has not confirmed your payment yet. Refresh this page shortly if you were charged."
+      body="Your payment provider has not confirmed the payment yet. Refresh this page shortly if you were charged."
     >
       <TicketReceipt order={order} />
       <button
