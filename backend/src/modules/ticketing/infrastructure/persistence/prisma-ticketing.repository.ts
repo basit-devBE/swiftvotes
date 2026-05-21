@@ -19,6 +19,7 @@ import {
   CreateTicketTypeInput,
   MarkTicketPaymentFailedInput,
   MarkTicketPaymentSucceededInput,
+  MarkTicketPaymentSucceededResult,
   RedeemedIssuedTicket,
   RecordTicketWebhookEventInput,
   TicketingRepository,
@@ -47,6 +48,8 @@ const ORDER_INCLUDE = {
   payment: true,
   issuedTickets: true,
 };
+
+const MAX_CONFIRMATION_TRANSACTION_ATTEMPTS = 4;
 
 type PrismaOrderWithRelations = PrismaTicketOrder & {
   items: Array<
@@ -214,9 +217,10 @@ export class PrismaTicketingRepository implements TicketingRepository {
 
   async markPaymentSucceededAndIssueTickets(
     input: MarkTicketPaymentSucceededInput,
-  ): Promise<TicketOrder> {
-    return this.prisma.$transaction(
-      async (tx) => {
+  ): Promise<MarkTicketPaymentSucceededResult> {
+    return this.withWriteConflictRetry(() =>
+      this.prisma.$transaction(
+        async (tx) => {
         const order = await tx.ticketOrder.findFirst({
           where: { payment: { reference: input.reference } },
           include: ORDER_INCLUDE,
@@ -230,7 +234,44 @@ export class PrismaTicketingRepository implements TicketingRepository {
           order.status === PrismaTicketOrderStatus.PAID &&
           order.payment?.status === PrismaTicketPaymentStatus.SUCCEEDED
         ) {
-          return this.toOrderDomain(order);
+          return { order: this.toOrderDomain(order), issuedNow: false };
+        }
+
+        const lockedPayment = await tx.ticketPayment.updateMany({
+          where: {
+            reference: input.reference,
+            status: PrismaTicketPaymentStatus.PENDING,
+          },
+          data: {
+            status: PrismaTicketPaymentStatus.SUCCEEDED,
+            providerRef: input.providerRef ?? undefined,
+            amountPaidMinor: input.amountPaidMinor ?? undefined,
+            feeMinor: input.feeMinor ?? undefined,
+            paidAt: input.paidAt,
+            channel: input.channel ?? undefined,
+            cardLast4: input.cardLast4 ?? undefined,
+            mobileNumber: input.mobileNumber ?? undefined,
+            rawVerifyResponse:
+              input.rawVerifyResponse !== undefined
+                ? input.rawVerifyResponse ?? Prisma.JsonNull
+                : undefined,
+          },
+        });
+
+        if (lockedPayment.count === 0) {
+          const latest = await tx.ticketOrder.findFirst({
+            where: { payment: { reference: input.reference } },
+            include: ORDER_INCLUDE,
+          });
+
+          if (
+            latest?.status === PrismaTicketOrderStatus.PAID &&
+            latest.payment?.status === PrismaTicketPaymentStatus.SUCCEEDED
+          ) {
+            return { order: this.toOrderDomain(latest), issuedNow: false };
+          }
+
+          throw new Error("Ticket payment is already being processed.");
         }
 
         for (const item of order.items) {
@@ -249,10 +290,17 @@ export class PrismaTicketingRepository implements TicketingRepository {
             throw new Error("Ticket inventory is no longer available.");
           }
 
-          await tx.ticketType.update({
-            where: { id: ticketType.id },
+          const updatedInventory = await tx.ticketType.updateMany({
+            where: {
+              id: item.ticketTypeId,
+              quantitySold: ticketType.quantitySold,
+            },
             data: { quantitySold: { increment: item.quantity } },
           });
+
+          if (updatedInventory.count === 0) {
+            throw new Error("Ticket inventory was updated concurrently.");
+          }
 
           await tx.issuedTicket.createMany({
             data: Array.from({ length: item.quantity }, () => ({
@@ -265,62 +313,92 @@ export class PrismaTicketingRepository implements TicketingRepository {
           });
         }
 
-        await tx.ticketPayment.update({
-          where: { reference: input.reference },
-          data: {
-            status: PrismaTicketPaymentStatus.SUCCEEDED,
-            providerRef: input.providerRef ?? undefined,
-            amountPaidMinor: input.amountPaidMinor ?? undefined,
-            feeMinor: input.feeMinor ?? undefined,
-            paidAt: input.paidAt,
-            channel: input.channel ?? undefined,
-            cardLast4: input.cardLast4 ?? undefined,
-            mobileNumber: input.mobileNumber ?? undefined,
-            rawVerifyResponse:
-              input.rawVerifyResponse !== undefined
-                ? input.rawVerifyResponse ?? Prisma.JsonNull
-                : undefined,
-          },
-        });
-
         const updated = await tx.ticketOrder.update({
           where: { id: order.id },
           data: { status: PrismaTicketOrderStatus.PAID },
           include: ORDER_INCLUDE,
         });
 
-        return this.toOrderDomain(updated);
+        return { order: this.toOrderDomain(updated), issuedNow: true };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
+    );
+  }
+
+  private async withWriteConflictRetry<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_CONFIRMATION_TRANSACTION_ATTEMPTS; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetryableTransactionError(error) || attempt === MAX_CONFIRMATION_TRANSACTION_ATTEMPTS) {
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 75 * attempt));
+      }
+    }
+
+    throw lastError;
+  }
+
+  private isRetryableTransactionError(error: unknown): boolean {
+    return (
+      (error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2034" || error.code === "P2028")) ||
+      (error instanceof Error &&
+        (error.message === "Ticket inventory was updated concurrently." ||
+          error.message === "Ticket payment is already being processed."))
     );
   }
 
   async markPaymentFailed(
     input: MarkTicketPaymentFailedInput,
   ): Promise<TicketOrder> {
-    const payment = await this.prisma.ticketPayment.update({
-      where: { reference: input.reference },
-      data: {
-        status: PrismaTicketPaymentStatus.FAILED,
-        providerRef: input.providerRef ?? undefined,
-        failureReason: input.failureReason,
-        failedAt: input.failedAt,
-        rawVerifyResponse:
-          input.rawVerifyResponse !== undefined
-            ? input.rawVerifyResponse ?? Prisma.JsonNull
-            : undefined,
-        order: {
-          update: { status: PrismaTicketOrderStatus.FAILED },
+    const order = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.ticketPayment.findUnique({
+        where: { reference: input.reference },
+        include: { order: { include: ORDER_INCLUDE } },
+      });
+
+      if (!existing) {
+        throw new Error("Ticket payment was not found.");
+      }
+
+      if (
+        existing.status === PrismaTicketPaymentStatus.SUCCEEDED ||
+        existing.order.status === PrismaTicketOrderStatus.PAID
+      ) {
+        return existing.order;
+      }
+
+      await tx.ticketPayment.update({
+        where: { reference: input.reference },
+        data: {
+          status: PrismaTicketPaymentStatus.FAILED,
+          providerRef: input.providerRef ?? undefined,
+          failureReason: input.failureReason,
+          failedAt: input.failedAt,
+          rawVerifyResponse:
+            input.rawVerifyResponse !== undefined
+              ? input.rawVerifyResponse ?? Prisma.JsonNull
+              : undefined,
+          order: {
+            update: { status: PrismaTicketOrderStatus.FAILED },
+          },
         },
-      },
-      select: { orderId: true },
+      });
+
+      return tx.ticketOrder.findUniqueOrThrow({
+        where: { id: existing.orderId },
+        include: ORDER_INCLUDE,
+      });
     });
 
-    const order = await this.findOrderById(payment.orderId);
-    if (!order) {
-      throw new Error("Ticket order was not found after failed payment update.");
-    }
-    return order;
+    return this.toOrderDomain(order);
   }
 
   async getPaymentStatus(reference: string): Promise<TicketPaymentStatus | null> {

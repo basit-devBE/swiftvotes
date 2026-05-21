@@ -65,7 +65,7 @@ export class ConfirmTicketOrderUseCase {
     const rawVerifyResponse = verified.raw as Prisma.InputJsonValue;
 
     if (verified.status === "success") {
-      const order = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
+      const result = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
         reference,
         providerRef: verified.providerRef,
         amountPaidMinor: verified.amount,
@@ -76,8 +76,10 @@ export class ConfirmTicketOrderUseCase {
         mobileNumber: verified.mobileNumber,
         rawVerifyResponse,
       });
-      await this.sendConfirmationEmail(order);
-      return order;
+      if (result.issuedNow) {
+        await this.sendConfirmationEmail(result.order);
+      }
+      return result.order;
     }
 
     return this.ticketingRepository.markPaymentFailed({
@@ -119,7 +121,7 @@ export class ConfirmTicketOrderUseCase {
     }
 
     if (verified.status === "success") {
-      const order = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
+      const result = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
         reference,
         providerRef: verified.providerRef,
         amountPaidMinor: verified.amountMinor ?? existing.payment.amountMinor,
@@ -129,8 +131,10 @@ export class ConfirmTicketOrderUseCase {
         mobileNumber: verified.mobileNumber,
         rawVerifyResponse,
       });
-      await this.sendConfirmationEmail(order);
-      return order;
+      if (result.issuedNow) {
+        await this.sendConfirmationEmail(result.order);
+      }
+      return result.order;
     }
 
     if (verified.status === "failed" || verified.status === "abandoned") {
