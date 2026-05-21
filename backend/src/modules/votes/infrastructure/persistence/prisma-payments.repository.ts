@@ -224,7 +224,7 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
         : Promise.resolve([]),
       contestantIds.length > 0
         ? this.prisma.contestant.findMany({
-            where: { id: { in: contestantIds } },
+            where: { id: { in: contestantIds }, deletedAt: null },
             select: { id: true, name: true, code: true },
           })
         : Promise.resolve([]),

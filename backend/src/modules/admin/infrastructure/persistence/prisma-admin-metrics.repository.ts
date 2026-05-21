@@ -51,7 +51,7 @@ export class PrismaAdminMetricsRepository implements AdminMetricsRepository {
       this.prisma.event.count(),
       this.prisma.user.count(),
       this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
-      this.prisma.contestant.count(),
+      this.prisma.contestant.count({ where: { deletedAt: null } }),
       this.prisma.event.groupBy({
         by: ["status"],
         _count: { _all: true },

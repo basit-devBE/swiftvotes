@@ -304,8 +304,8 @@ export class UssdHooksService {
 
   private async findContestantByCode(code: string): Promise<ResolvedContestant> {
     const normalizedCode = this.normalizeContestantCode(code);
-    const contestant = await this.prisma.contestant.findUnique({
-      where: { code: normalizedCode },
+    const contestant = await this.prisma.contestant.findFirst({
+      where: { code: normalizedCode, deletedAt: null },
       include: { event: true, category: true },
     });
 

@@ -8,6 +8,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { UsersModule } from "../users/users.module";
 import { VotesModule } from "../votes/votes.module";
 import { CONTESTANTS_REPOSITORY } from "./application/contestants.tokens";
+import { DeleteContestantUseCase } from "./application/use-cases/delete-contestant.use-case";
 import { GetContestantCredentialsUseCase } from "./application/use-cases/get-contestant-credentials.use-case";
 import { GetContestantUseCase } from "./application/use-cases/get-contestant.use-case";
 import { GetMyContestantProfileUseCase } from "./application/use-cases/get-my-contestant-profile.use-case";
@@ -36,6 +37,7 @@ import { MyContestantController } from "./presentation/http/my-contestant.contro
     GetContestantCredentialsUseCase,
     RegenerateMagicLinkUseCase,
     UpdateContestantUseCase,
+    DeleteContestantUseCase,
     ProvisionContestantAccountUseCase,
     GetMyContestantProfilesUseCase,
     GetMyContestantProfileUseCase,

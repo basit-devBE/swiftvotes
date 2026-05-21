@@ -46,6 +46,7 @@ export interface ContestantsRepository {
     contestantId: string,
     input: UpdateContestantDetailsRecord,
   ): Promise<Contestant>;
+  softDelete(contestantId: string, deletedByUserId: string): Promise<Contestant>;
   updateUserId(contestantId: string, userId: string): Promise<Contestant>;
   findWithContextByUserId(userId: string): Promise<ContestantWithContext[]>;
 }

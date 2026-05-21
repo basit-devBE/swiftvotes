@@ -87,7 +87,7 @@ export class PrismaContestantsRepository implements ContestantsRepository {
 
   async findByEvent(eventId: string): Promise<Contestant[]> {
     const contestants = await this.prisma.contestant.findMany({
-      where: { eventId },
+      where: { eventId, deletedAt: null },
       orderBy: { code: "asc" },
     });
 
@@ -99,7 +99,7 @@ export class PrismaContestantsRepository implements ContestantsRepository {
     categoryId: string,
   ): Promise<Contestant[]> {
     const contestants = await this.prisma.contestant.findMany({
-      where: { eventId, categoryId },
+      where: { eventId, categoryId, deletedAt: null },
       orderBy: { code: "asc" },
     });
 
@@ -107,8 +107,8 @@ export class PrismaContestantsRepository implements ContestantsRepository {
   }
 
   async findById(contestantId: string): Promise<Contestant | null> {
-    const contestant = await this.prisma.contestant.findUnique({
-      where: { id: contestantId },
+    const contestant = await this.prisma.contestant.findFirst({
+      where: { id: contestantId, deletedAt: null },
     });
 
     return contestant ? this.toDomain(contestant) : null;
@@ -155,9 +155,22 @@ export class PrismaContestantsRepository implements ContestantsRepository {
     return this.toDomain(contestant);
   }
 
+  async softDelete(contestantId: string, deletedByUserId: string): Promise<Contestant> {
+    const contestant = await this.prisma.contestant.update({
+      where: { id: contestantId },
+      data: {
+        deletedAt: new Date(),
+        deletedByUserId,
+        userId: null,
+      },
+    });
+
+    return this.toDomain(contestant);
+  }
+
   async findWithContextByUserId(userId: string): Promise<ContestantWithContext[]> {
     const rows = await this.prisma.contestant.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       include: { event: true, category: true },
       orderBy: { createdAt: "desc" },
     });
@@ -196,6 +209,8 @@ export class PrismaContestantsRepository implements ContestantsRepository {
       phone: contestant.phone,
       imageUrl: contestant.imageUrl,
       imageKey: contestant.imageKey,
+      deletedAt: contestant.deletedAt,
+      deletedByUserId: contestant.deletedByUserId,
       createdAt: contestant.createdAt,
       updatedAt: contestant.updatedAt,
     };

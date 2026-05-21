@@ -254,6 +254,8 @@ model Contestant {
   phone        String?
   imageUrl     String?
   imageKey     String?
+  deletedAt    DateTime?
+  deletedByUserId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
