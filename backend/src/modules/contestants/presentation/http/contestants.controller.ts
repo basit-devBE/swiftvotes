@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
 
 import { EventRole } from "../../../access-control/domain/event-role";
 import { EventRoles } from "../../../access-control/presentation/http/decorators/event-roles.decorator";
+import { AuthenticatedRequestUser } from "../../../auth/domain/authenticated-request-user";
+import { CurrentUser } from "../../../auth/presentation/http/decorators/current-user.decorator";
 import { Public } from "../../../auth/presentation/http/decorators/public.decorator";
+import { DeleteContestantUseCase } from "../../application/use-cases/delete-contestant.use-case";
 import { GetContestantCredentialsUseCase } from "../../application/use-cases/get-contestant-credentials.use-case";
 import { GetContestantUseCase } from "../../application/use-cases/get-contestant.use-case";
 import { ListContestantsUseCase } from "../../application/use-cases/list-contestants.use-case";
@@ -22,6 +25,7 @@ export class ContestantsController {
     private readonly getContestantCredentialsUseCase: GetContestantCredentialsUseCase,
     private readonly regenerateMagicLinkUseCase: RegenerateMagicLinkUseCase,
     private readonly updateContestantUseCase: UpdateContestantUseCase,
+    private readonly deleteContestantUseCase: DeleteContestantUseCase,
   ) {}
 
   @Public()
@@ -77,5 +81,20 @@ export class ContestantsController {
     @Param("contestantId") contestantId: string,
   ): Promise<{ magicLinkUrl: string }> {
     return this.regenerateMagicLinkUseCase.execute(contestantId);
+  }
+
+  @Delete(":contestantId")
+  @HttpCode(204)
+  @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
+  async deleteContestant(
+    @Param("eventId") eventId: string,
+    @Param("contestantId") contestantId: string,
+    @CurrentUser() currentUser: AuthenticatedRequestUser,
+  ): Promise<void> {
+    await this.deleteContestantUseCase.execute({
+      eventId,
+      contestantId,
+      deletedByUserId: currentUser.id,
+    });
   }
 }

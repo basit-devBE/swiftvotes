@@ -10,6 +10,8 @@ export type Contestant = {
   phone: string | null;
   imageUrl: string | null;
   imageKey: string | null;
+  deletedAt: Date | null;
+  deletedByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

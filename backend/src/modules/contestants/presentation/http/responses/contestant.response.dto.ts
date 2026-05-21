@@ -12,6 +12,8 @@ export class ContestantResponseDto {
   phone!: string | null;
   imageUrl!: string | null;
   imageKey!: string | null;
+  deletedAt!: string | null;
+  deletedByUserId!: string | null;
   createdAt!: string;
   updatedAt!: string;
 
@@ -28,6 +30,8 @@ export class ContestantResponseDto {
       phone: contestant.phone,
       imageUrl: contestant.imageUrl,
       imageKey: contestant.imageKey,
+      deletedAt: contestant.deletedAt?.toISOString() ?? null,
+      deletedByUserId: contestant.deletedByUserId,
       createdAt: contestant.createdAt.toISOString(),
       updatedAt: contestant.updatedAt.toISOString(),
     };
