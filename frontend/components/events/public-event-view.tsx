@@ -14,12 +14,14 @@ import {
   listContestants,
   listTicketTypes,
   startPhoneVerification,
+  verifyTicketOrder,
 } from "@/lib/api/events";
 import {
   ContestantResponse,
   EventCategoryResponse,
   EventStatus,
   EventResponse,
+  TicketOrderResponse,
   TicketTypeResponse,
 } from "@/lib/api/types";
 import {
@@ -309,6 +311,13 @@ function TicketCheckoutPanel({
   event: EventResponse;
   ticketTypes: TicketTypeResponse[];
 }) {
+  type TicketCheckoutStep =
+    | "form"
+    | "submitting"
+    | "payment_pending"
+    | "payment_failed"
+    | "success";
+
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
@@ -325,6 +334,13 @@ function TicketCheckoutPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<TicketCheckoutStep>("form");
+  const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [paymentAttempts, setPaymentAttempts] = useState(0);
+  const [paymentCheckKey, setPaymentCheckKey] = useState(0);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<TicketOrderResponse | null>(null);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const salesState = getTicketSalesState(event);
   const availableTicketTypes = ticketTypes.filter((ticketType) => {
@@ -350,6 +366,8 @@ function TicketCheckoutPanel({
   const currency = selectedItems[0]?.ticketType.currency ?? ticketTypes[0]?.currency ?? "GHS";
   const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const phoneSelectionLocked = Boolean(verificationChallenge);
+  const isCheckoutLocked =
+    step === "submitting" || step === "payment_pending" || step === "success";
 
   function setQuantity(ticketType: TicketTypeResponse, nextQuantity: number) {
     const remaining =
@@ -366,6 +384,105 @@ function TicketCheckoutPanel({
     setVerificationChallenge(null);
     setVerifiedPhone(null);
     setNotice(null);
+    setPaymentReference(null);
+    setPaymentAttempts(0);
+    setConfirmedOrder(null);
+    setStep("form");
+  }
+
+  async function runPaymentStatusCheck(
+    reference: string,
+    signal: { cancelled: boolean },
+  ): Promise<"confirmed" | "failed" | "pending" | "error"> {
+    try {
+      const order = await verifyTicketOrder(event.id, reference);
+      if (signal.cancelled) return "error";
+
+      if (order.status === "PAID") {
+        setConfirmedOrder(order);
+        setStep("success");
+        setNotice(null);
+        setError(null);
+        setIsStatusModalOpen(true);
+        return "confirmed";
+      }
+
+      if (order.status === "FAILED" || order.status === "CANCELLED") {
+        setError("Payment was not confirmed, so no tickets were issued.");
+        setStep("payment_failed");
+        setIsStatusModalOpen(true);
+        return "failed";
+      }
+
+      return "pending";
+    } catch (checkoutError) {
+      if (signal.cancelled) return "error";
+      setError(
+        checkoutError instanceof ApiClientError
+          ? checkoutError.message
+          : "We couldn't confirm this ticket payment yet.",
+      );
+      return "error";
+    }
+  }
+
+  useEffect(() => {
+    if (step !== "payment_pending" || !paymentReference || usePaystack) return;
+
+    const activeReference = paymentReference;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const maxAttempts = 8;
+
+    async function poll() {
+      attempts += 1;
+      setPaymentAttempts(attempts);
+      setIsCheckingPayment(true);
+
+      const outcome = await runPaymentStatusCheck(activeReference, { cancelled });
+      if (cancelled) return;
+
+      if (outcome === "confirmed" || outcome === "failed") {
+        setIsCheckingPayment(false);
+        return;
+      }
+
+      if (outcome === "pending" && attempts < maxAttempts) {
+        timeoutId = setTimeout(() => {
+          void poll();
+        }, 2200);
+        return;
+      }
+
+      setIsCheckingPayment(false);
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [event.id, paymentCheckKey, paymentReference, step]);
+
+  async function handleCheckAgain() {
+    if (!paymentReference) return;
+    setError(null);
+    setNotice(null);
+    setStep("payment_pending");
+    setPaymentCheckKey((current) => current + 1);
+  }
+
+  function resetCheckoutFlow() {
+    setStep("form");
+    setPaymentReference(null);
+    setPaymentAttempts(0);
+    setConfirmedOrder(null);
+    setIsCheckingPayment(false);
+    setNotice(null);
+    setError(null);
+    setIsStatusModalOpen(false);
   }
 
   function validateBuyerDetails(): boolean {
@@ -403,6 +520,8 @@ function TicketCheckoutPanel({
     eventSubmit.preventDefault();
     if (!validateBuyerDetails()) return;
     setIsSubmitting(true);
+    setStep("submitting");
+    setError(null);
 
     try {
       if (usePaystack) {
@@ -421,6 +540,7 @@ function TicketCheckoutPanel({
           return;
         }
         setNotice("Payment request started. Complete the prompt to finish checkout.");
+        setStep("form");
         return;
       }
 
@@ -435,6 +555,7 @@ function TicketCheckoutPanel({
           expiresAt: challenge.expiresAt,
         });
         setNotice(`Verification code sent to ${challenge.maskedPhone}.`);
+        setStep("form");
         return;
       }
 
@@ -467,7 +588,13 @@ function TicketCheckoutPanel({
         window.location.href = result.paymentUrl;
         return;
       }
-      setNotice("Payment request sent. Approve the mobile money prompt to complete your ticket purchase.");
+      setPaymentReference(result.reference);
+      setConfirmedOrder(null);
+      setPaymentAttempts(0);
+      setNotice("");
+      setPaymentCheckKey((current) => current + 1);
+      setStep("payment_pending");
+      setIsStatusModalOpen(true);
     } catch (checkoutError) {
       setError(
         checkoutError instanceof ApiClientError
@@ -476,6 +603,7 @@ function TicketCheckoutPanel({
             ? "Unable to start checkout. Please try again."
             : "Unable to verify this phone number. Please try again.",
       );
+      setStep("form");
     } finally {
       setIsVerifyingPhone(false);
       setIsSubmitting(false);
@@ -560,7 +688,7 @@ function TicketCheckoutPanel({
             className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
             value={buyerName}
             onChange={(inputEvent) => setBuyerName(inputEvent.target.value)}
-            disabled={!salesState.isOpen || isSubmitting}
+            disabled={!salesState.isOpen || isCheckoutLocked}
             placeholder="Your name"
           />
         </label>
@@ -571,7 +699,7 @@ function TicketCheckoutPanel({
             className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
             value={buyerEmail}
             onChange={(inputEvent) => setBuyerEmail(inputEvent.target.value)}
-            disabled={!salesState.isOpen || isSubmitting}
+            disabled={!salesState.isOpen || isCheckoutLocked}
             placeholder="you@example.com"
           />
         </label>
@@ -593,11 +721,11 @@ function TicketCheckoutPanel({
                 }
               />
               <StatusPill
-                label="Payment request"
+                label="Ticket confirmed"
                 state={
-                  notice?.includes("Payment request sent")
+                  step === "success"
                     ? "done"
-                    : isSubmitting && Boolean(verifiedPhone)
+                    : step === "payment_pending" && isCheckingPayment
                       ? "active"
                       : "idle"
                 }
@@ -613,7 +741,7 @@ function TicketCheckoutPanel({
                 className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm outline-none transition focus:border-primary/40"
                 value={buyerPhone}
                 onChange={(inputEvent) => resetPhoneVerification(inputEvent.target.value)}
-                disabled={!salesState.isOpen || isSubmitting || phoneSelectionLocked}
+                disabled={!salesState.isOpen || isCheckoutLocked || phoneSelectionLocked}
                 placeholder="0241234567"
               />
             </label>
@@ -627,7 +755,7 @@ function TicketCheckoutPanel({
                   className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-[#fbfcff] px-3 text-sm tracking-[0.24em] outline-none transition focus:border-primary/40"
                   value={otpCode}
                   onChange={(inputEvent) => setOtpCode(inputEvent.target.value.replace(/\D/g, ""))}
-                  disabled={!salesState.isOpen || isSubmitting}
+                  disabled={!salesState.isOpen || isCheckoutLocked}
                   placeholder="123456"
                 />
               </label>
@@ -645,7 +773,7 @@ function TicketCheckoutPanel({
                     key={provider.value}
                     type="button"
                     onClick={() => setMomoProvider(provider.value)}
-                    disabled={!salesState.isOpen || isSubmitting || phoneSelectionLocked}
+                    disabled={!salesState.isOpen || isCheckoutLocked || phoneSelectionLocked}
                     className={`h-10 rounded-xl border text-xs font-semibold transition ${
                       momoProvider === provider.value
                         ? "border-primary bg-primary text-white"
@@ -689,27 +817,249 @@ function TicketCheckoutPanel({
           {notice}
         </p>
       )}
+      {step === "payment_pending" && !isStatusModalOpen && (
+        <div className="mt-4 rounded-xl border border-primary/16 bg-primary/5 px-4 py-3 text-sm text-primary">
+          Payment is still pending. We have locked this checkout until the current attempt is confirmed or fails.
+          <button
+            type="button"
+            onClick={() => setIsStatusModalOpen(true)}
+            className="ml-2 font-semibold underline underline-offset-2"
+          >
+            Open payment status
+          </button>
+        </div>
+      )}
 
-      <button
-        type="submit"
-        disabled={
-          !salesState.isOpen ||
-          isSubmitting ||
-          selectedItems.length === 0 ||
-          (!usePaystack && Boolean(verificationChallenge) && !verifiedPhone && otpCode.length !== 6)
-        }
-        className="mt-5 flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-ink/12 disabled:text-ink/40"
-      >
-        {isSubmitting
-          ? usePaystack ? "Opening checkout..." : "Checking..."
-          : usePaystack
-            ? "Pay with Paystack"
-            : !verificationChallenge
-              ? "Send verification code"
-              : !verifiedPhone
-                ? isVerifyingPhone ? "Verifying..." : "Verify and pay"
-                : "Pay with JuniPay"}
-      </button>
+      {step === "payment_pending" && !isStatusModalOpen ? (
+        <button
+          type="button"
+          onClick={() => setIsStatusModalOpen(true)}
+          className="mt-5 flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition hover:bg-primary/90"
+        >
+          Open payment status
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={
+            !salesState.isOpen ||
+            isCheckoutLocked ||
+            selectedItems.length === 0 ||
+            (!usePaystack && Boolean(verificationChallenge) && !verifiedPhone && otpCode.length !== 6)
+          }
+          className="mt-5 flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-ink/12 disabled:text-ink/40"
+        >
+          {isSubmitting
+            ? usePaystack ? "Opening checkout..." : "Checking..."
+            : usePaystack
+              ? "Pay with Paystack"
+              : !verificationChallenge
+                ? "Send verification code"
+                : !verifiedPhone
+                  ? isVerifyingPhone ? "Verifying..." : "Verify and pay"
+                  : "Pay with JuniPay"}
+        </button>
+      )}
+
+      {isStatusModalOpen &&
+        (step === "payment_pending" || step === "payment_failed" || step === "success") && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ticket-checkout-status-title"
+        >
+          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md overflow-hidden rounded-[1.75rem] bg-white shadow-[0_40px_100px_-30px_rgba(7,17,31,0.45)]">
+            <div className="border-b border-ink/8 bg-[#f7f9fc] px-6 py-5">
+              <p
+                id="ticket-checkout-status-title"
+                className="font-display text-lg font-semibold tracking-tight text-ink"
+              >
+                {event.name}
+              </p>
+              <p className="mt-1 text-xs text-ink/50">
+                {totalQuantity} ticket{totalQuantity === 1 ? "" : "s"} · {formatCurrency(totalAmountMinor, currency)}
+              </p>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div
+                  className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                    step === "success"
+                      ? "bg-[#eef9f2]"
+                      : step === "payment_failed"
+                        ? "bg-[#fff2f4]"
+                        : "bg-primary/10"
+                  }`}
+                >
+                  <svg
+                    className={`h-8 w-8 ${
+                      step === "success"
+                        ? "text-[#1b6f4b]"
+                        : step === "payment_failed"
+                          ? "text-[#b40f17]"
+                          : "text-primary"
+                    }`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    {step === "success" ? (
+                      <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    ) : step === "payment_failed" ? (
+                      <path d="M9.75 9.75 14.25 14.25M14.25 9.75 9.75 14.25M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    ) : (
+                      <path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8V2Zm1 5h-2v6l5 3 .9-1.7-3.9-2.3V7Z" />
+                    )}
+                  </svg>
+                </div>
+
+                <div>
+                  <p className="font-display text-xl font-semibold tracking-tight text-ink">
+                    {step === "success"
+                      ? "Tickets confirmed"
+                      : step === "payment_failed"
+                        ? "Payment not confirmed"
+                        : isCheckingPayment
+                          ? "Checking your payment"
+                          : "Waiting for confirmation"}
+                  </p>
+                  <p className="mt-1 text-sm text-ink/55">
+                    {step === "success"
+                      ? "Your payment has been confirmed and your tickets have been issued."
+                      : step === "payment_failed"
+                        ? "The payment did not complete successfully, so no tickets were issued."
+                        : isCheckingPayment
+                          ? "Approve the mobile money prompt on your phone. We are checking with JuniPay and will confirm the order here."
+                          : "We have sent the payment prompt, but the order is not confirmed yet."}
+                  </p>
+                  {step === "success" && (
+                    <p className="mt-1 text-sm text-ink/55">
+                      Your ticket email is being sent to {confirmedOrder?.buyerEmail ?? buyerEmail}.
+                    </p>
+                  )}
+                </div>
+
+                <div className="w-full rounded-2xl border border-ink/10 bg-[#f7f9fc] p-4 text-left">
+                  <div className="flex flex-wrap gap-2">
+                    <StatusPill label="Prompt sent" state={paymentReference ? "done" : "idle"} />
+                    <StatusPill
+                      label="Payment verified"
+                      state={
+                        step === "success"
+                          ? "done"
+                          : isCheckingPayment
+                            ? "active"
+                            : "idle"
+                      }
+                    />
+                    <StatusPill
+                      label="Tickets issued"
+                      state={step === "success" ? "done" : "idle"}
+                    />
+                  </div>
+
+                  <dl className="mt-4 space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-ink/55">Buyer</dt>
+                      <dd className="font-semibold text-ink">{buyerName}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-ink/55">Tickets</dt>
+                      <dd className="font-semibold text-ink">
+                        {confirmedOrder?.items.reduce((sum, item) => sum + item.quantity, 0) ?? totalQuantity}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-ink/55">Amount</dt>
+                      <dd className="font-semibold text-ink">
+                        {formatCurrency(confirmedOrder?.totalAmountMinor ?? totalAmountMinor, confirmedOrder?.currency ?? currency)}
+                      </dd>
+                    </div>
+                    {step === "success" && confirmedOrder?.issuedTickets.length ? (
+                      <div className="grid gap-2">
+                        <dt className="text-ink/55">Ticket codes</dt>
+                        <dd className="flex flex-wrap gap-2">
+                          {confirmedOrder.issuedTickets.map((ticket) => (
+                            <span
+                              key={ticket.id}
+                              className="rounded-full bg-white px-3 py-1 font-mono text-[0.7rem] font-semibold text-ink ring-1 ring-ink/10"
+                            >
+                              {ticket.code}
+                            </span>
+                          ))}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </div>
+
+                {step === "payment_pending" && !isCheckingPayment && (
+                  <p className="max-w-sm text-sm leading-6 text-ink/55">
+                    Approval may still be pending on the wallet. If you have already approved it, check again.
+                  </p>
+                )}
+
+                {error && (
+                  <div className="w-full rounded-xl border border-[#f0cfd3] bg-[#fff2f4] px-4 py-3 text-sm text-[#b40f17]">
+                    {error}
+                  </div>
+                )}
+
+                <div className="mt-2 flex w-full flex-col gap-3">
+                  {step === "success" ? (
+                    <button
+                      type="button"
+                      onClick={resetCheckoutFlow}
+                      className="button-primary w-full"
+                    >
+                      Close
+                    </button>
+                  ) : step === "payment_failed" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={resetCheckoutFlow}
+                        className="button-primary w-full"
+                      >
+                        Try again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetCheckoutFlow}
+                        className="button-secondary w-full"
+                      >
+                        Close
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleCheckAgain()}
+                        disabled={isCheckingPayment}
+                        className="button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isCheckingPayment
+                          ? `Checking${paymentAttempts > 0 ? ` (${paymentAttempts})` : ""}...`
+                          : "Check status again"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsStatusModalOpen(false)}
+                        className="button-secondary w-full"
+                      >
+                        Close for now
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

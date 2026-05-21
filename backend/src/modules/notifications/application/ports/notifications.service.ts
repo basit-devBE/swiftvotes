@@ -40,6 +40,29 @@ export type VoteConfirmationPayload = {
   votedAt: Date;
 };
 
+export type TicketConfirmationPayload = {
+  recipientEmail: string;
+  recipientName: string;
+  eventId: string;
+  eventName: string;
+  primaryFlyerUrl: string;
+  eventStartAt: Date | null;
+  eventEndAt: Date | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  quantity: number;
+  amountMinor: number;
+  currency: string;
+  orderReference: string;
+  issuedAt: Date;
+  tickets: Array<{
+    code: string;
+    ticketTypeName: string;
+    qrImageUrl: string;
+    redeemUrl: string;
+  }>;
+};
+
 export interface NotificationsService {
   sendEventPendingApprovalEmail(
     payload: EventNotificationPayload,
@@ -54,4 +77,5 @@ export interface NotificationsService {
   ): Promise<void>;
   sendContestantWelcomeEmail(payload: ContestantWelcomePayload): Promise<void>;
   sendVoteConfirmationEmail(payload: VoteConfirmationPayload): Promise<void>;
+  sendTicketConfirmationEmail(payload: TicketConfirmationPayload): Promise<void>;
 }

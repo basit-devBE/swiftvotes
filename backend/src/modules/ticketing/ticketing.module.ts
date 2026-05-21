@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { appConfig } from "../../core/config/app.config";
 import { EventsModule } from "../events/events.module";
 import { JunipayModule } from "../junipay/junipay.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { PhoneVerificationsModule } from "../phone-verifications/phone-verifications.module";
 import { VotesModule } from "../votes/votes.module";
 import { ConfirmTicketOrderUseCase } from "./application/use-cases/confirm-ticket-order.use-case";
@@ -12,6 +13,7 @@ import { CreateTicketTypeUseCase } from "./application/use-cases/create-ticket-t
 import { DisableTicketTypeUseCase } from "./application/use-cases/disable-ticket-type.use-case";
 import { HandleTicketPaymentWebhookUseCase } from "./application/use-cases/handle-ticket-payment-webhook.use-case";
 import { ListTicketTypesUseCase } from "./application/use-cases/list-ticket-types.use-case";
+import { RedeemIssuedTicketUseCase } from "./application/use-cases/redeem-issued-ticket.use-case";
 import { UpdateTicketTypeUseCase } from "./application/use-cases/update-ticket-type.use-case";
 import { TICKETING_REPOSITORY } from "./application/ticketing.tokens";
 import { PrismaTicketingRepository } from "./infrastructure/persistence/prisma-ticketing.repository";
@@ -26,6 +28,7 @@ import { TicketingController } from "./presentation/http/ticketing.controller";
     VotesModule,
     JunipayModule,
     PhoneVerificationsModule,
+    NotificationsModule,
   ],
   controllers: [
     TicketingController,
@@ -39,6 +42,7 @@ import { TicketingController } from "./presentation/http/ticketing.controller";
     ListTicketTypesUseCase,
     CreateTicketOrderUseCase,
     ConfirmTicketOrderUseCase,
+    RedeemIssuedTicketUseCase,
     HandleTicketPaymentWebhookUseCase,
     {
       provide: TICKETING_REPOSITORY,

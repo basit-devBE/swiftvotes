@@ -6,6 +6,7 @@ import {
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
+  TicketConfirmationPayload,
   VoteConfirmationPayload,
 } from "../../application/ports/notifications.service";
 
@@ -71,6 +72,15 @@ export class AppLoggerNotificationsService implements NotificationsService {
       : `${payload.currency} ${(payload.amountMinor / 100).toFixed(2)}`;
     this.logger.log(
       `Vote confirmation email queued for ${payload.recipientEmail} — ${payload.quantity} vote(s) for ${payload.contestantName} (${payload.contestantCode}), event ${payload.eventName}, amount ${amount}`,
+      "Notifications",
+    );
+  }
+
+  async sendTicketConfirmationEmail(
+    payload: TicketConfirmationPayload,
+  ): Promise<void> {
+    this.logger.log(
+      `Ticket confirmation email queued for ${payload.recipientEmail} — ${payload.tickets.length} issued ticket(s), event ${payload.eventName}, order ${payload.orderReference}`,
       "Notifications",
     );
   }

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftVote Ticket Email Preview</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --surface: #ffffff;
+      --surface-soft: #f8faff;
+      --border: #dce5f2;
+      --text: #07111f;
+      --muted: #5e6a7f;
+      --subtle: #8e98aa;
+      --primary: #0f4cdb;
+      --primary-soft: #edf3ff;
+      --success: #1f8f5f;
+      --success-soft: #ecfbf3;
+      --shadow: 0 28px 80px -48px rgba(7, 17, 31, 0.34);
+      --shadow-soft: 0 18px 44px -32px rgba(7, 17, 31, 0.22);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(15, 76, 219, 0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(180, 15, 23, 0.05), transparent 18%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      padding: 32px 16px 64px;
+    }
+
+    .frame {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(7, 17, 31, 0.5);
+      text-align: center;
+    }
+
+    .shell {
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 40px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      position: relative;
+      min-height: 340px;
+      padding: 42px 44px 150px;
+      background:
+        linear-gradient(180deg, rgba(7, 17, 31, 0.1), rgba(7, 17, 31, 0.82)),
+        url("https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 120px;
+      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.98) 90%);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-pill,
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-pill {
+      border: 1px solid rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.86);
+    }
+
+    .status-pill {
+      border: 1px solid rgba(220, 255, 236, 0.42);
+      background: rgba(31, 143, 95, 0.18);
+      color: #e7fff0;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+      margin-top: 34px;
+      max-width: 540px;
+      color: white;
+    }
+
+    .hero-copy p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.62);
+    }
+
+    .hero-copy h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 48px;
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+      font-weight: 700;
+    }
+
+    .hero-copy .subhead {
+      margin-top: 18px;
+      max-width: 460px;
+      font-size: 17px;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .content {
+      position: relative;
+      margin-top: -104px;
+      padding: 0 28px 30px;
+      z-index: 2;
+    }
+
+    .ticket-card {
+      max-width: 640px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,255,0.95));
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .ticket-head {
+      padding: 24px 28px 18px;
+      background:
+        linear-gradient(135deg, rgba(15, 76, 219, 0.08), rgba(255,255,255,0.96) 56%),
+        white;
+      border-bottom: 1px solid #e9eef7;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .ticket-head h2 {
+      margin: 4px 0 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 34px;
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+    }
+
+    .ticket-head p {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(7, 17, 31, 0.46);
+    }
+
+    .ticket-chip {
+      border-radius: 999px;
+      border: 1px solid #cae7d5;
+      background: var(--success-soft);
+      color: var(--success);
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+    }
+
+    .ticket-body {
+      padding: 26px 28px 0;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .detail {
+      border: 1px solid #ecf1f8;
+      border-radius: var(--radius-md);
+      background: var(--surface-soft);
+      padding: 16px 16px 15px;
+      min-height: 86px;
+    }
+
+    .detail-label {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: rgba(7, 17, 31, 0.42);
+    }
+
+    .detail-value {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .detail-value.small {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .perforation {
+      position: relative;
+      margin: 26px 0 0;
+      padding: 0 28px;
+    }
+
+    .perforation::before {
+      content: "";
+      display: block;
+      border-top: 2px dashed #dbe4f0;
+    }
+
+    .cut-left,
+    .cut-right {
+      position: absolute;
+      top: -14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid rgba(220, 229, 242, 0.7);
+    }
+
+    .cut-left { left: -14px; }
+    .cut-right { right: -14px; }
+
+    .qr-zone {
+      padding: 28px 28px 30px;
+      text-align: center;
+    }
+
+    .qr-frame {
+      width: 196px;
+      height: 196px;
+      margin: 0 auto 18px;
+      border-radius: 24px;
+      background: white;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 18px 38px -30px rgba(7, 17, 31, 0.25);
+    }
+
+    .qr-frame svg {
+      width: 158px;
+      height: 158px;
+      display: block;
+    }
+
+    .qr-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .qr-copy {
+      margin: 10px auto 0;
+      max-width: 420px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .code-pill {
+      display: inline-flex;
+      margin-top: 18px;
+      border-radius: 999px;
+      border: 1px solid #d8e1ef;
+      background: white;
+      padding: 10px 16px;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.08em;
+    }
+
+    .section {
+      margin-top: 24px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: rgba(255,255,255,0.94);
+      padding: 24px;
+    }
+
+    .section h3 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      letter-spacing: -0.04em;
+    }
+
+    .section-label {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(7, 17, 31, 0.44);
+    }
+
+    .notes {
+      margin: 16px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    .notes li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .notes li::before {
+      content: "";
+      flex: 0 0 8px;
+      width: 8px;
+      height: 8px;
+      margin-top: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .issued-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .issued-card {
+      border: 1px solid #e6ecf6;
+      border-radius: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+      padding: 18px;
+      box-shadow: 0 12px 28px -26px rgba(7, 17, 31, 0.24);
+    }
+
+    .issued-card .top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .issued-card h4 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .issued-card p {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .issued-badge {
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 8px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+    }
+
+    .issued-qr {
+      width: 112px;
+      height: 112px;
+      margin: 18px auto 14px;
+      border-radius: 18px;
+      border: 1px solid #dce5f2;
+      background: white;
+      display: grid;
+      place-items: center;
+    }
+
+    .issued-qr svg {
+      width: 86px;
+      height: 86px;
+    }
+
+    .issued-code {
+      display: block;
+      text-align: center;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text);
+    }
+
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      border-radius: 999px;
+      padding: 0 20px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      transition: 180ms ease;
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, #0f4cdb, #245fe6);
+      color: white;
+      box-shadow: 0 16px 30px -22px rgba(15, 76, 219, 0.68);
+    }
+
+    .button-secondary {
+      border: 1px solid #d7e0ed;
+      background: white;
+      color: var(--text);
+    }
+
+    .meta {
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--subtle);
+    }
+
+    .footer {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--subtle);
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 18px 10px 42px;
+      }
+
+      .hero {
+        min-height: 300px;
+        padding: 26px 22px 124px;
+      }
+
+      .hero-copy h1 {
+        font-size: 38px;
+      }
+
+      .content {
+        margin-top: -88px;
+        padding: 0 14px 18px;
+      }
+
+      .ticket-head,
+      .ticket-body,
+      .qr-zone,
+      .section {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .ticket-head {
+        display: block;
+      }
+
+      .ticket-chip {
+        margin-top: 14px;
+        display: inline-flex;
+      }
+
+      .detail-grid,
+      .issued-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        align-items: stretch;
+      }
+
+      .action-row {
+        width: 100%;
+      }
+
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Ticket confirmation preview</p>
+
+    <div class="shell">
+      <section class="hero">
+        <div class="brand-row">
+          <span class="brand-pill">SwiftVote RSVP</span>
+          <span class="status-pill">Ticket confirmed</span>
+        </div>
+
+        <div class="hero-copy">
+          <p>Afro Night Live 2026</p>
+          <h1>You’re on the guest list.</h1>
+          <div class="subhead">
+            Your paid ticket is confirmed. Present this pass at the venue entrance and the organiser can scan it to validate entry.
+          </div>
+        </div>
+      </section>
+
+      <div class="content">
+        <section class="ticket-card">
+          <div class="ticket-head">
+            <div>
+              <p>Digital RSVP pass</p>
+              <h2>VIP Access</h2>
+            </div>
+            <span class="ticket-chip">Redeem once at entry</span>
+          </div>
+
+          <div class="ticket-body">
+            <div class="detail-grid">
+              <div class="detail">
+                <p class="detail-label">Guest</p>
+                <p class="detail-value">Abdul Basit</p>
+              </div>
+              <div class="detail">
+                <p class="detail-label">Quantity</p>
+                <p class="detail-value">2 tickets</p>
+              </div>
+              <div class="detail">
+                <p class="detail-label">Event date</p>
+                <p class="detail-value">Saturday, 24 May 2026</p>
+                <p class="detail-value small">7:00 PM</p>
+              </div>
+              <div class="detail">
+                <p class="detail-label">Venue</p>
+                <p class="detail-value">National Theatre</p>
+                <p class="detail-value small">Accra, Ghana</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="perforation">
+            <span class="cut-left"></span>
+            <span class="cut-right"></span>
+          </div>
+
+          <div class="qr-zone">
+            <div class="qr-frame" aria-label="QR code preview">
+              <svg viewBox="0 0 29 29" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+                <rect width="29" height="29" fill="#fff"/>
+                <g fill="#07111f">
+                  <rect x="1" y="1" width="7" height="7"/><rect x="2" y="2" width="5" height="5" fill="#fff"/><rect x="3" y="3" width="3" height="3"/>
+                  <rect x="21" y="1" width="7" height="7"/><rect x="22" y="2" width="5" height="5" fill="#fff"/><rect x="23" y="3" width="3" height="3"/>
+                  <rect x="1" y="21" width="7" height="7"/><rect x="2" y="22" width="5" height="5" fill="#fff"/><rect x="3" y="23" width="3" height="3"/>
+                  <rect x="10" y="1" width="1" height="1"/><rect x="12" y="1" width="1" height="1"/><rect x="14" y="1" width="1" height="1"/><rect x="16" y="1" width="1" height="1"/>
+                  <rect x="9" y="3" width="1" height="1"/><rect x="11" y="3" width="1" height="1"/><rect x="13" y="3" width="1" height="1"/><rect x="15" y="3" width="1" height="1"/><rect x="17" y="3" width="1" height="1"/>
+                  <rect x="10" y="5" width="1" height="1"/><rect x="12" y="5" width="1" height="1"/><rect x="14" y="5" width="1" height="1"/><rect x="16" y="5" width="1" height="1"/>
+                  <rect x="9" y="8" width="1" height="1"/><rect x="11" y="8" width="1" height="1"/><rect x="13" y="8" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/>
+                  <rect x="10" y="10" width="1" height="1"/><rect x="12" y="10" width="1" height="1"/><rect x="13" y="11" width="1" height="1"/><rect x="15" y="10" width="1" height="1"/><rect x="17" y="10" width="1" height="1"/>
+                  <rect x="9" y="12" width="1" height="1"/><rect x="11" y="12" width="1" height="1"/><rect x="14" y="12" width="1" height="1"/><rect x="16" y="12" width="1" height="1"/><rect x="18" y="12" width="1" height="1"/>
+                  <rect x="10" y="14" width="1" height="1"/><rect x="12" y="14" width="1" height="1"/><rect x="14" y="14" width="1" height="1"/><rect x="17" y="14" width="1" height="1"/><rect x="19" y="14" width="1" height="1"/>
+                  <rect x="9" y="16" width="1" height="1"/><rect x="11" y="16" width="1" height="1"/><rect x="13" y="16" width="1" height="1"/><rect x="15" y="16" width="1" height="1"/><rect x="18" y="16" width="1" height="1"/>
+                  <rect x="20" y="10" width="1" height="1"/><rect x="22" y="10" width="1" height="1"/><rect x="24" y="10" width="1" height="1"/><rect x="26" y="10" width="1" height="1"/>
+                  <rect x="20" y="12" width="1" height="1"/><rect x="23" y="12" width="1" height="1"/><rect x="25" y="12" width="1" height="1"/>
+                  <rect x="21" y="14" width="1" height="1"/><rect x="24" y="14" width="1" height="1"/><rect x="26" y="14" width="1" height="1"/>
+                  <rect x="20" y="16" width="1" height="1"/><rect x="22" y="16" width="1" height="1"/><rect x="24" y="16" width="1" height="1"/><rect x="26" y="16" width="1" height="1"/>
+                  <rect x="9" y="20" width="1" height="1"/><rect x="11" y="20" width="1" height="1"/><rect x="13" y="20" width="1" height="1"/><rect x="15" y="20" width="1" height="1"/><rect x="17" y="20" width="1" height="1"/>
+                  <rect x="10" y="22" width="1" height="1"/><rect x="12" y="22" width="1" height="1"/><rect x="14" y="22" width="1" height="1"/><rect x="16" y="22" width="1" height="1"/>
+                  <rect x="9" y="24" width="1" height="1"/><rect x="11" y="24" width="1" height="1"/><rect x="13" y="24" width="1" height="1"/><rect x="15" y="24" width="1" height="1"/><rect x="17" y="24" width="1" height="1"/>
+                  <rect x="20" y="21" width="1" height="1"/><rect x="22" y="21" width="1" height="1"/><rect x="24" y="21" width="1" height="1"/><rect x="26" y="21" width="1" height="1"/>
+                  <rect x="21" y="23" width="1" height="1"/><rect x="23" y="23" width="1" height="1"/><rect x="25" y="23" width="1" height="1"/>
+                  <rect x="20" y="25" width="1" height="1"/><rect x="22" y="25" width="1" height="1"/><rect x="24" y="25" width="1" height="1"/><rect x="26" y="25" width="1" height="1"/>
+                </g>
+              </svg>
+            </div>
+
+            <h3 class="qr-title">Scan at entry</h3>
+            <p class="qr-copy">
+              Present this QR code to the organiser or event admin at the entrance. It can only be redeemed once for admission.
+            </p>
+            <span class="code-pill">SVT-VIP-9X2A-41K</span>
+          </div>
+        </section>
+
+        <section class="section">
+          <p class="section-label">What to expect</p>
+          <h3>Bring this pass with you.</h3>
+          <ul class="notes">
+            <li>Show this email or a screenshot at the entrance for scanning.</li>
+            <li>Each issued ticket has its own QR code and can only be redeemed once.</li>
+            <li>Validation should only be completed by the event owner or a platform admin.</li>
+          </ul>
+        </section>
+
+        <section class="section">
+          <p class="section-label">Issued tickets</p>
+          <h3>One QR per attendee.</h3>
+          <div class="issued-grid">
+            <article class="issued-card">
+              <div class="top">
+                <div>
+                  <h4>VIP Access · Ticket 1</h4>
+                  <p>Use this code for the first guest.</p>
+                </div>
+                <span class="issued-badge">Admit one</span>
+              </div>
+              <div class="issued-qr">
+                <svg viewBox="0 0 29 29" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+                  <rect width="29" height="29" fill="#fff"/><g fill="#07111f"><rect x="1" y="1" width="7" height="7"/><rect x="21" y="1" width="7" height="7"/><rect x="1" y="21" width="7" height="7"/><rect x="10" y="3" width="1" height="1"/><rect x="12" y="3" width="1" height="1"/><rect x="14" y="3" width="1" height="1"/><rect x="16" y="3" width="1" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="12" y="8" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="10" y="12" width="1" height="1"/><rect x="14" y="12" width="1" height="1"/><rect x="18" y="12" width="1" height="1"/><rect x="21" y="12" width="1" height="1"/><rect x="23" y="14" width="1" height="1"/><rect x="25" y="16" width="1" height="1"/><rect x="10" y="22" width="1" height="1"/><rect x="12" y="24" width="1" height="1"/><rect x="14" y="22" width="1" height="1"/><rect x="16" y="24" width="1" height="1"/><rect x="22" y="23" width="1" height="1"/><rect x="24" y="25" width="1" height="1"/></g>
+                </svg>
+              </div>
+              <span class="issued-code">SVT-VIP-9X2A-41K</span>
+            </article>
+
+            <article class="issued-card">
+              <div class="top">
+                <div>
+                  <h4>VIP Access · Ticket 2</h4>
+                  <p>Use this code for the second guest.</p>
+                </div>
+                <span class="issued-badge">Admit one</span>
+              </div>
+              <div class="issued-qr">
+                <svg viewBox="0 0 29 29" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+                  <rect width="29" height="29" fill="#fff"/><g fill="#07111f"><rect x="1" y="1" width="7" height="7"/><rect x="21" y="1" width="7" height="7"/><rect x="1" y="21" width="7" height="7"/><rect x="10" y="1" width="1" height="1"/><rect x="12" y="3" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="9" y="10" width="1" height="1"/><rect x="11" y="12" width="1" height="1"/><rect x="13" y="14" width="1" height="1"/><rect x="15" y="16" width="1" height="1"/><rect x="17" y="18" width="1" height="1"/><rect x="20" y="10" width="1" height="1"/><rect x="22" y="12" width="1" height="1"/><rect x="24" y="14" width="1" height="1"/><rect x="26" y="16" width="1" height="1"/><rect x="10" y="21" width="1" height="1"/><rect x="12" y="23" width="1" height="1"/><rect x="14" y="25" width="1" height="1"/><rect x="22" y="23" width="1" height="1"/><rect x="24" y="21" width="1" height="1"/></g>
+                </svg>
+              </div>
+              <span class="issued-code">SVT-VIP-A8Q1-77R</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="actions">
+            <div class="action-row">
+              <a href="#" class="button button-primary">View event</a>
+              <a href="#" class="button button-secondary">Contact organiser</a>
+            </div>
+            <div class="meta">
+              Order ref: SWT-ORDER-204811<br />
+              Keep this for support, not for entry scanning.
+            </div>
+          </div>
+        </section>
+
+        <div class="footer">
+          This preview is a layout proposal for the SwiftVote ticket confirmation email.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

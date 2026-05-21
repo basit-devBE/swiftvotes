@@ -13,6 +13,7 @@ import {
   EventCategoryResponse,
   EventResponse,
   NominationResponse,
+  RedeemedIssuedTicketResponse,
   RejectNominationInput,
   SubmitNominationInput,
   StartPhoneVerificationInput,
@@ -143,6 +144,19 @@ export function verifyTicketOrder(
   const qs = new URLSearchParams({ reference }).toString();
   return apiRequest<TicketOrderResponse>(
     `/events/${eventId}/ticket-orders/verify?${qs}`,
+  );
+}
+
+export function redeemIssuedTicket(
+  eventId: string,
+  code: string,
+): Promise<RedeemedIssuedTicketResponse> {
+  return apiRequest<RedeemedIssuedTicketResponse>(
+    `/events/${eventId}/issued-tickets/redeem`,
+    {
+      method: "POST",
+      body: { code },
+    },
   );
 }
 

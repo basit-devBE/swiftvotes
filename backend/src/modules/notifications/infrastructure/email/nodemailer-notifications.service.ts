@@ -1,9 +1,11 @@
+import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigType } from "@nestjs/config";
 import * as ejs from "ejs";
 import * as nodemailer from "nodemailer";
+import QRCode from "qrcode";
 import { Resend } from "resend";
 
 import { appConfig } from "../../../../core/config/app.config";
@@ -14,23 +16,25 @@ import {
   EventNotificationPayload,
   NominationReceivedPayload,
   NotificationsService,
+  TicketConfirmationPayload,
   VoteConfirmationPayload,
 } from "../../application/ports/notifications.service";
 
 const TEMPLATES_DIR = path.join(__dirname, "templates");
-const LOGO_CID = "swiftvote-logo@mail";
 const LOGO_PATH = path.join(__dirname, "assets", "swiftvote-logo.png");
+const LOGO_CID = "swiftvote-logo";
 
-const LOGO_ATTACHMENT = {
-  filename: "swiftvote-logo.png",
-  path: LOGO_PATH,
-  cid: LOGO_CID,
+type InlineAttachment = {
+  filename: string;
+  content: Buffer;
+  contentId: string;
 };
 
 @Injectable()
 export class NodemailerNotificationsService implements NotificationsService {
   private readonly transporter: nodemailer.Transporter;
   private readonly resend: Resend | null;
+  private logoBufferPromise: Promise<Buffer> | null = null;
 
   constructor(
     @Inject(emailConfig.KEY)
@@ -58,6 +62,40 @@ export class NodemailerNotificationsService implements NotificationsService {
     return `${this.app.frontendOrigin}/events/${eventId}`;
   }
 
+  private ticketRedeemUrl(eventId: string, code: string): string {
+    return `${this.app.frontendOrigin}/events/${eventId}/tickets/redeem?code=${encodeURIComponent(code)}`;
+  }
+
+  private async getLogoAttachment(): Promise<InlineAttachment> {
+    if (!this.logoBufferPromise) {
+      this.logoBufferPromise = fs.readFile(LOGO_PATH);
+    }
+    return {
+      filename: "swiftvote-logo.png",
+      content: await this.logoBufferPromise,
+      contentId: LOGO_CID,
+    };
+  }
+
+  private async buildTicketQrAttachment(
+    eventId: string,
+    code: string,
+    cid: string,
+  ): Promise<InlineAttachment> {
+    const redeemUrl = `${this.app.frontendOrigin}/events/${eventId}/tickets/redeem?code=${encodeURIComponent(code.trim().toUpperCase())}`;
+    const buffer = await QRCode.toBuffer(redeemUrl, {
+      type: "png",
+      margin: 1,
+      color: { dark: "#07111f", light: "#ffffff" },
+      width: 256,
+    });
+    return {
+      filename: `${cid}.png`,
+      content: buffer,
+      contentId: cid,
+    };
+  }
+
   private async render(
     template: string,
     data: Record<string, unknown>,
@@ -70,7 +108,15 @@ export class NodemailerNotificationsService implements NotificationsService {
     });
   }
 
-  private async send(to: string, subject: string, html: string): Promise<void> {
+  private async send(
+    to: string,
+    subject: string,
+    html: string,
+    extraAttachments: InlineAttachment[] = [],
+  ): Promise<void> {
+    const logo = await this.getLogoAttachment();
+    const attachments: InlineAttachment[] = [logo, ...extraAttachments];
+
     if (this.resend) {
       try {
         const { error } = await this.resend.emails.send({
@@ -78,6 +124,11 @@ export class NodemailerNotificationsService implements NotificationsService {
           to,
           subject,
           html,
+          attachments: attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentId: a.contentId,
+          })),
         });
 
         if (error) {
@@ -113,7 +164,12 @@ export class NodemailerNotificationsService implements NotificationsService {
         to,
         subject,
         html,
-        attachments: [LOGO_ATTACHMENT],
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          cid: a.contentId,
+          contentDisposition: "inline",
+        })),
       });
       this.logger.log(
         `Email sent to ${to}: "${subject}"`,
@@ -247,5 +303,62 @@ export class NodemailerNotificationsService implements NotificationsService {
       eventUrl: this.eventUrl(payload.eventId),
     });
     await this.send(payload.recipientEmail, subject, html);
+  }
+
+  async sendTicketConfirmationEmail(
+    payload: TicketConfirmationPayload,
+  ): Promise<void> {
+    const subject = `Your ticket is confirmed — ${payload.eventName}`;
+    const amountFormatted = `${payload.currency} ${(payload.amountMinor / 100).toFixed(2)}`;
+
+    const ticketsWithCids = payload.tickets.map((ticket, index) => ({
+      ...ticket,
+      qrCid: `ticket-qr-${index}`,
+    }));
+
+    const qrAttachments = await Promise.all(
+      ticketsWithCids.map((ticket) =>
+        this.buildTicketQrAttachment(payload.eventId, ticket.code, ticket.qrCid),
+      ),
+    );
+
+    const html = await this.render("ticket-confirmation", {
+      subject,
+      recipientName: payload.recipientName,
+      eventName: payload.eventName,
+      primaryFlyerUrl: payload.primaryFlyerUrl,
+      eventDate: payload.eventStartAt
+        ? payload.eventStartAt.toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })
+        : "Date to be confirmed",
+      eventTime: payload.eventStartAt
+        ? payload.eventStartAt.toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Time to be confirmed",
+      venueName: payload.venueName ?? "Venue to be announced",
+      venueAddress: payload.venueAddress ?? null,
+      quantity: payload.quantity,
+      amountFormatted,
+      orderReference: payload.orderReference,
+      issuedAt: payload.issuedAt.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      eventUrl: this.eventUrl(payload.eventId),
+      tickets: ticketsWithCids.map((ticket) => ({
+        ...ticket,
+        qrImageUrl: `cid:${ticket.qrCid}`,
+        redeemUrl: ticket.redeemUrl || this.ticketRedeemUrl(payload.eventId, ticket.code),
+      })),
+    });
+    await this.send(payload.recipientEmail, subject, html, qrAttachments);
   }
 }
