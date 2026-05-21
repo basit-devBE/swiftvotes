@@ -70,7 +70,7 @@ export class JunipayService {
       phoneNumber: input.phoneNumber,
       channel: "mobile_money",
       senderEmail: input.senderEmail,
-      description: input.description,
+      description: this.normalizeDescription(input.description),
       foreignID: reference,
       callbackUrl: input.callbackUrl || this.config.callbackUrl,
     };
@@ -289,6 +289,14 @@ export class JunipayService {
 
   private toMajorAmount(amountMinor: number): number {
     return Number((amountMinor / 100).toFixed(2));
+  }
+
+  private normalizeDescription(description: string): string {
+    const normalized = description
+      .replace(/[^a-zA-Z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return normalized.slice(0, 50) || "SwiftVotes payment";
   }
 
   private parseJson(text: string): unknown {

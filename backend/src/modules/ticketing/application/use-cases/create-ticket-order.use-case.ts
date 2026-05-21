@@ -215,7 +215,7 @@ export class CreateTicketOrderUseCase {
         amountMinor: totalAmountMinor,
         currency,
         senderEmail: buyerEmail,
-        description: `Tickets for ${event.name}`,
+        description: "SwiftVotes ticket payment",
         callbackUrl: this.buildJunipayCallbackUrl(),
       });
 
