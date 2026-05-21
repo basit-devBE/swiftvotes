@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= subject %></title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f3f6fb;
+      font-family: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: #07111f;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper { width: 100%; padding: 32px 12px 48px; }
+    .shell {
+      max-width: 700px;
+      margin: 0 auto;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid #dce5f2;
+      background: #ffffff;
+      box-shadow: 0 28px 80px -48px rgba(7, 17, 31, 0.34);
+    }
+    .hero-image {
+      display: block;
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+    }
+    .hero-copy {
+      padding: 28px 30px 86px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(7,17,31,0.08)),
+        #0d1730;
+      color: #ffffff;
+    }
+    .logo {
+      height: 32px;
+      width: auto;
+      display: inline-block;
+      margin-bottom: 18px;
+    }
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.58);
+      margin-bottom: 12px;
+    }
+    .headline {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 38px;
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+    }
+    .subhead {
+      margin-top: 14px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.82);
+      max-width: 500px;
+    }
+    .ticket-card {
+      margin: -58px 24px 0;
+      border-radius: 26px;
+      border: 1px solid #dce5f2;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      box-shadow: 0 18px 46px -32px rgba(7, 17, 31, 0.28);
+      overflow: hidden;
+    }
+    .ticket-head {
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid #e9eef7;
+      background: linear-gradient(135deg, rgba(15,76,219,0.08), rgba(255,255,255,0.96) 58%);
+    }
+    .ticket-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(7,17,31,0.48);
+      margin-bottom: 10px;
+    }
+    .ticket-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: #07111f;
+    }
+    .detail-grid {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 12px;
+      padding: 12px;
+    }
+    .detail-card {
+      border: 1px solid #ecf1f8;
+      border-radius: 16px;
+      background: #f8fbff;
+      padding: 14px;
+      vertical-align: top;
+    }
+    .detail-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: rgba(7,17,31,0.4);
+      margin-bottom: 8px;
+    }
+    .detail-value {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.5;
+      color: #07111f;
+    }
+    .detail-sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.6;
+      color: #5d697d;
+    }
+    .perforation {
+      position: relative;
+      margin: 4px 0 0;
+      border-top: 2px dashed #dbe4f0;
+    }
+    .qr-zone {
+      padding: 24px 24px 28px;
+      text-align: center;
+    }
+    .qr-image {
+      display: inline-block;
+      width: 192px;
+      height: 192px;
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid #dce5f2;
+      background: #ffffff;
+      margin-bottom: 18px;
+    }
+    .qr-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #07111f;
+      margin-bottom: 10px;
+    }
+    .qr-copy {
+      max-width: 420px;
+      margin: 0 auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #5d697d;
+    }
+    .ticket-code {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid #d8e1ef;
+      background: #ffffff;
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #07111f;
+    }
+    .section {
+      margin: 22px 24px 0;
+      border: 1px solid #dce5f2;
+      border-radius: 22px;
+      background: #ffffff;
+      padding: 22px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(7,17,31,0.42);
+      margin-bottom: 8px;
+    }
+    .section-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      color: #07111f;
+      margin-bottom: 16px;
+    }
+    .notes {
+      margin: 0;
+      padding-left: 18px;
+      color: #5d697d;
+    }
+    .notes li {
+      margin-bottom: 10px;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    .issued-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 12px;
+      margin-top: 8px;
+    }
+    .issued-card {
+      border: 1px solid #e6ecf6;
+      border-radius: 18px;
+      background: #f9fbff;
+      padding: 16px;
+      vertical-align: top;
+      width: 50%;
+    }
+    .issued-title {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.4;
+      color: #07111f;
+    }
+    .issued-copy {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #5d697d;
+    }
+    .issued-qr {
+      display: block;
+      width: 118px;
+      height: 118px;
+      margin: 16px auto 12px;
+      border-radius: 16px;
+      border: 1px solid #dce5f2;
+      background: #ffffff;
+      padding: 10px;
+    }
+    .issued-code {
+      text-align: center;
+      font-family: "Courier New", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #07111f;
+    }
+    .button {
+      display: inline-block;
+      min-width: 160px;
+      margin-right: 10px;
+      margin-top: 6px;
+      padding: 13px 24px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+    }
+    .button-primary {
+      background: #0f4cdb;
+      color: #ffffff !important;
+    }
+    .button-secondary {
+      border: 1px solid #d7e0ed;
+      color: #07111f !important;
+      background: #ffffff;
+    }
+    .meta {
+      margin-top: 14px;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #8e98aa;
+    }
+    .footer {
+      padding: 22px 24px 28px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #8e98aa;
+    }
+    .footer a {
+      color: #0f4cdb;
+      text-decoration: none;
+    }
+    @media only screen and (max-width: 640px) {
+      .wrapper { padding: 16px 8px 32px; }
+      .hero-copy { padding: 22px 18px 76px; }
+      .headline { font-size: 31px; }
+      .ticket-card, .section { margin-left: 12px; margin-right: 12px; }
+      .detail-grid, .issued-table { border-spacing: 0 12px; }
+      .detail-grid tr, .issued-table tr { display: block; }
+      .detail-card, .issued-card {
+        display: block;
+        width: 100% !important;
+      }
+      .qr-image {
+        width: 164px;
+        height: 164px;
+      }
+      .button {
+        display: block;
+        width: 100%;
+        margin-right: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="shell">
+      <img src="<%= primaryFlyerUrl %>" alt="<%= eventName %>" class="hero-image" />
+      <div class="hero-copy">
+        <img src="<%= logoUrl %>" alt="SwiftVote" class="logo" />
+        <div class="eyebrow"><%= eventName %></div>
+        <div class="headline">Your ticket is confirmed.</div>
+        <div class="subhead">
+          Hi <%= recipientName %>, you’re on the guest list. Bring this pass or a screenshot to the venue entrance for validation.
+        </div>
+      </div>
+
+      <div class="ticket-card">
+        <div class="ticket-head">
+          <div class="ticket-label">Digital RSVP pass</div>
+          <div class="ticket-title"><%= tickets[0]?.ticketTypeName ?? "Event Access" %></div>
+        </div>
+        <table class="detail-grid" role="presentation">
+          <tr>
+            <td class="detail-card">
+              <div class="detail-title">Guest</div>
+              <div class="detail-value"><%= recipientName %></div>
+            </td>
+            <td class="detail-card">
+              <div class="detail-title">Quantity</div>
+              <div class="detail-value"><%= quantity %> ticket<%= quantity === 1 ? "" : "s" %></div>
+            </td>
+          </tr>
+          <tr>
+            <td class="detail-card">
+              <div class="detail-title">Event date</div>
+              <div class="detail-value"><%= eventDate %></div>
+              <span class="detail-sub"><%= eventTime %></span>
+            </td>
+            <td class="detail-card">
+              <div class="detail-title">Venue</div>
+              <div class="detail-value"><%= venueName %></div>
+              <% if (venueAddress) { %><span class="detail-sub"><%= venueAddress %></span><% } %>
+            </td>
+          </tr>
+        </table>
+        <div class="perforation"></div>
+        <div class="qr-zone">
+          <img src="<%= tickets[0]?.qrImageUrl %>" alt="Ticket QR code" class="qr-image" />
+          <div class="qr-title">Scan at entry</div>
+          <div class="qr-copy">
+            Event staff can scan this pass to confirm admission. Each issued ticket can only be redeemed once.
+          </div>
+          <div class="ticket-code"><%= tickets[0]?.code %></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">What to expect</div>
+        <div class="section-title">Bring this pass with you.</div>
+        <ul class="notes">
+          <li>Show this email or a screenshot at the venue entrance.</li>
+          <li>Each issued ticket below has its own QR code for admission.</li>
+          <li>Validation should only be completed by the event owner or a platform admin.</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Issued tickets</div>
+        <div class="section-title">One QR per attendee.</div>
+        <table class="issued-table" role="presentation">
+          <tr>
+            <% tickets.forEach(function(ticket, index) { %>
+              <td class="issued-card">
+                <div class="issued-title"><%= ticket.ticketTypeName %> · Ticket <%= index + 1 %></div>
+                <div class="issued-copy">Use this QR code for a single admission at the entrance.</div>
+                <img src="<%= ticket.qrImageUrl %>" alt="QR code for <%= ticket.code %>" class="issued-qr" />
+                <div class="issued-code"><%= ticket.code %></div>
+              </td>
+              <% if (index % 2 === 1 && index !== tickets.length - 1) { %></tr><tr><% } %>
+            <% }); %>
+          </tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <a href="<%= eventUrl %>" class="button button-primary">View event</a>
+        <a href="<%= tickets[0]?.redeemUrl %>" class="button button-secondary">Open redeem page</a>
+        <div class="meta">
+          Order ref: <%= orderReference %><br />
+          Issued: <%= issuedAt %><br />
+          Amount paid: <%= amountFormatted %>
+        </div>
+      </div>
+
+      <div class="footer">
+        This email was sent by SwiftVote. Keep it for your records and present it at the venue entrance.<br />
+        <a href="<%= frontendUrl %>">swiftvote.app</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

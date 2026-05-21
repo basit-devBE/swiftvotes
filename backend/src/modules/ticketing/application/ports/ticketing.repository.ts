@@ -94,6 +94,22 @@ export type TicketPaymentWebhookEvent = {
   processedAt: Date | null;
 };
 
+export type RedeemedIssuedTicket = {
+  id: string;
+  eventId: string;
+  eventName: string;
+  orderId: string;
+  orderReference: string | null;
+  buyerName: string;
+  buyerEmail: string;
+  ticketTypeName: string;
+  code: string;
+  status: string;
+  checkedInAt: Date | null;
+  checkedInById: string | null;
+  createdAt: Date;
+};
+
 export interface TicketingRepository {
   createTicketType(input: CreateTicketTypeInput): Promise<TicketType>;
   updateTicketType(
@@ -121,4 +137,9 @@ export interface TicketingRepository {
     input: RecordTicketWebhookEventInput,
   ): Promise<TicketPaymentWebhookEvent>;
   markWebhookProcessed(eventId: string): Promise<void>;
+  redeemIssuedTicket(input: {
+    eventId: string;
+    code: string;
+    checkedInById: string;
+  }): Promise<RedeemedIssuedTicket>;
 }

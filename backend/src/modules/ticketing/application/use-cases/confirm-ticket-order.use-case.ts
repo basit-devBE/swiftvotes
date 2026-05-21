@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   BadRequestException,
   Inject,
   Injectable,
@@ -6,6 +7,10 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 
+import { NOTIFICATIONS_SERVICE } from "../../../notifications/application/notifications.tokens";
+import { NotificationsService } from "../../../notifications/application/ports/notifications.service";
+import { EVENTS_REPOSITORY } from "../../../events/application/events.tokens";
+import { EventsRepository } from "../../../events/application/ports/events.repository";
 import { JunipayService } from "../../../junipay/infrastructure/junipay.service";
 import { PaystackService } from "../../../votes/infrastructure/payments/paystack.service";
 import { TicketOrder } from "../../domain/ticket-order";
@@ -19,6 +24,10 @@ export class ConfirmTicketOrderUseCase {
   constructor(
     @Inject(TICKETING_REPOSITORY)
     private readonly ticketingRepository: TicketingRepository,
+    @Inject(EVENTS_REPOSITORY)
+    private readonly eventsRepository: EventsRepository,
+    @Inject(NOTIFICATIONS_SERVICE)
+    private readonly notifications: NotificationsService,
     private readonly paystack: PaystackService,
     private readonly junipay: JunipayService,
   ) {}
@@ -56,7 +65,7 @@ export class ConfirmTicketOrderUseCase {
     const rawVerifyResponse = verified.raw as Prisma.InputJsonValue;
 
     if (verified.status === "success") {
-      return this.ticketingRepository.markPaymentSucceededAndIssueTickets({
+      const order = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
         reference,
         providerRef: verified.providerRef,
         amountPaidMinor: verified.amount,
@@ -67,6 +76,8 @@ export class ConfirmTicketOrderUseCase {
         mobileNumber: verified.mobileNumber,
         rawVerifyResponse,
       });
+      await this.sendConfirmationEmail(order);
+      return order;
     }
 
     return this.ticketingRepository.markPaymentFailed({
@@ -108,7 +119,7 @@ export class ConfirmTicketOrderUseCase {
     }
 
     if (verified.status === "success") {
-      return this.ticketingRepository.markPaymentSucceededAndIssueTickets({
+      const order = await this.ticketingRepository.markPaymentSucceededAndIssueTickets({
         reference,
         providerRef: verified.providerRef,
         amountPaidMinor: verified.amountMinor ?? existing.payment.amountMinor,
@@ -118,6 +129,8 @@ export class ConfirmTicketOrderUseCase {
         mobileNumber: verified.mobileNumber,
         rawVerifyResponse,
       });
+      await this.sendConfirmationEmail(order);
+      return order;
     }
 
     if (verified.status === "failed" || verified.status === "abandoned") {
@@ -131,5 +144,42 @@ export class ConfirmTicketOrderUseCase {
     }
 
     return existing;
+  }
+
+  private async sendConfirmationEmail(order: TicketOrder): Promise<void> {
+    const event = await this.eventsRepository.findById(order.eventId);
+    if (!event || !order.payment || order.issuedTickets.length === 0) {
+      return;
+    }
+
+    const itemNameById = new Map(
+      order.items.map((item) => [
+        item.id,
+        item.ticketTypeName ?? "Event Access",
+      ]),
+    );
+
+    await this.notifications.sendTicketConfirmationEmail({
+      recipientEmail: order.buyerEmail,
+      recipientName: order.buyerName,
+      eventId: event.id,
+      eventName: event.name,
+      primaryFlyerUrl: event.primaryFlyerUrl,
+      eventStartAt: event.eventStartAt,
+      eventEndAt: event.eventEndAt,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+      quantity: order.issuedTickets.length,
+      amountMinor: order.payment.amountPaidMinor ?? order.payment.amountMinor,
+      currency: order.currency,
+      orderReference: order.payment.reference,
+      issuedAt: order.payment.paidAt ?? new Date(),
+      tickets: order.issuedTickets.map((ticket) => ({
+        code: ticket.code,
+        ticketTypeName: itemNameById.get(ticket.orderItemId) ?? "Event Access",
+        qrImageUrl: "",
+        redeemUrl: "",
+      })),
+    });
   }
 }

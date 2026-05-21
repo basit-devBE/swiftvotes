@@ -5,9 +5,11 @@ import { smsConfig } from "../../core/config/sms.config";
 import { NOTIFICATIONS_SERVICE } from "./application/notifications.tokens";
 import { NodemailerNotificationsService } from "./infrastructure/email/nodemailer-notifications.service";
 import { ArkeselSmsService } from "./infrastructure/sms/arkesel-sms.service";
+import { NotificationsAssetsController } from "./presentation/http/notifications-assets.controller";
 
 @Module({
   imports: [ConfigModule.forFeature(smsConfig)],
+  controllers: [NotificationsAssetsController],
   providers: [
     ArkeselSmsService,
     {

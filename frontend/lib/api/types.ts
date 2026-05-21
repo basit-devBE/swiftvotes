@@ -245,6 +245,22 @@ export type IssuedTicketResponse = {
   updatedAt: string;
 };
 
+export type RedeemedIssuedTicketResponse = {
+  id: string;
+  eventId: string;
+  eventName: string;
+  orderId: string;
+  orderReference: string | null;
+  buyerName: string;
+  buyerEmail: string;
+  ticketTypeName: string;
+  code: string;
+  status: string;
+  checkedInAt: string | null;
+  checkedInById: string | null;
+  createdAt: string;
+};
+
 export type TicketPaymentResponse = {
   id: string;
   orderId: string;

@@ -19,6 +19,7 @@ import {
   CreateTicketTypeInput,
   MarkTicketPaymentFailedInput,
   MarkTicketPaymentSucceededInput,
+  RedeemedIssuedTicket,
   RecordTicketWebhookEventInput,
   TicketingRepository,
   TicketPaymentWebhookEvent,
@@ -350,6 +351,92 @@ export class PrismaTicketingRepository implements TicketingRepository {
       where: { id: eventId },
       data: { processed: true, processedAt: new Date() },
     });
+  }
+
+  async redeemIssuedTicket(input: {
+    eventId: string;
+    code: string;
+    checkedInById: string;
+  }): Promise<RedeemedIssuedTicket> {
+    const ticket = await this.prisma.issuedTicket.findFirst({
+      where: {
+        eventId: input.eventId,
+        code: input.code,
+      },
+      include: {
+        event: {
+          select: { name: true },
+        },
+        order: {
+          select: {
+            id: true,
+            buyerName: true,
+            buyerEmail: true,
+            payment: {
+              select: { reference: true },
+            },
+          },
+        },
+        ticketType: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new Error("Issued ticket was not found.");
+    }
+
+    if (ticket.status === "CHECKED_IN") {
+      throw new Error("Issued ticket has already been redeemed.");
+    }
+
+    if (ticket.status === "CANCELLED") {
+      throw new Error("Issued ticket is cancelled.");
+    }
+
+    const updated = await this.prisma.issuedTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: "CHECKED_IN",
+        checkedInAt: new Date(),
+        checkedInById: input.checkedInById,
+      },
+      include: {
+        event: {
+          select: { name: true },
+        },
+        order: {
+          select: {
+            id: true,
+            buyerName: true,
+            buyerEmail: true,
+            payment: {
+              select: { reference: true },
+            },
+          },
+        },
+        ticketType: {
+          select: { name: true },
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      eventId: updated.eventId,
+      eventName: updated.event.name,
+      orderId: updated.order.id,
+      orderReference: updated.order.payment?.reference ?? null,
+      buyerName: updated.order.buyerName,
+      buyerEmail: updated.order.buyerEmail,
+      ticketTypeName: updated.ticketType.name,
+      code: updated.code,
+      status: updated.status,
+      checkedInAt: updated.checkedInAt,
+      checkedInById: updated.checkedInById,
+      createdAt: updated.createdAt,
+    };
   }
 
   private generateTicketCode(): string {

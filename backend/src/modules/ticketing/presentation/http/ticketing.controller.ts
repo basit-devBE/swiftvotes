@@ -5,26 +5,36 @@ import {
   Delete,
   Get,
   HttpCode,
+  Inject,
   Param,
   Patch,
   Post,
   Query,
   Req,
+  StreamableFile,
 } from "@nestjs/common";
+import { ConfigType } from "@nestjs/config";
 import { Request } from "express";
+import QRCode from "qrcode";
 
 import { EventRole } from "../../../access-control/domain/event-role";
 import { EventRoles } from "../../../access-control/presentation/http/decorators/event-roles.decorator";
 import { Public } from "../../../auth/presentation/http/decorators/public.decorator";
+import { CurrentUser } from "../../../auth/presentation/http/decorators/current-user.decorator";
+import { AuthenticatedRequestUser } from "../../../auth/domain/authenticated-request-user";
+import { appConfig } from "../../../../core/config/app.config";
 import { ConfirmTicketOrderUseCase } from "../../application/use-cases/confirm-ticket-order.use-case";
 import { CreateTicketOrderUseCase } from "../../application/use-cases/create-ticket-order.use-case";
 import { CreateTicketTypeUseCase } from "../../application/use-cases/create-ticket-type.use-case";
 import { DisableTicketTypeUseCase } from "../../application/use-cases/disable-ticket-type.use-case";
 import { ListTicketTypesUseCase } from "../../application/use-cases/list-ticket-types.use-case";
+import { RedeemIssuedTicketUseCase } from "../../application/use-cases/redeem-issued-ticket.use-case";
 import { UpdateTicketTypeUseCase } from "../../application/use-cases/update-ticket-type.use-case";
 import { CreateTicketOrderDto } from "./dto/create-ticket-order.dto";
 import { CreateTicketTypeDto } from "./dto/create-ticket-type.dto";
+import { RedeemIssuedTicketDto } from "./dto/redeem-issued-ticket.dto";
 import { UpdateTicketTypeDto } from "./dto/update-ticket-type.dto";
+import { RedeemedIssuedTicketResponseDto } from "./responses/redeemed-issued-ticket.response.dto";
 import {
   CreateTicketOrderResponseDto,
   TicketOrderResponseDto,
@@ -43,6 +53,9 @@ export class TicketingController {
     private readonly listTicketTypesUseCase: ListTicketTypesUseCase,
     private readonly createTicketOrderUseCase: CreateTicketOrderUseCase,
     private readonly confirmTicketOrderUseCase: ConfirmTicketOrderUseCase,
+    private readonly redeemIssuedTicketUseCase: RedeemIssuedTicketUseCase,
+    @Inject(appConfig.KEY)
+    private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
   @Public()
@@ -152,5 +165,43 @@ export class TicketingController {
       throw new BadRequestException("Reference does not belong to this event.");
     }
     return TicketOrderResponseDto.fromDomain(order);
+  }
+
+  @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
+  @Post("issued-tickets/redeem")
+  async redeemIssuedTicket(
+    @Param("eventId") eventId: string,
+    @Body() body: RedeemIssuedTicketDto,
+    @CurrentUser() currentUser: AuthenticatedRequestUser,
+  ): Promise<RedeemedIssuedTicketResponseDto> {
+    const ticket = await this.redeemIssuedTicketUseCase.execute({
+      eventId,
+      code: body.code,
+      checkedInById: currentUser.id,
+    });
+    return RedeemedIssuedTicketResponseDto.fromDomain(ticket);
+  }
+
+  @Public()
+  @Get("issued-tickets/qr")
+  async getIssuedTicketQr(
+    @Param("eventId") eventId: string,
+    @Query("code") code: string | undefined,
+  ): Promise<StreamableFile> {
+    if (!code) {
+      throw new BadRequestException("code query param is required.");
+    }
+
+    const redeemUrl = `${this.app.frontendOrigin}/events/${eventId}/tickets/redeem?code=${encodeURIComponent(code.trim().toUpperCase())}`;
+    const buffer = await QRCode.toBuffer(redeemUrl, {
+      type: "png",
+      margin: 1,
+      color: {
+        dark: "#07111f",
+        light: "#ffffff",
+      },
+      width: 256,
+    });
+    return new StreamableFile(buffer, { type: "image/png" });
   }
 }
