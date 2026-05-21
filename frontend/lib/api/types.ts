@@ -145,6 +145,19 @@ export type UpdateEventInput = Partial<Omit<CreateEventInput, "categories">> & {
   publicCanViewLeaderboard?: boolean;
 };
 
+export type UpdateEventScheduleInput = {
+  nominationStartAt?: string | null;
+  nominationEndAt?: string | null;
+  votingStartAt?: string;
+  votingEndAt?: string;
+  ticketSalesStartAt?: string | null;
+  ticketSalesEndAt?: string | null;
+  eventStartAt?: string | null;
+  eventEndAt?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+};
+
 export type TicketTypeResponse = {
   id: string;
   eventId: string;

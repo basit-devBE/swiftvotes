@@ -18,6 +18,7 @@ import {
   listTicketTypes,
   regenerateMagicLink,
   rejectNomination,
+  updateEventSchedule,
   updateTicketType,
   updateContestant,
   updateEventVisibility,
@@ -48,6 +49,7 @@ import {
   NominationStatus,
   TicketTypeResponse,
   UpdateContestantInput,
+  UpdateEventScheduleInput,
 } from "@/lib/api/types";
 import {
   getEventModeLabel,
@@ -69,7 +71,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "overview" | "nominations" | "contestants" | "votes" | "leaderboard" | "tickets";
+type Tab = "overview" | "schedule" | "nominations" | "contestants" | "votes" | "leaderboard" | "tickets";
 type NomFilter = "all" | NominationStatus;
 type PaymentStatusFilter = "all" | PaymentStatus;
 
@@ -144,6 +146,26 @@ function formatDateTime(date: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function toDateTimeLocalValue(date: string | null): string {
+  if (!date) return "";
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const offsetMs = parsed.getTimezoneOffset() * 60_000;
+  return new Date(parsed.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function dateTimeLocalToIso(value: string): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function addToDateTimeLocal(value: string, amountMs: number): string {
+  const base = value ? new Date(value) : new Date();
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+  return toDateTimeLocalValue(new Date(safeBase.getTime() + amountMs).toISOString());
 }
 
 function formatCurrency(minor: number, currency: string): string {
@@ -2972,6 +2994,328 @@ function LeaderboardCategoryPanel({ category }: { category: LeaderboardCategory 
   );
 }
 
+function ScheduleTab({
+  event,
+  onUpdated,
+}: {
+  event: EventResponse;
+  onUpdated: (event: EventResponse) => void;
+}) {
+  const [nominationStartAt, setNominationStartAt] = useState(toDateTimeLocalValue(event.nominationStartAt));
+  const [nominationEndAt, setNominationEndAt] = useState(toDateTimeLocalValue(event.nominationEndAt));
+  const [votingStartAt, setVotingStartAt] = useState(toDateTimeLocalValue(event.votingStartAt));
+  const [votingEndAt, setVotingEndAt] = useState(toDateTimeLocalValue(event.votingEndAt));
+  const [ticketSalesStartAt, setTicketSalesStartAt] = useState(toDateTimeLocalValue(event.ticketSalesStartAt));
+  const [ticketSalesEndAt, setTicketSalesEndAt] = useState(toDateTimeLocalValue(event.ticketSalesEndAt));
+  const [eventStartAt, setEventStartAt] = useState(toDateTimeLocalValue(event.eventStartAt));
+  const [eventEndAt, setEventEndAt] = useState(toDateTimeLocalValue(event.eventEndAt));
+  const [venueName, setVenueName] = useState(event.venueName ?? "");
+  const [venueAddress, setVenueAddress] = useState(event.venueAddress ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNominationStartAt(toDateTimeLocalValue(event.nominationStartAt));
+    setNominationEndAt(toDateTimeLocalValue(event.nominationEndAt));
+    setVotingStartAt(toDateTimeLocalValue(event.votingStartAt));
+    setVotingEndAt(toDateTimeLocalValue(event.votingEndAt));
+    setTicketSalesStartAt(toDateTimeLocalValue(event.ticketSalesStartAt));
+    setTicketSalesEndAt(toDateTimeLocalValue(event.ticketSalesEndAt));
+    setEventStartAt(toDateTimeLocalValue(event.eventStartAt));
+    setEventEndAt(toDateTimeLocalValue(event.eventEndAt));
+    setVenueName(event.venueName ?? "");
+    setVenueAddress(event.venueAddress ?? "");
+  }, [event.id, event.updatedAt]);
+
+  const votingHasStarted =
+    event.status === "VOTING_LIVE" ||
+    event.status === "VOTING_CLOSED" ||
+    new Date(event.votingStartAt).getTime() <= Date.now();
+
+  function now() {
+    return toDateTimeLocalValue(new Date().toISOString());
+  }
+
+  async function handleSave() {
+    const input: UpdateEventScheduleInput = {};
+
+    if (hasVotingEnabled(event)) {
+      if (!votingHasStarted) {
+        input.nominationStartAt = dateTimeLocalToIso(nominationStartAt);
+        input.nominationEndAt = dateTimeLocalToIso(nominationEndAt);
+        const votingStartIso = dateTimeLocalToIso(votingStartAt);
+        if (votingStartIso) input.votingStartAt = votingStartIso;
+      }
+      const votingEndIso = dateTimeLocalToIso(votingEndAt);
+      if (votingEndIso) input.votingEndAt = votingEndIso;
+    }
+
+    if (hasTicketingEnabled(event)) {
+      input.ticketSalesStartAt = dateTimeLocalToIso(ticketSalesStartAt);
+      input.ticketSalesEndAt = dateTimeLocalToIso(ticketSalesEndAt);
+      input.eventStartAt = dateTimeLocalToIso(eventStartAt);
+      input.eventEndAt = dateTimeLocalToIso(eventEndAt);
+      input.venueName = venueName.trim() || null;
+      input.venueAddress = venueAddress.trim() || null;
+    }
+
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateEventSchedule(event.id, input);
+      onUpdated(updated);
+      setMessage("Schedule updated.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof ApiClientError
+          ? saveError.message
+          : "Unable to update schedule.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-6">
+        {hasVotingEnabled(event) && (
+          <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+                  Voting schedule
+                </p>
+                <p className="mt-2 text-sm leading-6 text-ink/52">
+                  Adjust nominations and voting dates after approval.
+                </p>
+              </div>
+              {votingHasStarted && (
+                <span className="rounded-full border border-[#f3e3c5] bg-[#fbf6e9] px-3 py-1 text-[0.68rem] font-semibold text-[#8a6512]">
+                  Nominations locked
+                </span>
+              )}
+            </div>
+
+            {votingHasStarted && (
+              <p className="mt-4 rounded-xl border border-[#f3e3c5] bg-[#fbf6e9] px-4 py-3 text-sm text-[#8a6512]">
+                Voting has started, so nominations cannot be reopened and voting start cannot be moved.
+              </p>
+            )}
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <ScheduleDateField
+                label="Nominations start"
+                value={nominationStartAt}
+                onChange={setNominationStartAt}
+                disabled={votingHasStarted || saving}
+                onNow={() => setNominationStartAt(now())}
+              />
+              <ScheduleDateField
+                label="Nominations end"
+                value={nominationEndAt}
+                onChange={setNominationEndAt}
+                disabled={votingHasStarted || saving}
+                onNow={() => setNominationEndAt(now())}
+              />
+              <ScheduleDateField
+                label="Voting starts"
+                value={votingStartAt}
+                onChange={setVotingStartAt}
+                disabled={votingHasStarted || saving}
+                onNow={() => setVotingStartAt(now())}
+              />
+              <ScheduleDateField
+                label="Voting ends"
+                value={votingEndAt}
+                onChange={setVotingEndAt}
+                disabled={saving}
+                onNow={() => setVotingEndAt(now())}
+              />
+            </div>
+          </div>
+        )}
+
+        {hasTicketingEnabled(event) && (
+          <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+              Ticketing and venue
+            </p>
+            <p className="mt-2 text-sm leading-6 text-ink/52">
+              Control sales dates, event time, and the venue visitors see.
+            </p>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <ScheduleDateField
+                label="Ticket sales start"
+                value={ticketSalesStartAt}
+                onChange={setTicketSalesStartAt}
+                disabled={saving}
+                onNow={() => setTicketSalesStartAt(now())}
+              />
+              <ScheduleDateField
+                label="Ticket sales end"
+                value={ticketSalesEndAt}
+                onChange={setTicketSalesEndAt}
+                disabled={saving}
+                onNow={() => setTicketSalesEndAt(now())}
+              />
+              <ScheduleDateField
+                label="Event starts"
+                value={eventStartAt}
+                onChange={setEventStartAt}
+                disabled={saving}
+                onNow={() => setEventStartAt(now())}
+              />
+              <ScheduleDateField
+                label="Event ends"
+                value={eventEndAt}
+                onChange={setEventEndAt}
+                disabled={saving}
+                onNow={() => setEventEndAt(now())}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/52">Venue name</span>
+                <input
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  disabled={saving}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-primary/12 bg-white px-3 text-sm text-ink outline-none transition focus:border-primary/42 focus:ring-2 focus:ring-primary/10 disabled:bg-ink/5 disabled:text-ink/40"
+                  placeholder="Accra International Conference Centre"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink/52">Venue address</span>
+                <input
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  disabled={saving}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-primary/12 bg-white px-3 text-sm text-ink outline-none transition focus:border-primary/42 focus:ring-2 focus:ring-primary/10 disabled:bg-ink/5 disabled:text-ink/40"
+                  placeholder="Osu, Accra"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="rounded-xl border border-accent/14 bg-accent/5 px-4 py-3 text-sm font-medium text-accent">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="rounded-xl border border-[#cfe7da] bg-[#eef9f2] px-4 py-3 text-sm font-medium text-[#1b6f4b]">
+            {message}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          className="button-primary w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? "Saving schedule..." : "Save schedule"}
+        </button>
+      </div>
+
+      <div className="rounded-[1.5rem] border border-primary/10 bg-white/86 p-6 shadow-[0_8px_28px_-18px_rgba(7,17,31,0.14)]">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ink/40">
+          Current state
+        </p>
+        <p className="mt-2 font-display text-2xl font-semibold tracking-[-0.04em] text-ink">
+          {formatEventStatus(event.status)}
+        </p>
+        <dl className="mt-5 space-y-3 text-sm">
+          {hasVotingEnabled(event) && (
+            <>
+              <ScheduleDatum label="Nominations" value={`${formatDateTime(event.nominationStartAt)} to ${formatDateTime(event.nominationEndAt)}`} />
+              <ScheduleDatum label="Voting" value={`${formatDateTime(event.votingStartAt)} to ${formatDateTime(event.votingEndAt)}`} />
+            </>
+          )}
+          {hasTicketingEnabled(event) && (
+            <>
+              <ScheduleDatum label="Ticket sales" value={`${formatDateTime(event.ticketSalesStartAt)} to ${formatDateTime(event.ticketSalesEndAt)}`} />
+              <ScheduleDatum label="Event time" value={`${formatDateTime(event.eventStartAt)} to ${formatDateTime(event.eventEndAt)}`} />
+              <ScheduleDatum label="Venue" value={event.venueName || "Not set"} />
+            </>
+          )}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+function ScheduleDateField({
+  label,
+  value,
+  onChange,
+  disabled,
+  onNow,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  onNow: () => void;
+}) {
+  const quickActions = [
+    { label: "+1 hr", ms: 60 * 60 * 1000 },
+    { label: "+1 day", ms: 24 * 60 * 60 * 1000 },
+    { label: "+7 days", ms: 7 * 24 * 60 * 60 * 1000 },
+  ];
+
+  return (
+    <label className="block rounded-2xl border border-primary/10 bg-[#f7f9fc] p-4">
+      <span className="text-xs font-semibold text-ink/52">{label}</span>
+      <input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="mt-2 h-11 w-full rounded-xl border border-primary/12 bg-white px-3 text-sm text-ink outline-none transition focus:border-primary/42 focus:ring-2 focus:ring-primary/10 disabled:bg-ink/5 disabled:text-ink/40"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onNow}
+          disabled={disabled}
+          className="rounded-full border border-primary/16 bg-white px-3 py-1 text-[0.68rem] font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Now
+        </button>
+        {quickActions.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={() => onChange(addToDateTimeLocal(value, action.ms))}
+            disabled={disabled}
+            className="rounded-full border border-primary/16 bg-white px-3 py-1 text-[0.68rem] font-semibold text-ink/60 transition hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </label>
+  );
+}
+
+function ScheduleDatum({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#edf0f6] bg-[#f7f9fc] p-3">
+      <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-ink/38">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold leading-5 text-ink">{value}</dd>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -3075,6 +3419,7 @@ export function EventManageView({ eventId }: { eventId: string }) {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
+    { key: "schedule", label: "Schedule" },
     ...(hasVotingEnabled(event)
       ? [
           { key: "nominations" as const, label: "Nominations" },
@@ -3202,12 +3547,12 @@ export function EventManageView({ eventId }: { eventId: string }) {
       </div>
 
       {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-      <div className="mt-8 flex gap-0 border-b border-primary/10">
+      <div className="mt-8 flex gap-0 overflow-x-auto border-b border-primary/10">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`-mb-px border-b-2 px-5 py-3 text-sm font-semibold transition ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition ${
               activeTab === key
                 ? "border-primary text-primary"
                 : "border-transparent text-ink/44 hover:text-ink/72"
@@ -3231,6 +3576,9 @@ export function EventManageView({ eventId }: { eventId: string }) {
             togglingLeaderboard={togglingLeaderboard}
             togglingPublicLeaderboard={togglingPublicLeaderboard}
           />
+        )}
+        {activeTab === "schedule" && (
+          <ScheduleTab event={event} onUpdated={setEvent} />
         )}
         {activeTab === "nominations" && (
           <NominationsTab

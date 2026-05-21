@@ -20,6 +20,7 @@ import {
   StartPhoneVerificationResponse,
   UpdateContestantInput,
   UpdateEventInput,
+  UpdateEventScheduleInput,
   UpdateTicketTypeInput,
   TicketTypeResponse,
   TicketOrderResponse,
@@ -63,6 +64,16 @@ export function updateEventVisibility(
   },
 ): Promise<EventResponse> {
   return apiRequest<EventResponse>(`/events/${eventId}/visibility`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function updateEventSchedule(
+  eventId: string,
+  input: UpdateEventScheduleInput,
+): Promise<EventResponse> {
+  return apiRequest<EventResponse>(`/events/${eventId}/schedule`, {
     method: "PATCH",
     body: input,
   });
