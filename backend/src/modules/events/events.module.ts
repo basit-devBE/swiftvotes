@@ -17,6 +17,7 @@ import { ResubmitEventUseCase } from "./application/use-cases/resubmit-event.use
 import { SubmitEventUseCase } from "./application/use-cases/submit-event.use-case";
 import { SynchronizeEventLifecycleUseCase } from "./application/use-cases/synchronize-event-lifecycle.use-case";
 import { UpdateCategoryUseCase } from "./application/use-cases/update-category.use-case";
+import { UpdateEventScheduleUseCase } from "./application/use-cases/update-event-schedule.use-case";
 import { UpdateEventUseCase } from "./application/use-cases/update-event.use-case";
 import { UpdateEventVisibilityUseCase } from "./application/use-cases/update-event-visibility.use-case";
 import { EVENTS_REPOSITORY } from "./application/events.tokens";
@@ -33,6 +34,7 @@ import { EventsController } from "./presentation/http/events.controller";
     ListMyEventsUseCase,
     GetEventDetailsUseCase,
     UpdateEventUseCase,
+    UpdateEventScheduleUseCase,
     UpdateEventVisibilityUseCase,
     SubmitEventUseCase,
     ResubmitEventUseCase,

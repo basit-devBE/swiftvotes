@@ -30,6 +30,7 @@ import { RejectEventUseCase } from "../../application/use-cases/reject-event.use
 import { ResubmitEventUseCase } from "../../application/use-cases/resubmit-event.use-case";
 import { SubmitEventUseCase } from "../../application/use-cases/submit-event.use-case";
 import { UpdateCategoryUseCase } from "../../application/use-cases/update-category.use-case";
+import { UpdateEventScheduleUseCase } from "../../application/use-cases/update-event-schedule.use-case";
 import { UpdateEventUseCase } from "../../application/use-cases/update-event.use-case";
 import { UpdateEventVisibilityUseCase } from "../../application/use-cases/update-event-visibility.use-case";
 import { CreateEventCategoryDto } from "./dto/create-event-category.dto";
@@ -37,6 +38,7 @@ import { CreateEventDto } from "./dto/create-event.dto";
 import { RejectEventDto } from "./dto/reject-event.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { UpdateEventDto } from "./dto/update-event.dto";
+import { UpdateEventScheduleDto } from "./dto/update-event-schedule.dto";
 import { UpdateEventVisibilityDto } from "./dto/update-event-visibility.dto";
 import { EventCategoryResponseDto } from "./responses/event-category.response.dto";
 import { EventResponseDto } from "./responses/event.response.dto";
@@ -63,6 +65,7 @@ export class EventsController {
     private readonly updateCategoryUseCase: UpdateCategoryUseCase,
     private readonly deleteCategoryUseCase: DeleteCategoryUseCase,
     private readonly updateEventVisibilityUseCase: UpdateEventVisibilityUseCase,
+    private readonly updateEventScheduleUseCase: UpdateEventScheduleUseCase,
   ) {}
 
   @Public()
@@ -259,6 +262,53 @@ export class EventsController {
       contestantsCanViewLeaderboard: body.contestantsCanViewLeaderboard,
       publicCanViewLeaderboard: body.publicCanViewLeaderboard,
     });
+    return EventResponseDto.fromDomain(event);
+  }
+
+  @Patch(":eventId/schedule")
+  @EventRoles(EventRole.EVENT_OWNER, EventRole.EVENT_ADMIN)
+  async updateEventSchedule(
+    @Param("eventId") eventId: string,
+    @Body() body: UpdateEventScheduleDto,
+  ): Promise<EventResponseDto> {
+    const event = await this.updateEventScheduleUseCase.execute({
+      eventId,
+      nominationStartAt: body.nominationStartAt
+        ? new Date(body.nominationStartAt)
+        : body.nominationStartAt === null
+          ? null
+          : undefined,
+      nominationEndAt: body.nominationEndAt
+        ? new Date(body.nominationEndAt)
+        : body.nominationEndAt === null
+          ? null
+          : undefined,
+      votingStartAt: body.votingStartAt ? new Date(body.votingStartAt) : undefined,
+      votingEndAt: body.votingEndAt ? new Date(body.votingEndAt) : undefined,
+      ticketSalesStartAt: body.ticketSalesStartAt
+        ? new Date(body.ticketSalesStartAt)
+        : body.ticketSalesStartAt === null
+          ? null
+          : undefined,
+      ticketSalesEndAt: body.ticketSalesEndAt
+        ? new Date(body.ticketSalesEndAt)
+        : body.ticketSalesEndAt === null
+          ? null
+          : undefined,
+      eventStartAt: body.eventStartAt
+        ? new Date(body.eventStartAt)
+        : body.eventStartAt === null
+          ? null
+          : undefined,
+      eventEndAt: body.eventEndAt
+        ? new Date(body.eventEndAt)
+        : body.eventEndAt === null
+          ? null
+          : undefined,
+      venueName: body.venueName,
+      venueAddress: body.venueAddress,
+    });
+
     return EventResponseDto.fromDomain(event);
   }
 
