@@ -60,6 +60,11 @@ export type MarkTicketPaymentSucceededInput = {
   rawVerifyResponse?: Prisma.InputJsonValue | null;
 };
 
+export type MarkTicketPaymentSucceededResult = {
+  order: TicketOrder;
+  issuedNow: boolean;
+};
+
 export type MarkTicketPaymentFailedInput = {
   reference: string;
   providerRef?: string | null;
@@ -129,7 +134,7 @@ export interface TicketingRepository {
   ): Promise<TicketPayment>;
   markPaymentSucceededAndIssueTickets(
     input: MarkTicketPaymentSucceededInput,
-  ): Promise<TicketOrder>;
+  ): Promise<MarkTicketPaymentSucceededResult>;
   markPaymentFailed(input: MarkTicketPaymentFailedInput): Promise<TicketOrder>;
   getPaymentStatus(reference: string): Promise<TicketPaymentStatus | null>;
 
