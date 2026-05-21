@@ -364,6 +364,8 @@ export type ContestantResponse = {
   phone: string | null;
   imageUrl: string | null;
   imageKey: string | null;
+  deletedAt: string | null;
+  deletedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 };

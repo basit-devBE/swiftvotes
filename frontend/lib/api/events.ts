@@ -263,6 +263,15 @@ export function updateContestant(
   );
 }
 
+export function deleteContestant(
+  eventId: string,
+  contestantId: string,
+): Promise<void> {
+  return apiRequest<void>(`/events/${eventId}/contestants/${contestantId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getContestantCredentials(
   eventId: string,
   contestantId: string,

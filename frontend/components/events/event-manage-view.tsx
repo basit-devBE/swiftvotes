@@ -9,6 +9,7 @@ import { ApiClientError } from "@/lib/api/client";
 import {
   confirmNomination,
   createTicketType,
+  deleteContestant,
   disableTicketType,
   getContestantCredentials,
   getEvent,
@@ -1290,12 +1291,14 @@ function ContestantDrawer({
   eventId,
   categories,
   onUpdated,
+  onDeleted,
   onClose,
 }: {
   contestant: ContestantResponse;
   eventId: string;
   categories: EventCategoryResponse[];
   onUpdated: (contestant: ContestantResponse) => void;
+  onDeleted: (contestantId: string) => void;
   onClose: () => void;
 }) {
   const [creds, setCreds] = useState<ContestantCredentialsResponse | null>(null);
@@ -1308,6 +1311,7 @@ function ContestantDrawer({
   const [imageUrl, setImageUrl] = useState<string | null>(contestant.imageUrl);
   const [imageKey, setImageKey] = useState<string | null>(contestant.imageKey);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -1430,6 +1434,29 @@ function ContestantDrawer({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteContestant() {
+    const confirmed = window.confirm(
+      "Remove this contestant from public voting and USSD lookup? Existing votes and payment records will be kept for audit.",
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setFormError(null);
+    try {
+      await deleteContestant(eventId, contestant.id);
+      onDeleted(contestant.id);
+      onClose();
+    } catch (deleteError) {
+      setFormError(
+        deleteError instanceof ApiClientError
+          ? deleteError.message
+          : "Unable to delete contestant.",
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -1670,6 +1697,28 @@ function ContestantDrawer({
               </>
             )}
           </div>
+
+          <div className="border-t border-primary/8 px-6 py-5">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-ink/40">
+              Remove contestant
+            </p>
+            <div className="mt-4 rounded-xl border border-[#f0cfd3] bg-[#fff7f8] p-4">
+              <p className="text-sm font-semibold text-[#8a1118]">
+                Remove from voting
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#8a1118]/70">
+                This hides the contestant from public voting, USSD lookup, leaderboard, and contestant lists. Existing votes and payment records are kept.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleDeleteContestant()}
+                disabled={deleting}
+                className="mt-4 w-full rounded-full bg-[#b40f17] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#990d14] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {deleting ? "Removing..." : "Remove contestant"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -1703,6 +1752,13 @@ function ContestantsTab({
       ),
     );
     setSelectedContestant(updated);
+  }
+
+  function handleContestantDeleted(contestantId: string) {
+    setContestants((current) =>
+      current.filter((contestant) => contestant.id !== contestantId),
+    );
+    setSelectedContestant(null);
   }
 
   useEffect(() => {
@@ -1842,6 +1898,7 @@ function ContestantsTab({
           eventId={eventId}
           categories={categories}
           onUpdated={handleContestantUpdated}
+          onDeleted={handleContestantDeleted}
           onClose={() => setSelectedContestant(null)}
         />
       )}
